@@ -226,7 +226,7 @@ The skill will:
 ## How It Works
 
 <details>
-<summary><h3>Incident Postmortem (<code>/prism:incident</code>)</h3></summary>
+<summary><b>Incident Postmortem</b> (<code>/prism:incident</code>)</summary>
 
 ```mermaid
 graph TD
@@ -274,7 +274,7 @@ graph TD
 </details>
 
 <details>
-<summary><h3>PRD Policy Analysis (<code>/prism:prd</code>)</h3></summary>
+<summary><b>PRD Policy Analysis</b> (<code>/prism:prd</code>)</summary>
 
 ```mermaid
 graph TD
@@ -311,7 +311,7 @@ graph TD
 </details>
 
 <details>
-<summary><h3>Plan with Committee Debate (<code>/prism:plan</code>)</h3></summary>
+<summary><b>Plan with Committee Debate</b> (<code>/prism:plan</code>)</summary>
 
 ```mermaid
 graph TD
