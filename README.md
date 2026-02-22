@@ -6,7 +6,7 @@ Prism spawns a coordinated team of specialized AI agents — each analyzing from
 
 ## Philosophy
 
-Humanity's hardest problems have never been solved by a single viewpoint — they fall when diverse minds collide, challenge, and refine each other's thinking. Prism brings that same process to AI: give the same problem to multiple specialists with different lenses, then force their answers through adversarial debate until only the defensible parts survive.
+How has humanity solved its hardest problems? Diverse minds in a room, arguing until only the defensible ideas survive. Prism is that room — but the minds are AI specialists, and nobody gets to leave until the weak ideas are dead.
 
 ## Skills
 
