@@ -1,6 +1,6 @@
 ---
 name: incident
-description: Orchestrates coordinated agent teams for perspective-driven critical incident deep-analysis. Dynamically selects analytical perspectives from an archetype library based on incident characteristics. Includes mandatory devil's advocate challenge and optional tribunal review. Activates for keywords: "incident-analysis", "incident analysis", "장애 분석", "장애분석", "postmortem", "root cause analysis", "RCA", "outage analysis", "production issue", or critical production problems requiring structured investigation.
+description: Multi-perspective agent team incident postmortem with devil's advocate challenge
 version: 2.1.0
 user-invocable: true
 allowed-tools: Task, SendMessage, TeamCreate, TeamDelete, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion, Read, Glob, Grep, Bash, WebFetch, WebSearch, mcp__podo-docs__search_files, mcp__podo-docs__read_file, mcp__podo-docs__list_directory, mcp__podo-docs__directory_tree

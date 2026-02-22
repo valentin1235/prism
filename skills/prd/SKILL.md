@@ -1,6 +1,6 @@
 ---
 name: prd
-description: Analyzes PRD documents for policy-level conflicts and ambiguities using a multi-perspective agent team. Takes a PRD file, dynamically generates N ontology-based policy analysis perspectives, spawns analyst agents + Devil's Advocate verification, and produces a PM decision report. Triggered by "prd 분석", "기획서 분석", "정책 분석", "prd review", "policy review", "PRD 검토", "analyze prd", "policy analysis".
+description: Multi-perspective PRD policy conflict analysis with devil's advocate verification
 version: 1.0.0
 user-invocable: true
 allowed-tools: Task, SendMessage, TeamCreate, TeamDelete, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion, Read, Glob, Grep, Bash, Write, ToolSearch, mcp__podo-docs__directory_tree, mcp__podo-docs__list_directory, mcp__podo-docs__read_file, mcp__podo-docs__read_text_file, mcp__podo-docs__read_multiple_files, mcp__podo-docs__search_files
