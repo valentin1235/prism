@@ -4,6 +4,12 @@ Multi-perspective agent team analysis plugin for [Claude Code](https://docs.anth
 
 Prism spawns a coordinated team of specialized AI agents — each analyzing from a different perspective — then cross-validates findings through a Devil's Advocate before producing a final report.
 
+## Philosophy
+
+Throughout history, humanity's hardest problems have been solved not by a single brilliant mind, but by bringing together diverse perspectives — each examining the same problem through a different lens. Peer review in science, cross-functional teams in engineering, adversarial proceedings in law — precision emerges from the collision of viewpoints.
+
+Prism applies this principle to AI-assisted analysis. Instead of asking one agent for one answer, it spawns a team of specialists, each with a distinct analytical perspective, and forces their findings through adversarial challenge and structured debate. The result is analysis with depth and rigor that no single perspective — human or AI — could achieve alone.
+
 ## Skills
 
 | Skill | Command | Description |
@@ -302,8 +308,17 @@ graph TD
 graph TD
     A[Input Analysis & Context] --> B[Generate 3-6 Perspectives]
     B --> C[Team Formation]
-    C --> D[Parallel Analysis]
-    D --> E[Devil's Advocate Synthesis]
+
+    C --> D1[Analyst 1]
+    C --> D2[Analyst 2]
+    C --> D3[Analyst 3]
+    C --> DN[Analyst N]
+
+    D1 --> E[Devil's Advocate Synthesis]
+    D2 --> E
+    D3 --> E
+    DN --> E
+
     E --> F["Committee Debate (UX + Eng + Planner)"]
     F --> G{Consensus?}
 
@@ -312,9 +327,15 @@ graph TD
     G -->|"No Consensus"| I[Shutdown Committee]
     I --> J[Add Perspective + Gap Analysis]
 
-    J -->|"Normal: max 2 loops"| D
-    J -->|"Hell: unlimited loops"| D
+    J -->|"Normal: max 2 loops"| C
+    J -->|"Hell: unlimited loops"| C
 
+    style D1 fill:#4a9eff,color:#fff
+    style D2 fill:#4a9eff,color:#fff
+    style D3 fill:#4a9eff,color:#fff
+    style DN fill:#4a9eff,color:#fff
+    style E fill:#ef4444,color:#fff
+    style F fill:#f59e0b,color:#fff
     style G fill:#f96,stroke:#333
     style H fill:#6f6,stroke:#333
     style I fill:#f66,stroke:#333
