@@ -172,6 +172,8 @@ The skill will guide you through:
 | | External Dependency |
 | | User Experience |
 
+---
+
 ### PRD Policy Analysis
 
 ```
@@ -187,6 +189,8 @@ The skill will:
 5. **Report** — Final policy analysis report written to the PRD's directory
 
 **Output:** `prd-policy-review-report.md` in the same directory as the PRD file.
+
+---
 
 ### Plan (Committee Debate)
 
