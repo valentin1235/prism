@@ -334,9 +334,9 @@ graph TD
     style DN fill:#4a9eff,color:#fff
     style E fill:#ef4444,color:#fff
     style F fill:#f59e0b,color:#fff
-    style G fill:#f96,stroke:#333
-    style H fill:#6f6,stroke:#333
-    style I fill:#f66,stroke:#333
+    style G fill:#b45309,color:#fff,stroke:#333
+    style H fill:#15803d,color:#fff,stroke:#333
+    style I fill:#b91c1c,color:#fff,stroke:#333
 ```
 
 **Normal Mode**: Working consensus (2/3) or better proceeds to output. Max 2 feedback loops, then forced output.
