@@ -3,7 +3,7 @@ name: incident
 description: Multi-perspective agent team incident postmortem with devil's advocate challenge
 version: 2.1.0
 user-invocable: true
-allowed-tools: Task, SendMessage, TeamCreate, TeamDelete, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion, Read, Glob, Grep, Bash, WebFetch, WebSearch, mcp__podo-docs__search_files, mcp__podo-docs__read_file, mcp__podo-docs__list_directory, mcp__podo-docs__directory_tree
+allowed-tools: Task, SendMessage, TeamCreate, TeamDelete, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion, Read, Glob, Grep, Bash, WebFetch, WebSearch, mcp__ontology-docs__search_files, mcp__ontology-docs__read_file, mcp__ontology-docs__list_directory, mcp__ontology-docs__directory_tree
 ---
 
 # Table of Contents
@@ -78,6 +78,19 @@ MUST complete ALL steps. Skipping intake → unfocused analysis.
 ### Step 0.3: Gather Evidence
 
 Collect: error messages, stack traces, logs, event timeline, recent deploys, affected services/endpoints/regions, monitoring data, initial hypotheses.
+
+### Step 0.3.5: Documentation & Codebase Discovery
+
+1. Discover docs structure via `mcp__ontology-docs__directory_tree` (root)
+2. Identify top-level directories (e.g., frontend/, backend/, shared/, etc.)
+3. Build `{CODEBASE_REFERENCE}` block:
+
+Template:
+- Search `{discovered_path_1}` for {detected domain} docs
+- Search `{discovered_path_2}` for {detected domain} docs
+- Trace from documentation to source code (file:line)
+
+4. If MCP unavailable → error: "ontology-docs MCP not configured. See plugin README for setup."
 
 ### Phase 0 Exit Gate
 
@@ -212,7 +225,7 @@ Task(
   name="{archetype-id}-analyst",
   team_name="incident-analysis-{id}",
   model="{model}",
-  prompt="{prompt from file with {INCIDENT_CONTEXT} replaced}"
+  prompt="{prompt from file with {INCIDENT_CONTEXT} and {CODEBASE_REFERENCE} replaced}"
 )
 ```
 

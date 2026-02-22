@@ -3,12 +3,12 @@ name: prd
 description: Multi-perspective PRD policy conflict analysis with devil's advocate verification
 version: 1.0.0
 user-invocable: true
-allowed-tools: Task, SendMessage, TeamCreate, TeamDelete, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion, Read, Glob, Grep, Bash, Write, ToolSearch, mcp__podo-docs__directory_tree, mcp__podo-docs__list_directory, mcp__podo-docs__read_file, mcp__podo-docs__read_text_file, mcp__podo-docs__read_multiple_files, mcp__podo-docs__search_files
+allowed-tools: Task, SendMessage, TeamCreate, TeamDelete, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion, Read, Glob, Grep, Bash, Write, ToolSearch, mcp__ontology-docs__directory_tree, mcp__ontology-docs__list_directory, mcp__ontology-docs__read_file, mcp__ontology-docs__read_text_file, mcp__ontology-docs__read_multiple_files, mcp__ontology-docs__search_files
 ---
 
 # PRD Multi-Perspective Policy Analysis
 
-Analyze a PRD against existing policy documents (via podo-docs MCP) to find policy-level conflicts and ambiguities using a coordinated agent team.
+Analyze a PRD against existing policy documents (via ontology-docs MCP) to find policy-level conflicts and ambiguities using a coordinated agent team.
 
 ## Input
 
@@ -23,10 +23,19 @@ Analyze a PRD against existing policy documents (via podo-docs MCP) to find poli
 /prd-team-analysis @path/to/prd.md
 ```
 
-Reference docs are accessed via `podo-docs` MCP — no path input needed.
+Reference docs are accessed via `ontology-docs` MCP — no path input needed.
 If PRD file not found, error: `"PRD file not found: {path}"`.
 
 ## Phase 1: PRD Analysis & Perspective Generation
+
+### 1.0 Language Detection
+
+Detect report language from user's environment:
+1. Check if CLAUDE.md contains `Language` directive → use that language
+2. Otherwise, detect from user's input language in this session
+3. Store as `{REPORT_LANGUAGE}` for Phase 5
+
+Default: user's detected language.
 
 ### 1.1 Read PRD
 
@@ -34,7 +43,7 @@ Read full PRD via `Read`. Also read any sibling files (handoff, constraints) in 
 
 ### 1.2 Generate Perspectives
 
-Analyze PRD functional requirements and cross-reference with podo-docs domains to derive **N orthogonal policy analysis perspectives**.
+Analyze PRD functional requirements and cross-reference with ontology-docs domains to derive **N orthogonal policy analysis perspectives**.
 
 Rules:
 - Each perspective covers a **policy ontology unit** (e.g., ticket policy, payment policy, retention policy)
@@ -64,7 +73,7 @@ PRD sections: {FR-N, NFR-N, etc.}
 
 Create 1 task per perspective. MUST include in `description`:
 - Summary of relevant PRD content (FR/NFR for this perspective)
-- Analysis scope (policy domains to explore via podo-docs MCP)
+- Analysis scope (policy domains to explore via ontology-docs MCP)
 - Analysis rules (see "Analyst Behavior Rules" below)
 
 ### 2.3 TaskCreate — Devil's Advocate
@@ -101,7 +110,7 @@ You report to the team lead ("team-lead").
 
 == WORK PROTOCOL ==
 1. TaskList → find my assigned task → TaskUpdate(status="in_progress")
-2. Use podo-docs MCP tools (directory_tree, search_files, read_file, etc.) to explore and read relevant domain docs
+2. Use ontology-docs MCP tools (directory_tree, search_files, read_file, etc.) to explore and read relevant domain docs
 3. Cross-reference PRD sections against docs to find policy conflicts/ambiguities
 4. Report findings via SendMessage to team-lead
 5. TaskUpdate(status="completed")
@@ -114,13 +123,13 @@ Analyst behavior rules (include in prompt):
 - Report ONLY planning-level policy conflicts/ambiguities. Exclude dev implementation details.
 - Format: "PRD says X, but docs say Y" — always cite both sides.
 - Severity: CRITICAL (policy conflict, feature blocking) / HIGH (ambiguous, multiple interpretations) / MEDIUM (undefined, edge case)
-- MUST cite podo-docs filename and section as evidence.
+- MUST cite ontology-docs filename and section as evidence.
 
 == REPORT FORMAT ==
 Per issue:
 ### [{SEVERITY}-{N}] {Title}
 - **PRD states**: {what PRD defines}
-- **Existing policy**: {what podo-docs says, filename:section}
+- **Existing policy**: {what ontology-docs says, filename:section}
 - **Conflict/Ambiguity**: {why this is a problem}
 - **Decision needed**: checklist of items PM must decide
 ```
@@ -178,66 +187,37 @@ MUST: Periodically check `TaskList`. If any task stays `in_progress` for 5+ minu
 After DA report received, lead synthesizes the final .md report via `Write`.
 
 MUST: Write report to **PRD file's directory** as `prd-policy-review-report.md`.
-MUST: Report content in **Korean (한글)**.
+MUST: Report content in **{REPORT_LANGUAGE}** (detected in Phase 1.0).
 
 ### Report Structure
 
 ```markdown
-# PRD 정책 분석 최종 보고서
+# {REPORT_TITLE: "PRD Policy Analysis Final Report"}
 
-**대상**: {PRD 제목}
-**분석일**: {날짜}
-**분석 방법**: {N}인 멀티 에이전트 팀 ({N-1}개 관점 분석가 + Devil's Advocate)
-**참조 문서**: podo-docs MCP (참조 파일 수)
+**Target**: {PRD title}
+**Analysis Date**: {date}
+**Method**: {N}-agent multi-perspective team ({N-1} perspective analysts + Devil's Advocate)
+**Reference Docs**: ontology-docs MCP ({file count} files referenced)
 
 ---
 
-## 목차
-1. 분석 개요
-2. PM 필수 의사결정 TOP 10
-3. PRD 내부 자기 모순
-4~{N+3}. 각 관점별 분석 결과
-{N+4}. Devil's Advocate 검증 결과
-{N+5}. 개발 레벨 다운그레이드 (PM 결정 불필요)
-{N+6}. 권고 사항
-
-## 1. 분석 개요
-### 팀 구성
-| 팀원 | 관점 | 발견 이슈 |
-(분석가별 이슈 수와 심각도 분포)
-
-### 통계 요약
-| 항목 | 수치 |
-(원본 이슈, 중복 병합 후, 심각도 변경, 다운그레이드, 신규 발견, PRD 모순, TOP PM 결정)
-
-## 2. PM 필수 의사결정 TOP 10
-### TOP 1. [{심각도}] {제목}
-- **현황**: ...
-- **영향**: ...
-- **결정 필요**: 체크리스트
-
-(TOP 2–10 동일 포맷)
-
-## 3. PRD 내부 자기 모순
-(PRD 자체의 앞뒤 불일치)
-
-## 4~N. 각 관점별 분석 결과
-(분석가 원본 보고 — 심각도별 정렬)
-
-## DA 검증 결과
-(중복 병합, 심각도 교정, 반론 내역)
-
-## 개발 레벨 다운그레이드
-(PM 결정 불필요, 개발자 판단 사항)
-
-## 권고 사항
-(다음 단계 제안)
+## TOC
+1. Analysis Overview
+2. TOP 10 PM Decisions Required
+3. PRD Internal Contradictions
+4~{N+3}. Per-Perspective Analysis Results
+{N+4}. Devil's Advocate Verification
+{N+5}. Dev-Level Downgrades (No PM Decision Needed)
+{N+6}. Recommendations
 ```
+
+MUST: Write all section headers and content in {REPORT_LANGUAGE}.
+If Korean: use the following header mappings: "Analysis Overview" → "분석 개요", "TOP 10 PM Decisions Required" → "PM 필수 의사결정 TOP 10", "PRD Internal Contradictions" → "PRD 내부 자기 모순", "Per-Perspective Analysis Results" → "각 관점별 분석 결과", "Devil's Advocate Verification" → "Devil's Advocate 검증 결과", "Dev-Level Downgrades" → "개발 레벨 다운그레이드", "Recommendations" → "권고 사항".
 
 ### Report Rules
 
-- TOP 10 items MUST include `결정 필요` as checklist (`- [ ]`)
-- All issues MUST cite podo-docs filename and section as evidence
+- TOP 10 items MUST include `Decision needed` as checklist (`- [ ]`)
+- All issues MUST cite ontology-docs filename and section as evidence
 - Dev-level downgrade section MUST explain why PM decision is unnecessary
 
 ## Phase 6: Team Teardown
@@ -256,7 +236,7 @@ MUST verify before outputting report:
 - [ ] All analyst tasks in `completed` status
 - [ ] DA task in `completed` status
 - [ ] Every TOP 10 item has `Decision needed` checklist
-- [ ] Every issue has podo-docs citation evidence
+- [ ] Every issue has ontology-docs citation evidence
 - [ ] PRD contradictions section exists (state "None found" if 0)
 - [ ] Statistics summary numbers match actual issue counts
 - [ ] Report file successfully written

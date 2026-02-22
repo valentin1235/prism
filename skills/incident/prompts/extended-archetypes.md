@@ -27,9 +27,8 @@ INCIDENT CONTEXT:
 {INCIDENT_CONTEXT}
 
 ### Codebase Reference
-MUST use `mcp__podo-docs__search_files` to consult ontology docs, trace to source. Cite file:line.
-- Search `/Users/heechul/podo-backend/podo-docs` for auth, access control, API security patterns
-- Search `/Users/heechul/podo-app/podo-docs` for client-side token handling, session management
+MUST use `mcp__ontology-docs__search_files` to consult ontology docs, then trace to source code. Cite file:line.
+{CODEBASE_REFERENCE}
 
 TASKS:
 1. Threat vectors: attack surface, MITRE ATT&CK classification, initial access, privilege escalation, targeted vs. opportunistic
@@ -75,9 +74,8 @@ INCIDENT CONTEXT:
 {INCIDENT_CONTEXT}
 
 ### Codebase Reference
-MUST use `mcp__podo-docs__search_files` to consult ontology docs, trace to source. Cite file:line.
-- Search `/Users/heechul/podo-backend/podo-docs` for data models, migration scripts, replication configs
-- Search `/Users/heechul/podo-app/podo-docs` for client-side data caching, offline sync patterns
+MUST use `mcp__ontology-docs__search_files` to consult ontology docs, then trace to source code. Cite file:line.
+{CODEBASE_REFERENCE}
 
 TASKS:
 1. Data lineage: origin → corruption point, transformation that introduced corruption, pipeline map, code paths per step
@@ -122,11 +120,8 @@ INCIDENT CONTEXT:
 {INCIDENT_CONTEXT}
 
 ### Codebase Reference
-MUST use `mcp__podo-docs__search_files` to identify performance-critical code paths.
-- Search `/Users/heechul/podo-backend/podo-docs` for DB query patterns, connection pool configs, cache layers, queue processing
-- Search `/Users/heechul/podo-app/podo-docs` for client-side rendering bottlenecks, bundle size, lazy loading
-- Trace hot paths from API endpoint → service → DB/cache to find bottleneck code (file:line)
-- Check actual timeout/retry/pool size values in source code, not just documentation
+MUST use `mcp__ontology-docs__search_files` to consult ontology docs, then trace to source code. Cite file:line.
+{CODEBASE_REFERENCE}
 
 TASKS:
 1. Resource profiling: CPU/memory/IO/network at incident time, which saturated first, baseline vs. incident, resource leaks
@@ -166,11 +161,8 @@ INCIDENT CONTEXT:
 {INCIDENT_CONTEXT}
 
 ### Codebase Reference
-MUST use `mcp__podo-docs__search_files` to consult ontology docs for UX analysis.
-- Search `/Users/heechul/podo-app/podo-docs` for component tree, routing, state management, error boundaries
-- Search `/Users/heechul/podo-backend/podo-docs` for API error response formats, status codes, error message schemas
-- Trace actual error handling code paths: catch blocks, error boundaries, fallback UI components (file:line)
-- Check actual error messages users see — read i18n/locale files or hardcoded strings in source
+MUST use `mcp__ontology-docs__search_files` to consult ontology docs, then trace to source code. Cite file:line.
+{CODEBASE_REFERENCE}
 
 TASKS:
 1. User journey mapping: reconstruct what users were doing when the incident hit. Which pages/flows were affected? What did they see (error screen, blank page, infinite loader, stale data)?
@@ -231,7 +223,7 @@ Read TaskGet, mark in_progress → completed. Send findings via SendMessage.
 
 Spawn: `oh-my-claudecode:architect-medium`, name: `deployment-analyst`, model: `sonnet`
 
-Codebase Reference: MUST use `mcp__podo-docs__search_files` — search `/Users/heechul/podo-backend/podo-docs` for deployment pipeline, CI/CD config, feature flags, and environment configs.
+Codebase Reference: MUST use `mcp__ontology-docs__search_files` to consult ontology docs. {CODEBASE_REFERENCE}
 
 Tasks: (1) Correlate timeline with recent deploys/config changes (2) Audit deployment pipeline compliance (3) Diff configs before/after (4) Evaluate rollback options and speed (5) Assess canary/gradual rollout coverage
 
@@ -241,7 +233,7 @@ Output: Change Correlation Timeline, Pipeline Audit, Config Diff, Rollback Asses
 
 Spawn: `oh-my-claudecode:architect-medium`, name: `network-analyst`, model: `sonnet`
 
-Codebase Reference: MUST use `mcp__podo-docs__search_files` — search `/Users/heechul/podo-backend/podo-docs` for service topology, inter-service communication patterns, DNS configs, and LB settings.
+Codebase Reference: MUST use `mcp__ontology-docs__search_files` to consult ontology docs. {CODEBASE_REFERENCE}
 
 Tasks: (1) Map network topology (2) Trace connectivity failures (3) Analyze DNS resolution + TTL (4) Evaluate LB health checks and routing (5) Cross-AZ/region failover assessment
 
@@ -251,7 +243,7 @@ Output: Topology Map, Connectivity Trace, DNS Analysis, LB Assessment, Recommend
 
 Spawn: `oh-my-claudecode:architect`, name: `concurrency-analyst`, model: `opus`
 
-Codebase Reference: MUST use `mcp__podo-docs__search_files` — search `/Users/heechul/podo-app/podo-docs` and `/Users/heechul/podo-backend/podo-docs`, cite file:line.
+Codebase Reference: MUST use `mcp__ontology-docs__search_files` to consult ontology docs, cite file:line. {CODEBASE_REFERENCE}
 
 Tasks: (1) Concurrent access patterns involved (2) Lock ordering + deadlock cycles (3) Happens-before in distributed ops (4) Transaction isolation verification (5) State mutation trace under concurrency
 
@@ -261,7 +253,7 @@ Output: Concurrency Model, Lock/Contention Map, Race Condition ID, State Mutatio
 
 Spawn: `oh-my-claudecode:architect-medium`, name: `dependency-analyst`, model: `sonnet`
 
-Codebase Reference: MUST use `mcp__podo-docs__search_files` — search `/Users/heechul/podo-backend/podo-docs` for external API client implementations, SDK configs, timeout/retry values, and fallback logic (file:line).
+Codebase Reference: MUST use `mcp__ontology-docs__search_files` to consult ontology docs. {CODEBASE_REFERENCE}
 
 Tasks: (1) Full dependency chain map (2) Vendor status page correlation (3) Fallback/degraded-mode behavior (4) Timeout/retry/circuit-breaker configs with values (5) Coupling strength + blast radius
 

@@ -22,11 +22,8 @@ INCIDENT CONTEXT:
 {INCIDENT_CONTEXT}
 
 ### Codebase Reference
-MUST use `mcp__podo-docs__search_files` to consult ontology docs, then trace to source code.
-- Search `/Users/heechul/podo-app/podo-docs` for frontend flows, deployment events, client-side event emissions
-- Search `/Users/heechul/podo-backend/podo-docs` for backend pipelines, cron schedules, queue processing flows
-- Trace deployment pipelines, cron schedules, queue processing flows to verify event ordering
-- Cross-reference log timestamps with code-level event emission points (file:line)
+MUST use `mcp__ontology-docs__search_files` to consult ontology docs, then trace to source code.
+{CODEBASE_REFERENCE}
 
 TASKS:
 1. Build chronological timeline: first anomaly → escalation → detection → response → mitigation → resolution
@@ -61,10 +58,8 @@ INCIDENT CONTEXT:
 {INCIDENT_CONTEXT}
 
 ### Codebase Reference
-
-MUST use `mcp__podo-docs__search_files` to consult ontology docs before forming hypotheses:
-- Frontend: search `/Users/heechul/podo-app/podo-docs` → follow links to source code
-- Backend: search `/Users/heechul/podo-backend/podo-docs` → follow links to source code
+MUST use `mcp__ontology-docs__search_files` to consult ontology docs, then trace to source code.
+{CODEBASE_REFERENCE}
 
 Every hypothesis MUST cite specific code paths (file:function:line). Documentation-only analysis is INCOMPLETE — will be returned for revision.
 
@@ -113,10 +108,8 @@ INCIDENT CONTEXT:
 {INCIDENT_CONTEXT}
 
 ### Codebase Reference
-
-MUST use `mcp__podo-docs__search_files` to consult ontology docs, then trace to source code. All findings MUST cite file:line.
-- Search `/Users/heechul/podo-app/podo-docs` and `/Users/heechul/podo-backend/podo-docs`
-- Show actual code — e.g., "src/services/payment.ts:142 calls Redis without circuit breaker; hangs until 30s timeout at src/config/http.ts:28"
+MUST use `mcp__ontology-docs__search_files` to consult ontology docs, then trace to source code. All findings MUST cite file:line.
+{CODEBASE_REFERENCE}
 
 TASKS:
 1. Architecture: failure-enabling patterns, SPOFs, cascading failure handling, missing resilience
@@ -163,10 +156,8 @@ INCIDENT CONTEXT:
 {INCIDENT_CONTEXT}
 
 ### Codebase Reference
-MUST use `mcp__podo-docs__search_files` to map impact to actual user journeys and service boundaries.
-- Search `/Users/heechul/podo-app/podo-docs` for frontend component hierarchy, user flows, error handling UX
-- Search `/Users/heechul/podo-backend/podo-docs` for API endpoints, service dependency graph, data flow paths
-- Quantify blast radius by tracing which services/components are downstream of the failure point
+MUST use `mcp__ontology-docs__search_files` to consult ontology docs, then trace to source code.
+{CODEBASE_REFERENCE}
 
 TASKS:
 1. User impact: affected count, degraded functionality, duration per segment, geographic variations
