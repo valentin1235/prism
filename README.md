@@ -221,7 +221,8 @@ The skill will:
 
 ## How It Works
 
-### Incident Postmortem (`/prism:incident`)
+<details>
+<summary><h3>Incident Postmortem (<code>/prism:incident</code>)</h3></summary>
 
 ```mermaid
 graph TD
@@ -266,7 +267,10 @@ graph TD
     style X fill:#dc2626,color:#fff
 ```
 
-### PRD Policy Analysis (`/prism:prd`)
+</details>
+
+<details>
+<summary><h3>PRD Policy Analysis (<code>/prism:prd</code>)</h3></summary>
 
 ```mermaid
 graph TD
@@ -300,7 +304,10 @@ graph TD
     style X fill:#dc2626,color:#fff
 ```
 
-### Plan with Committee Debate (`/prism:plan`)
+</details>
+
+<details>
+<summary><h3>Plan with Committee Debate (<code>/prism:plan</code>)</h3></summary>
 
 ```mermaid
 graph TD
@@ -338,6 +345,8 @@ graph TD
     style H fill:#16a34a,color:#fff,stroke:#333
     style I fill:#dc2626,color:#fff,stroke:#333
 ```
+
+</details>
 
 **Normal Mode**: Working consensus (2/3) or better proceeds to output. Max 2 feedback loops, then forced output.
 
