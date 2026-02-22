@@ -1,0 +1,31 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "prism",
+  "description": "Multi-perspective agent team analysis — incident postmortem and PRD policy review",
+  "owner": {
+    "name": "heechul",
+    "email": "cohem.yoon@day1company.co.kr"
+  },
+  "plugins": [
+    {
+      "name": "prism",
+      "description": "Multi-perspective agent team analysis — incident postmortem and PRD policy review",
+      "version": "1.0.0",
+      "author": {
+        "name": "heechul",
+        "email": "cohem.yoon@day1company.co.kr"
+      },
+      "source": "./",
+      "category": "productivity",
+      "tags": [
+        "multi-agent",
+        "multi-perspective",
+        "incident",
+        "prd",
+        "postmortem",
+        "analysis"
+      ]
+    }
+  ],
+  "version": "1.0.0"
+}
