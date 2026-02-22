@@ -71,9 +71,9 @@ If you already have an `env` section with other keys, just add the new key insid
 
 > Without this setting, Prism skills will refuse to run and show a setup guide instead.
 
-### Step 3: Install oh-my-claudecode (dependency)
+### Step 3: Install oh-my-claudecode (agent pack)
 
-Prism agents use oh-my-claudecode agent types (`architect`, `architect-medium`, `analyst`, `critic`, etc.). Install it if you haven't already:
+Prism does not have its own built-in agents. It currently uses [oh-my-claudecode](https://github.com/anthropics-community/oh-my-claudecode) as a general-purpose agent pack, which provides the specialized agent types needed for team analysis (`architect`, `architect-medium`, `analyst`, `critic`, etc.). Install it if you haven't already:
 
 ```bash
 claude plugin add omc/oh-my-claudecode
@@ -94,28 +94,14 @@ And enable it:
 
 Both skills can reference your internal documentation through the `ontology-docs` MCP server. This is optional but recommended for accurate policy/codebase analysis.
 
-Use the `claude mcp add` CLI command to register the server. Replace `/path/to/your/docs` with the absolute path to your documentation directory.
-
-**User scope** (available across all your projects):
+Use the `claude mcp add` CLI command to register the server with **user scope**. Replace `/path/to/your/docs` with the absolute path to your documentation directory.
 
 ```bash
 claude mcp add --transport stdio --scope user ontology-docs \
   -- npx -y @modelcontextprotocol/server-filesystem /path/to/your/docs
 ```
 
-**Local scope** (current project only, default):
-
-```bash
-claude mcp add --transport stdio ontology-docs \
-  -- npx -y @modelcontextprotocol/server-filesystem /path/to/your/docs
-```
-
-**Project scope** (shared with your team via `.mcp.json`):
-
-```bash
-claude mcp add --transport stdio --scope project ontology-docs \
-  -- npx -y @modelcontextprotocol/server-filesystem /path/to/your/docs
-```
+> The `ontology-docs` MCP server must be registered with `--scope user` so it is available across all projects. Local or project scope will not work with Prism.
 
 Verify it was added:
 
@@ -199,35 +185,83 @@ The skill will:
 
 ## How It Works
 
+### Incident Postmortem (`/prism:incident`)
+
+```mermaid
+graph TD
+    A[User Input] --> B{Prerequisite Gate}
+    B -->|Not enabled| X[Show setup guide & STOP]
+    B -->|Enabled| C[Problem Intake]
+    C -->|Severity, Evidence, Context| D{SEV1 or Active?}
+
+    D -->|Yes| E1[Fast Track: 4 Core + DA]
+    D -->|No| E2[Perspective Generation]
+    E2 -->|Select 3-5 archetypes| E1
+
+    E1 --> F[Team Formation]
+
+    F --> G1[Timeline Analyst]
+    F --> G2[Root Cause Analyst]
+    F --> G3[Systems Analyst]
+    F --> GN[+ Extended Analysts]
+
+    G1 --> H[Devil's Advocate]
+    G2 --> H
+    G3 --> H
+    GN --> H
+
+    H --> I{Tribunal needed?}
+    I -->|Yes| J1[UX Critic]
+    I -->|Yes| J2[Engineering Critic]
+    I -->|No| K
+
+    J1 --> K[Final Report]
+    J2 --> K
+
+    K --> L[Team Teardown]
+
+    style G1 fill:#4a9eff,color:#fff
+    style G2 fill:#4a9eff,color:#fff
+    style G3 fill:#4a9eff,color:#fff
+    style GN fill:#4a9eff,color:#fff
+    style H fill:#ef4444,color:#fff
+    style J1 fill:#f59e0b,color:#fff
+    style J2 fill:#f59e0b,color:#fff
+    style X fill:#dc2626,color:#fff
 ```
-User Input
-    |
-    v
-[Prerequisite Gate] -- checks CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS
-    |
-    v
-[Problem Intake / PRD Analysis]
-    |
-    v
-[Perspective Generation] -- selects 3-6 orthogonal analysis angles
-    |
-    v
-[Team Formation] -- TeamCreate + spawn agents in parallel
-    |
-    v
-[Parallel Analysis] -- each agent analyzes from its perspective
-    |
-    v
-[Devil's Advocate] -- cross-validates, challenges, ranks findings
-    |
-    v
-[Tribunal] -- (incident only, conditional) UX + Engineering critics
-    |
-    v
-[Final Report] -- synthesized, evidence-cited report
-    |
-    v
-[Team Teardown] -- shutdown agents + cleanup
+
+### PRD Policy Analysis (`/prism:prd`)
+
+```mermaid
+graph TD
+    A["/prism:prd path/to/prd.md"] --> B{Prerequisite Gate}
+    B -->|Not enabled| X[Show setup guide & STOP]
+    B -->|Enabled| C[Read PRD & Sibling Files]
+    C --> D[Generate 3-6 Policy Perspectives]
+
+    D --> E[Team Formation]
+
+    E --> F1[Policy Analyst 1]
+    E --> F2[Policy Analyst 2]
+    E --> F3[Policy Analyst 3]
+    E --> FN[Policy Analyst N]
+
+    F1 -->|ontology-docs MCP| G[All Analysts Complete]
+    F2 -->|ontology-docs MCP| G
+    F3 -->|ontology-docs MCP| G
+    FN -->|ontology-docs MCP| G
+
+    G --> H[Devil's Advocate]
+    H -->|Merge, Calibrate, Rank| I["Final Report (prd-policy-review-report.md)"]
+
+    I --> J[Team Teardown]
+
+    style F1 fill:#4a9eff,color:#fff
+    style F2 fill:#4a9eff,color:#fff
+    style F3 fill:#4a9eff,color:#fff
+    style FN fill:#4a9eff,color:#fff
+    style H fill:#ef4444,color:#fff
+    style X fill:#dc2626,color:#fff
 ```
 
 ## Troubleshooting
