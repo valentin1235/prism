@@ -6,9 +6,7 @@ Prism spawns a coordinated team of specialized AI agents — each analyzing from
 
 ## Philosophy
 
-Throughout history, humanity's hardest problems have been solved not by a single brilliant mind, but by bringing together diverse perspectives — each examining the same problem through a different lens. Peer review in science, cross-functional teams in engineering, adversarial proceedings in law — precision emerges from the collision of viewpoints.
-
-Prism applies this principle to AI-assisted analysis. Instead of asking one agent for one answer, it spawns a team of specialists, each with a distinct analytical perspective, and forces their findings through adversarial challenge and structured debate. The result is analysis with depth and rigor that no single perspective — human or AI — could achieve alone.
+Hard problems don't yield to a single viewpoint. They never have. Prism gives the same problem to multiple AI specialists — each with a different lens — then forces their answers through adversarial debate until only the defensible parts survive.
 
 ## Skills
 
