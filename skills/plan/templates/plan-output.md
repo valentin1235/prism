@@ -4,6 +4,7 @@
 - [Executive Summary](#executive-summary)
 - [Plan Overview](#plan-overview)
 - [Context & Background](#context--background)
+- [Ontology Analysis](#ontology-analysis)
 - [Perspective Findings](#perspective-findings)
 - [Integrated Analysis](#integrated-analysis)
 - [Devil's Advocate Findings](#devils-advocate-findings)
@@ -32,23 +33,43 @@ Fill all sections. Write "N/A" if truly irrelevant — do NOT leave sections emp
 ## Context & Background
 {Relevant background from input analysis — what led to this plan}
 
+## Ontology Analysis
+
+### Ontology Catalog
+| # | Path | Domain | Summary | Key Topics |
+|---|------|--------|---------|------------|
+
+### Per-Perspective Ontology Findings
+
+{For EACH perspective (excluding DA):}
+
+#### {Perspective Name}
+| # | Document | Relevance | Key Findings | Citations |
+|---|----------|-----------|-------------|-----------|
+
+### Cross-Perspective Interpretation
+| Document | Perspectives That Found Insights | Key Differences in Interpretation |
+|----------|-------------------------------|----------------------------------|
+
 ## Perspective Findings
 
 {For EACH perspective (excluding DA):}
 
 ### {Perspective Name}
-{Summary of key findings, risks, and recommendations from this perspective}
+{Summary of key findings, risks, and recommendations from this perspective — grounded in ontology evidence}
 
 ## Integrated Analysis
-- **Convergence**: Where perspectives independently agreed
-- **Divergence**: Where they disagreed + how resolved
-- **Emergent Insights**: Findings only visible when combining perspectives
+- **Convergence**: Where perspectives independently agreed on the same ontology evidence
+- **Divergence**: Where they interpreted the same documents differently + how resolved
+- **Emergent Insights**: Findings only visible when combining perspectives on shared ontology
 
 ## Devil's Advocate Findings
 ### Challenges & Responses
 {Key challenges raised and how they were addressed}
 ### Blind Spots Identified
 {What the analysis initially missed}
+### Ontology Audit
+{DA's cross-perspective ontology comparison — interpretation conflicts, coverage gaps, missed evidence}
 ### Risk Register
 | # | Risk | Severity | Likelihood | Mitigation | Status |
 |---|------|----------|-----------|------------|--------|
@@ -115,7 +136,14 @@ Gate: {Proceed to Phase 3 only if...}
 {What to do if the plan fails or needs to be reversed}
 
 ## Appendix
-- Perspectives and selection rationale
-- Full analyst reports (if requested)
-- Committee debate transcript summary
-- Input document reference
+
+### Perspectives and Selection Rationale
+{Why each perspective was selected}
+
+### Ontology Documents Analyzed
+| # | Path | Domain | Analyzed By (Perspectives) |
+|---|------|--------|--------------------------|
+
+### Full Analyst Reports (if requested)
+### Committee Debate Transcript Summary
+### Input Document Reference

@@ -3,13 +3,14 @@ name: plan
 description: Analyzes input from multiple dynamically-generated perspectives, synthesizes via Devil's Advocate, and produces actionable execution plans through 3-person committee debate with consensus enforcement
 version: 1.0.0
 user-invocable: true
-allowed-tools: Task, SendMessage, TeamCreate, TeamDelete, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion, Read, Glob, Grep, Bash, Write, WebFetch, WebSearch
+allowed-tools: Task, SendMessage, TeamCreate, TeamDelete, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion, Read, Glob, Grep, Bash, Write, WebFetch, WebSearch, mcp__ontology-docs__directory_tree, mcp__ontology-docs__list_directory, mcp__ontology-docs__read_file, mcp__ontology-docs__read_text_file, mcp__ontology-docs__read_multiple_files, mcp__ontology-docs__search_files
 ---
 
 # Table of Contents
 
 - [Prerequisite](#prerequisite)
 - [Phase 0: Input Analysis & Context Gathering](#phase-0-input-analysis--context-gathering)
+- [Phase 0.5: Ontology Discovery](#phase-05-ontology-discovery)
 - [Phase 1: Dynamic Perspective Generation](#phase-1-dynamic-perspective-generation)
 - [Phase 2: Team Formation](#phase-2-team-formation)
 - [Phase 3: Parallel Multi-Perspective Analysis](#phase-3-parallel-multi-perspective-analysis)
@@ -37,6 +38,7 @@ MUST persist phase outputs to `.omc/state/plan-{short-id}/` (create in Phase 2).
 | File | Written | Read By |
 |------|---------|---------|
 | `context.md` | Phase 2 | All agents |
+| `ontology-catalog.md` | Phase 0.5 | All analysts, DA |
 | `analyst-findings.md` | Phase 3 exit | DA |
 | `da-synthesis.md` | Phase 4 exit | Committee |
 | `committee-debate.md` | Phase 5 exit | Analysts (re-entry) |
@@ -44,7 +46,7 @@ MUST persist phase outputs to `.omc/state/plan-{short-id}/` (create in Phase 2).
 
 ## Phase 0: Input Analysis & Context Gathering
 
-MUST complete ALL steps. Skipping intake → unfocused analysis, wasted committee time.
+MUST complete ALL steps.
 
 ### Step 0.1: Detect Input Type
 
@@ -108,6 +110,46 @@ Summarize extracted context and confirm with user before continuing.
 
 ---
 
+## Phase 0.5: Ontology Discovery
+
+**Purpose**: Ontology docs are the PRIMARY ANALYSIS TARGET — every perspective analyzes the entire corpus through its own lens.
+
+### Step 0.5.1: Check Ontology Availability
+
+Call `mcp__ontology-docs__directory_tree` on root.
+
+| Result | Action |
+|--------|--------|
+| Success | Set `ONTOLOGY_AVAILABLE=true`. Proceed to 0.5.2. |
+| Error / MCP not configured | Set `ONTOLOGY_AVAILABLE=false`. **STOP** — cannot proceed without ontology. Error: "ontology-docs MCP is not configured. This skill requires ontology docs as its analysis target." |
+
+### Step 0.5.2: Build Ontology Catalog
+
+For each top-level directory:
+1. Try `mcp__ontology-docs__read_text_file` on `{dir}/README.md`
+2. If not found, try `{dir}/CLAUDE.md`
+3. If neither exists, `mcp__ontology-docs__list_directory` and infer domain from filenames
+
+Build ontology catalog:
+
+```
+| # | Path | Domain | Summary | Key Topics |
+|---|------|--------|---------|------------|
+| 1 | {dir}/ | {domain} | {1-2 line summary} | {3-5 keywords} |
+```
+
+### Step 0.5.3: Save Catalog
+
+Hold catalog in memory. Write to `.omc/state/plan-{short-id}/ontology-catalog.md` after directory is created in Phase 2.
+
+### Phase 0.5 Exit Gate
+
+- [ ] `ONTOLOGY_AVAILABLE=true`
+- [ ] Catalog built (domain/summary confirmed per top-level directory)
+- [ ] Full ontology document listing acquired
+
+---
+
 ## Phase 1: Dynamic Perspective Generation
 
 ### Step 1.1: Seed Analysis (Internal)
@@ -149,20 +191,7 @@ If a perspective fails any check → replace or drop it.
 
 ### Step 1.3: Present to User
 
-`AskUserQuestion`:
-```
-question: "I recommend these {N} perspectives for analysis. How to proceed?"
-header: "Perspectives"
-options:
-  - label: "Proceed"
-    description: "Start analysis with these perspectives"
-  - label: "Add perspective"
-    description: "I want an additional analysis angle"
-  - label: "Remove perspective"
-    description: "Drop one of the proposed perspectives"
-  - label: "Modify perspective"
-    description: "Adjust scope or questions of a perspective"
-```
+`AskUserQuestion` (header: "Perspectives", options: "Proceed" / "Add perspective" / "Remove perspective" / "Modify perspective")
 
 ### Step 1.4: Iterate Until Approved
 
@@ -254,25 +283,13 @@ Placeholder replacements:
 - `{PERSPECTIVE_SCOPE}` → perspective scope description
 - `{KEY_QUESTIONS}` → numbered list of key questions
 - `{PLAN_CONTEXT}` → full Phase 0 extracted context (goal, scope, constraints, raw input)
-- `{CODEBASE_REFERENCE}` → codebase search instructions (if plan involves code), otherwise "N/A — this plan does not involve codebase analysis"
+- `{REFERENCE_DOCS}` → Full ontology catalog from Phase 0.5 (identical for ALL analysts)
 
 ### Step 3.3: Analyst Prompt Structure
 
-Worker preamble (shared by all analysts):
-```
-You are a TEAM WORKER in team "plan-committee-{short-id}". Your name is "{perspective-id}-analyst".
-You report to the team lead ("team-lead").
+Worker preamble (prepend to all analysts): team name, worker name, team-lead reporting, standard work protocol (TaskList → in_progress → analyze → SendMessage → completed → shutdown_response on request).
 
-== WORK PROTOCOL ==
-1. TaskList → find my assigned task → TaskUpdate(status="in_progress")
-2. Analyze the planning context from your assigned perspective
-3. Answer ALL key questions with evidence and reasoning
-4. Report findings via SendMessage to team-lead
-5. TaskUpdate(status="completed")
-6. On shutdown_request → respond with shutdown_response(approve=true)
-```
-
-Followed by the perspective-specific prompt from `prompts/analyst.md`.
+Followed by perspective-specific prompt from `prompts/analyst.md`.
 
 ### Step 3.4: Monitor & Coordinate
 
@@ -329,6 +346,7 @@ Placeholder replacements:
 - `{ALL_ANALYST_FINDINGS}` → compiled findings from all analysts
 - `{PLAN_CONTEXT}` → Phase 0 context
 - `{PRIOR_ITERATION_CONTEXT}` → empty string on first pass; on feedback loop iterations, include previous DA synthesis + committee debate results + gap analysis
+- `{REFERENCE_DOCS}` → Full ontology catalog from Phase 0.5 (DA: cross-validate interpretation differences)
 
 ### Step 4.3: Monitor DA
 
@@ -385,34 +403,17 @@ Wait for all 3 members to send their initial position via `SendMessage`.
 
 Lead mediates (UX Critic ↔ Lead ↔ Engineering Critic, Lead ↔ Planner) — members do NOT message each other directly.
 
-**Debate protocol:**
+**Debate protocol:** Lead receives 3 positions → identifies disagreements → sends targeted cross-questions via `SendMessage` → collects responses → updates convergence table → max 3 rounds.
 
-1. Lead receives 3 initial positions
-2. Lead identifies disagreements across positions
-3. Lead sends targeted cross-questions via `SendMessage` — share each member's concerns with others for response
-4. Collect responses, update convergence table
-5. If disagreements remain → additional targeted rounds (max 3 rounds per debate session)
-
-**Planner = Tie-breaker**: When UX Critic and Engineering Critic reach deadlock on an item, explicitly ask Planner: "UX position: {X}. Engineering position: {Y}. As tie-breaker, propose a resolution that balances both concerns."
+**Planner = Tie-breaker**: On UX/Engineering deadlock, ask Planner to propose resolution balancing both concerns.
 
 ### Step 5.7: Consensus Check
 
-Build convergence table for each plan element:
+Build convergence table per plan element (UX Critic / Engineering Critic / Planner / Consensus level).
 
-| Plan Element | UX Critic | Engineering Critic | Planner | Consensus |
-|-------------|-----------|-------------------|---------|-----------|
-| {element} | {position} | {position} | {position} | {level} |
+**Consensus levels:** **Strong** (3/3) → Phase 6 | **Working** (2/3, dissent documented) → Phase 6 | **Partial** (60%+ consensus) → Phase 6 with open items | **No Consensus** (<60%) → Feedback Loop.
 
-**Consensus levels:**
-
-| Level | Condition | Action |
-|-------|-----------|--------|
-| **Strong** | 3/3 agree | Proceed to Phase 6 |
-| **Working** | 2/3 agree, 1 dissent documented | Proceed to Phase 6 (document dissent) |
-| **Partial** | 60%+ of plan elements have Strong or Working consensus | Proceed to Phase 6 (document open items) |
-| **No Consensus** | <60% of plan elements have consensus | → Feedback Loop |
-
-**Hell Mode override**: Only Strong (3/3 unanimous) proceeds to Phase 6. Working/Partial/No Consensus ALL → Feedback Loop.
+**Hell Mode override**: Only Strong → Phase 6. All others → Feedback Loop.
 
 Write committee positions and debate results to `.omc/state/plan-{short-id}/committee-debate.md`.
 
@@ -462,19 +463,11 @@ If file already exists → `plan-{short-id}.md` to avoid overwrite.
 
 ### Step 6.3: Synthesize Plan
 
-Fill the output template with:
-- Phase 0 context (goal, scope, constraints)
-- Analyst findings (organized by perspective)
-- DA synthesis (challenges, blind spots, risk)
-- Committee positions and consensus results
-- Dissenting views (attributed)
-- Open items requiring future decision
-
-Write via `Write` tool in the detected report language.
+Fill the output template with: Phase 0 context, ontology catalog + per-perspective findings, analyst findings, DA synthesis, committee positions + consensus, dissenting views, open items. Write via `Write` tool in the detected report language.
 
 ### Step 6.4: Chat Summary
 
-After writing the file, output to chat: Goal, File path, Consensus level (% of elements), Perspectives used, Iteration count. Then: Key Decisions (numbered, with consensus level), Top 5 Action Items (action + owner + timeline), Open Items list (or "None — full consensus achieved").
+Output to chat: Goal, File path, Consensus level, Perspectives used, Iteration count, Key Decisions (numbered), Top 5 Action Items, Open Items.
 
 ---
 
@@ -488,4 +481,4 @@ After writing the file, output to chat: Goal, File path, Consensus level (% of e
 
 ## Gate Summary
 
-Prerequisite → Phase 0 [5-item] → Phase 1 [4-item] → Phase 2 → Phase 3 [4-item] → Phase 4 [3-item] → Phase 5 [consensus] → Phase 6 → Phase 7. No Consensus at Phase 5 → feedback loop to Phase 3. Every gate specifies exact missing items — fix before proceeding.
+Prerequisite → Phase 0 [5-item] → Phase 0.5 [3-item, ontology discovery] → Phase 1 [4-item] → Phase 2 → Phase 3 [4-item] → Phase 4 [3-item] → Phase 5 [consensus] → Phase 6 → Phase 7. Phase 0.5 HARD GATE: ontology-docs unavailable → STOP. No Consensus at Phase 5 → feedback loop to Phase 3. Every gate specifies exact missing items — fix before proceeding.

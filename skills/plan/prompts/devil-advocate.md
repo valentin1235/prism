@@ -21,6 +21,7 @@ All prompts use these placeholders:
 - `{ALL_ANALYST_FINDINGS}` — compiled findings from all analysts
 - `{PLAN_CONTEXT}` — full planning context from Phase 0
 - `{PRIOR_ITERATION_CONTEXT}` — empty on first pass; on feedback loops includes previous DA synthesis + committee debate + gap analysis
+- `{REFERENCE_DOCS}` — full ontology catalog from Phase 0.5
 
 ---
 
@@ -37,9 +38,14 @@ ALL ANALYST FINDINGS:
 PRIOR ITERATION CONTEXT (if feedback loop):
 {PRIOR_ITERATION_CONTEXT}
 
+### Reference Documents — Ontology
+{REFERENCE_DOCS}
+
+Use `mcp__ontology-docs__` tools to verify analyst claims and discover missed evidence.
+
 YOUR MISSION:
 
-Synthesize all analyst findings into a coherent package, then ruthlessly challenge it.
+Synthesize all analyst findings into a coherent package, then ruthlessly challenge it. Pay special attention to how different perspectives interpreted the SAME ontology documents — contradictions and blind spots in interpretation are high-value findings.
 
 == SYNTHESIS TASKS ==
 
@@ -78,6 +84,13 @@ Synthesize all analyst findings into a coherent package, then ruthlessly challen
    - Identify quick wins vs. heavy lifts
    - Propose phasing strategy
 
+7. **CROSS-PERSPECTIVE ONTOLOGY AUDIT**:
+   - All analysts analyzed the SAME ontology docs. Compare their interpretations.
+   - Where did two perspectives read the same document but reach different conclusions? Why?
+   - Did any analyst overlook critical content in a document that another analyst caught?
+   - Are there ontology docs that NO analyst extracted meaningful findings from? Re-examine them.
+   - Verify analyst citations — spot-check key claims against actual ontology content.
+
 == OUTPUT FORMAT ==
 
 ## Devil's Advocate Synthesis
@@ -88,6 +101,14 @@ Synthesize all analyst findings into a coherent package, then ruthlessly challen
 ### Cross-Perspective Contradictions
 | Topic | Perspective A | Perspective B | Evidence A | Evidence B | DA Assessment |
 |-------|-------------|-------------|-----------|-----------|--------------|
+
+### Ontology Interpretation Comparison
+| Document | Perspective A Interpretation | Perspective B Interpretation | Conflict? | DA Assessment |
+|----------|---------------------------|---------------------------|-----------|--------------|
+
+### Ontology Coverage Gaps
+| # | Document/Section | Missed By | What Was Missed | Significance |
+|---|-----------------|-----------|----------------|-------------|
 
 ### Assumption Challenges
 | # | Assumed Truth | Challenge | Alternative | Evidence For/Against |
