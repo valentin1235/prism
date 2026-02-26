@@ -1,95 +1,99 @@
 # Ontology Scope Mapping
 
-Pre-determine which ontology docs each perspective should explore during analysis, preventing analysts from wasting time searching irrelevant documents.
+Orchestrate the ontology workflow: build a pool of reference documents, map them to perspectives, and generate scoped references for analysts.
 
 ## Parameters
 
 | Placeholder | Description | Examples |
 |-------------|-------------|---------|
-| `{AVAILABILITY_MODE}` | Behavior when MCP is not configured | `optional` (warn and proceed) / `required` (error and stop) |
+| `{AVAILABILITY_MODE}` | Behavior when ontology-docs MCP is not configured | `optional` (warn and proceed) / `required` (error and stop) |
 | `{UNMAPPED_POLICY}` | Whether unmapped perspectives are allowed | `allowed` (acceptable for non-ontology domains) / `forbidden` (perspective must be reassessed) |
+| `{WEB_LINKS}` | User-provided URLs to include in pool | `["https://example.com/guide"]` or empty `[]` (default: `[]`) |
 
 ---
 
-## Step 1: Check Ontology Availability
+## Phase A: Build Ontology Pool
 
-Call `mcp__ontology-docs__directory_tree` on root to discover top-level structure.
+→ Read and execute `ontology-pool.md` with:
+- `{AVAILABILITY_MODE}` = (pass through from caller)
+- `{WEB_LINKS}` = (pass through from caller)
 
-| Result | {AVAILABILITY_MODE}=optional | {AVAILABILITY_MODE}=required |
-|--------|------------------------------|------------------------------|
-| Success | `ONTOLOGY_AVAILABLE=true`. Proceed. | Proceed. |
-| Error / MCP not configured | `ONTOLOGY_AVAILABLE=false`. Warn: "ontology-docs MCP not configured. Analysis will proceed without reference docs." **Skip remaining steps.** | Error: "ontology-docs MCP not configured. See plugin README for setup." **STOP.** |
+**Output:** Pool Catalog (unified table of available document and web sources).
 
-## Step 2: Characterize Ontologies
+If Pool Catalog is empty and `{AVAILABILITY_MODE}`=`optional` → analysts get `{ONTOLOGY_SCOPE}` = "N/A — no ontology sources available". Skip to Exit Gate.
 
-For each top-level directory:
-1. Attempt to read `{dir}/README.md` via `mcp__ontology-docs__read_text_file`
-2. If not found, attempt `{dir}/CLAUDE.md`
-3. If neither exists, use `mcp__ontology-docs__list_directory` to inspect file listing and infer the domain
+## Phase B: Map Perspectives to Pool Entries
 
-Build ontology catalog:
+With the Pool Catalog from Phase A, evaluate each locked perspective against available pool entries.
 
-```
-| # | Path | Domain | Summary | Key Topics |
-|---|------|--------|---------|------------|
-| 1 | {dir}/ | {domain} | {1-2 line summary} | {3-5 keywords} |
-```
+### Step B.1: Select Relevant Entries
 
-## Step 3: Map Perspectives to Ontologies
-
-Match each locked perspective's scope against catalog entries:
+For each locked perspective, select relevant pool entries:
 
 ```
-| Perspective | Relevant Ontologies | Reasoning |
-|-------------|-------------------|-----------|
-| {perspective-name} | {catalog #1}, {catalog #3} | {why these docs are relevant} |
-| {perspective-name} | (none) | {domain outside ontology coverage} |
+| Perspective | Selected Ontologies | Reasoning |
+|-------------|---------------------|-----------|
+| {perspective-name} | Pool #{1}, #{3} | {why these are relevant to this perspective's scope} |
+| {perspective-name} | (none) | {domain outside pool coverage} |
 ```
 
 Mapping rules:
-- Map ONLY when perspective scope and ontology domain are directly related
-- One ontology MAY be mapped to multiple perspectives
-- Do NOT force-map irrelevant ontologies
+- Map ONLY when perspective scope and pool entry domain are directly related
+- One pool entry MAY be mapped to multiple perspectives
+- Do NOT force-map irrelevant entries
+- `unavailable` entries MUST NOT be mapped
 
-**If `{UNMAPPED_POLICY}`=`allowed`**: Unmapped perspectives are acceptable (analysis domain outside ontology coverage).
-**If `{UNMAPPED_POLICY}`=`forbidden`**: Unmapped perspectives are NOT allowed — analysis requires reference docs. Reassess the perspective if no relevant ontology exists.
+**If `{UNMAPPED_POLICY}`=`allowed`**: Unmapped perspectives are acceptable (analysis domain outside pool coverage).
+**If `{UNMAPPED_POLICY}`=`forbidden`**: Unmapped perspectives are NOT allowed — reassess the perspective if no relevant pool entry exists.
 
-## Step 4: Generate Scoped References
+## Phase C: Generate Scoped References
 
 Generate per-perspective `{ONTOLOGY_SCOPE}` blocks:
 
-### When ontologies are mapped:
-```
-Your assigned ontology docs for this perspective:
-- {path}: {domain} — {summary}
-- {path}: {domain} — {summary}
+### When pool entries are mapped:
 
-Use mcp__ontology-docs__ tools (search_files, read_file, read_text_file, etc.) to explore THESE docs first.
-You MAY search other ontology docs if needed, but prioritize your assigned scope.
-Cite findings as "filename:section".
+For **document sources** (mcp):
+```
+- doc: {path}: {domain} — {summary}
+  Access: Use mcp__ontology-docs__ tools (search_files, read_file, read_text_file) to explore.
 ```
 
-### When no ontologies are mapped (allowed only):
+For **web sources**:
 ```
-No ontology docs mapped to this perspective.
-You MAY search ontology-docs if you discover relevant documentation during analysis,
-but this is not expected for your scope.
+- web: {url}: {domain} — {summary}
+  Access: Content summary provided below. Use WebFetch if deeper exploration needed.
+  {cached summary from pool build}
+```
+
+Combined per-perspective block:
+```
+Your assigned reference documents for this perspective:
+{list of mapped entries with access instructions}
+
+Analyze ONLY these documents through your perspective's lens.
+Cite findings as "source:section" (doc sources) or "url:section" (web sources).
+```
+
+### When no entries are mapped (allowed only):
+```
+No reference documents mapped to this perspective.
+Proceed with analysis based on available evidence and expertise.
 ```
 
 ### For Devil's Advocate (always full scope):
 ```
-You have access to ALL ontology docs. Verify analysts explored the right scope.
+You have access to ALL pool entries. Verify analysts explored the right scope.
 
-Available ontology docs:
-{full catalog table}
+Full Ontology Pool:
+{complete pool catalog table — available entries only}
 
-Check: Did each analyst find relevant evidence in their assigned docs?
-Check: Are there relevant docs in UNASSIGNED ontology areas that analysts missed?
+Check: Did each analyst find relevant evidence in their assigned documents?
+Check: Are there relevant documents in UNASSIGNED pool entries that analysts missed?
 ```
 
 ## Exit Gate
 
-- [ ] Catalog complete (domain/summary confirmed for each top-level directory)
-- [ ] Mapping decision made for every perspective (unmapped = intentional decision, per `{UNMAPPED_POLICY}`)
-- [ ] Per-perspective `{ONTOLOGY_SCOPE}` blocks generated
-- [ ] DA full-scope block generated
+- [ ] Pool Catalog built (all MCP docs + web links characterized)
+- [ ] Mapping decision made for every perspective (unmapped = intentional, per `{UNMAPPED_POLICY}`)
+- [ ] Per-perspective `{ONTOLOGY_SCOPE}` blocks generated with correct access instructions per source type
+- [ ] DA full-scope block generated with complete available pool
