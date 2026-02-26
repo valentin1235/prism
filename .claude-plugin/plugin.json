@@ -1,5 +1,6 @@
 {
   "name": "prism",
   "version": "1.0.0",
-  "description": "Multi-perspective agent team analysis — incident postmortem and PRD policy review"
+  "description": "Multi-perspective agent team analysis — incident postmortem and PRD policy review",
+  "skills": "./skills/"
 }
