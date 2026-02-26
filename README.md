@@ -27,24 +27,24 @@ Before installing Prism, make sure you have:
 
 ### Step 1: Install the plugin
 
-```bash
-claude plugin add prism-plugins/prism
+Inside Claude Code, register the Prism marketplace and install the plugin:
+
+```
+/plugin marketplace add valentin1235/prism
+/plugin install prism@prism-plugins
 ```
 
-Or clone manually:
+Or from the terminal CLI:
 
 ```bash
-git clone https://github.com/valentin1235/prism.git ~/.claude/plugins/prism
+claude plugin marketplace add valentin1235/prism
+claude plugin install prism@prism-plugins
 ```
 
-Then enable it in `~/.claude/settings.json`:
+The plugin will be automatically enabled after installation. You can verify with `/plugin` (Installed tab) or:
 
-```json
-{
-  "enabledPlugins": {
-    "prism@prism-plugins": true
-  }
-}
+```bash
+claude plugin list
 ```
 
 ### Step 2: Enable Agent Team Mode
@@ -80,24 +80,21 @@ If you already have an `env` section with other keys, just add the new key insid
 
 Prism does not have its own built-in agents. It currently uses [oh-my-claudecode](https://github.com/anthropics-community/oh-my-claudecode) as a general-purpose agent pack, which provides the specialized agent types needed for team analysis (`architect`, `architect-medium`, `analyst`, `critic`, etc.). Install it if you haven't already:
 
-```bash
-claude plugin add omc/oh-my-claudecode
+```
+/plugin marketplace add Yeachan-Heo/oh-my-claudecode
+/plugin install oh-my-claudecode@omc
 ```
 
-And enable it:
+Or from the terminal CLI:
 
-```json
-{
-  "enabledPlugins": {
-    "oh-my-claudecode@omc": true,
-    "prism@prism-plugins": true
-  }
-}
+```bash
+claude plugin marketplace add Yeachan-Heo/oh-my-claudecode
+claude plugin install oh-my-claudecode@omc
 ```
 
 ### Step 4: Configure ontology-docs MCP (optional)
 
-Both skills can reference your internal documentation through the `ontology-docs` MCP server. This is optional but recommended for accurate policy/codebase analysis.
+All skills can reference your internal documentation through the `ontology-docs` MCP server. This is optional but recommended for accurate policy/codebase analysis.
 
 Use the `claude mcp add` CLI command to register the server with **user scope**. Replace `/path/to/your/docs` with the absolute path to your documentation directory.
 
@@ -106,7 +103,9 @@ claude mcp add --transport stdio --scope user ontology-docs \
   -- npx -y @modelcontextprotocol/server-filesystem /path/to/your/docs
 ```
 
-> The `ontology-docs` MCP server must be registered with `--scope user` so it is available across all projects. Local or project scope will not work with Prism.
+> **The server name must be exactly `ontology-docs`.** Prism skills internally reference `mcp__ontology-docs__*` tools by this name. Using a different name will cause the skills to fail.
+
+> `--scope user` is recommended so the MCP server is available across all projects. With `local` or `project` scope, the server will only be accessible within that specific project.
 
 Verify it was added:
 
@@ -128,7 +127,7 @@ If everything is configured correctly, the skill will start the incident intake 
 
 ## Full settings.json Example
 
-Here's a complete example with all required settings:
+After completing all installation steps, your `~/.claude/settings.json` should contain at least these entries. The `env` section must be added manually (Step 2), while `enabledPlugins` are added automatically by `claude plugin install`:
 
 ```json
 {
