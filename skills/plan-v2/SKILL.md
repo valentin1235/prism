@@ -33,7 +33,7 @@ MUST persist phase outputs to `.omc/state/plan-{short-id}/` (create in Phase 2).
 | File | Written | Read By |
 |------|---------|---------|
 | `context.md` | Phase 2 | All agents |
-| `ontology-catalog.md` | Phase 1.6 | All analysts |
+| `ontology-catalog.md` | Phase 1.7 | All analysts |
 | `analyst-findings.md` | Phase 3 exit | DA |
 | `da-synthesis.md` | Phase 4 exit | Committee |
 | `committee-debate.md` | Phase 5 exit | Analysts (re-entry) |
@@ -163,15 +163,37 @@ Repeat 1.3 until user selects "Proceed". Warn if <3 perspectives: "Fewer than 3 
 
 Lock final perspective roster: ID, name, scope, key questions, model, agent type, rationale.
 
-### Step 1.6: Ontology Scope Mapping
+### Step 1.6: Collect External References
+
+`AskUserQuestion`:
+```
+question: "분석에 참고할 외부 링크(URL)가 있나요? 웹 문서, 기술 블로그, API 문서 등을 온톨로지 풀에 추가할 수 있습니다."
+header: "External References"
+options:
+  - label: "링크 추가"
+    description: "참고할 URL을 입력합니다"
+  - label: "없음 — 바로 진행"
+    description: "ontology-docs MCP 문서만으로 진행합니다"
+```
+
+If user selects "링크 추가":
+1. Collect URLs from user input (comma or newline separated)
+2. Store as `{WEB_LINKS}` list (e.g., `["https://...", "https://..."]`)
+3. Ask again: "더 추가할 링크가 있나요?" — repeat until user says no
+
+If user selects "없음 — 바로 진행":
+- Set `{WEB_LINKS}` = `[]`
+
+### Step 1.7: Ontology Scope Mapping
 
 → Read and execute `../shared/ontology-scope-mapping.md` with:
 - `{AVAILABILITY_MODE}` = `optional`
 - `{UNMAPPED_POLICY}` = `allowed`
+- `{WEB_LINKS}` = (collected from Step 1.6, default `[]`)
 
 If `ONTOLOGY_AVAILABLE=false` → analysts get `{ONTOLOGY_SCOPE}` = "N/A — ontology-docs not available".
 
-Save catalog to `.omc/state/plan-{short-id}/ontology-catalog.md`.
+Save catalog to `.omc/state/plan-{short-id}/ontology-catalog.md`. If web sources were included, catalog MUST show both `mcp` and `web` type entries.
 
 ### Phase 1 Exit Gate
 
@@ -181,6 +203,7 @@ MUST NOT proceed until:
 - [ ] Each passes Quality Gate
 - [ ] User approved the roster
 - [ ] Roster locked (no further changes)
+- [ ] External references collected (or explicitly skipped by user)
 - [ ] Ontology scope mapping complete (or explicitly skipped if MCP unavailable)
 
 ---
@@ -256,7 +279,7 @@ Placeholder replacements:
 - `{PERSPECTIVE_SCOPE}` → perspective scope description
 - `{KEY_QUESTIONS}` → numbered list of key questions
 - `{PLAN_CONTEXT}` → full Phase 0 extracted context (goal, scope, constraints, raw input)
-- `{ONTOLOGY_SCOPE}` → **perspective-specific scoped reference** from Phase 1.6
+- `{ONTOLOGY_SCOPE}` → **perspective-specific scoped reference** from Phase 1.7
 
 ### Step 3.3: Analyst Prompt Structure
 
@@ -315,7 +338,7 @@ Placeholder replacements:
 - `{ALL_ANALYST_FINDINGS}` → compiled findings from all analysts
 - `{PLAN_CONTEXT}` → Phase 0 context
 - `{PRIOR_ITERATION_CONTEXT}` → empty string on first pass; on feedback loop iterations, include previous DA synthesis + committee debate results + gap analysis
-- `{ONTOLOGY_SCOPE}` → DA full-scope ontology reference from Phase 1.6
+- `{ONTOLOGY_SCOPE}` → DA full-scope ontology reference from Phase 1.7
 
 ### Step 4.3: Monitor DA
 
@@ -475,7 +498,7 @@ After writing the file, output to chat: Goal, File path, Consensus level (% of e
 ## Gate Summary
 
 ```
-Prerequisite → Phase 0 [5-item] → Phase 1 [5-item, incl. ontology mapping] → Phase 2 → Phase 3 [4-item] → Phase 4 [3-item] → Phase 5 [consensus] → Phase 6 → Phase 7
+Prerequisite → Phase 0 [5-item] → Phase 1 [6-item, incl. external refs + ontology mapping] → Phase 2 → Phase 3 [4-item] → Phase 4 [3-item] → Phase 5 [consensus] → Phase 6 → Phase 7
                                                                                   ↓ (ONTOLOGY_AVAILABLE=false)
                                                                                   └─ Analysts get {ONTOLOGY_SCOPE}="N/A", proceed normally
 ```

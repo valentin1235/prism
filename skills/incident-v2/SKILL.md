@@ -11,6 +11,7 @@ allowed-tools: Task, SendMessage, TeamCreate, TeamDelete, TaskCreate, TaskUpdate
 - [Archetype Index](#archetype-index)
 - [Phase 0: Problem Intake](#phase-0-problem-intake)
 - [Phase 0.5: Perspective Generation](#phase-05-perspective-generation)
+- [Phase 0.6: Collect External References](#phase-06-collect-external-references)
 - [Phase 0.7: Ontology Scope Mapping](#phase-07-ontology-scope-mapping)
 - [Phase 1: Team Formation](#phase-1-team-formation)
 - [Phase 2: Analysis Execution](#phase-2-analysis-execution)
@@ -158,11 +159,33 @@ Selection rules:
 
 ---
 
+## Phase 0.6: Collect External References
+
+`AskUserQuestion`:
+```
+question: "분석에 참고할 외부 링크(URL)가 있나요? 장애 관련 문서, 모니터링 대시보드, 이슈 트래커 링크 등을 온톨로지 풀에 추가할 수 있습니다."
+header: "External References"
+options:
+  - label: "링크 추가"
+    description: "참고할 URL을 입력합니다"
+  - label: "없음 — 바로 진행"
+    description: "ontology-docs MCP 문서만으로 진행합니다"
+```
+
+If user selects "링크 추가":
+1. Collect URLs from user input (comma or newline separated)
+2. Store as `{WEB_LINKS}` list (e.g., `["https://...", "https://..."]`)
+3. Ask again: "더 추가할 링크가 있나요?" — repeat until user says no
+
+If user selects "없음 — 바로 진행":
+- Set `{WEB_LINKS}` = `[]`
+
 ## Phase 0.7: Ontology Scope Mapping
 
 → Read and execute `../shared/ontology-scope-mapping.md` with:
 - `{AVAILABILITY_MODE}` = `optional`
 - `{UNMAPPED_POLICY}` = `allowed`
+- `{WEB_LINKS}` = (collected from Phase 0.6, default `[]`)
 
 If `ONTOLOGY_AVAILABLE=false` → skip to Phase 1. All analysts get `{ONTOLOGY_SCOPE}` = "N/A — ontology-docs not available".
 
@@ -313,9 +336,9 @@ Deeper investigation → Phase 2. Tribunal → Phase 2.5.
 ## Gate Summary
 
 ```
-Phase 0 ──[5-item gate]──→ Phase 0.5 ──→ Phase 0.7 ──[exit gate]──→ Phase 1 ──→ Phase 2 ──[6-item gate]──→ Phase 2.5? ──→ Phase 3 ──→ Phase 4
-                                                  ↓ (ONTOLOGY_AVAILABLE=false)
-                                                  └──→ Phase 1 (skip 0.7)
+Phase 0 ──[5-item gate]──→ Phase 0.5 ──→ Phase 0.6 ──→ Phase 0.7 ──[exit gate]──→ Phase 1 ──→ Phase 2 ──[6-item gate]──→ Phase 2.5? ──→ Phase 3 ──→ Phase 4
+                                                        ↓ (ONTOLOGY_AVAILABLE=false)
+                                                        └──→ Phase 1 (skip 0.7)
 ```
 
 Every gate specifies exact missing items. Fix before proceeding.

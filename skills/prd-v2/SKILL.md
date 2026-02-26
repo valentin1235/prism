@@ -77,15 +77,37 @@ PRD sections: {FR-N, NFR-N, etc.}
 
 → Apply `../shared/perspective-quality-gate.md` with `{DOMAIN}` = "prd", `{EVIDENCE_SOURCE}` = "PRD content and ontology docs".
 
-### 1.3 Ontology Scope Mapping
+### 1.3 Collect External References
+
+`AskUserQuestion`:
+```
+question: "PRD 분석에 참고할 외부 링크(URL)가 있나요? 정책 문서, 기획 레퍼런스, 경쟁사 분석 등을 온톨로지 풀에 추가할 수 있습니다."
+header: "External References"
+options:
+  - label: "링크 추가"
+    description: "참고할 URL을 입력합니다"
+  - label: "없음 — 바로 진행"
+    description: "ontology-docs MCP 문서만으로 진행합니다"
+```
+
+If user selects "링크 추가":
+1. Collect URLs from user input (comma or newline separated)
+2. Store as `{WEB_LINKS}` list (e.g., `["https://...", "https://..."]`)
+3. Ask again: "더 추가할 링크가 있나요?" — repeat until user says no
+
+If user selects "없음 — 바로 진행":
+- Set `{WEB_LINKS}` = `[]`
+
+### 1.4 Ontology Scope Mapping
 
 → Read and execute `../shared/ontology-scope-mapping.md` with:
 - `{AVAILABILITY_MODE}` = `required`
 - `{UNMAPPED_POLICY}` = `forbidden`
+- `{WEB_LINKS}` = (collected from Step 1.3, default `[]`)
 
 PRD analysis requires policy document references — MCP unavailability stops execution, and unmapped perspectives must be reassessed.
 
-#### Phase 1.3 Exit Gate
+#### Phase 1.4 Exit Gate
 
 Additional check beyond shared module exit gate:
 - [ ] Every perspective has ≥1 ontology doc mapped (required for PRD analysis)
@@ -154,7 +176,7 @@ All analysts use `analyst` (opus) — PRD policy conflict analysis requires deep
 - `{WORKER_NAME}` = `"{perspective-slug}-analyst"`
 - `{WORK_ACTION}` = `"Use ontology-docs MCP tools to explore and read your assigned ontology docs (see ONTOLOGY SCOPE below), then cross-reference PRD sections against docs to find policy conflicts/ambiguities"`
 
-Then include `{ONTOLOGY_SCOPE}` block from Phase 1.3.
+Then include `{ONTOLOGY_SCOPE}` block from Phase 1.4.
 
 Analyst behavior rules (include in prompt):
 ```
@@ -189,7 +211,7 @@ Task(
 ```
 
 MUST replace in DA prompt:
-- `{ONTOLOGY_SCOPE}` → full-scope ontology reference from Phase 1.3 (all docs, not perspective-filtered)
+- `{ONTOLOGY_SCOPE}` → full-scope ontology reference from Phase 1.4 (all docs, not perspective-filtered)
 
 DA prompt core:
 ```
