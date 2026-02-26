@@ -1,7 +1,5 @@
 # Ontology Scope Mapping
 
-Orchestrate the ontology workflow: build a pool of reference documents, map them to perspectives, and generate scoped references for analysts.
-
 ## Parameters
 
 | Placeholder | Description | Examples |
@@ -23,10 +21,6 @@ Orchestrate the ontology workflow: build a pool of reference documents, map them
 If Pool Catalog is empty and `{AVAILABILITY_MODE}`=`optional` → analysts get `{ONTOLOGY_SCOPE}` = "N/A — no ontology sources available". Skip to Exit Gate.
 
 ## Phase B: Map Perspectives to Pool Entries
-
-With the Pool Catalog from Phase A, evaluate each locked perspective against available pool entries.
-
-### Step B.1: Select Relevant Entries
 
 For each locked perspective, select relevant pool entries:
 

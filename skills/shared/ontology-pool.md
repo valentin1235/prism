@@ -1,7 +1,5 @@
 # Ontology Pool
 
-Build a unified pool of reference documents from registered sources before perspective-ontology mapping.
-
 ## Parameters
 
 | Placeholder | Description | Examples |
@@ -50,7 +48,7 @@ If `{WEB_LINKS}` is empty → skip to Step 4.
 For each URL in `{WEB_LINKS}`:
 1. Fetch content via `WebFetch`
 2. Extract: title, domain/topic, summary (1-2 lines), key topics (3-5 keywords)
-3. Cache the extracted summary for analyst prompt injection (avoid redundant fetches during analysis)
+3. Cache the extracted summary for analyst prompt injection
 4. If fetch fails → mark as `unavailable` with reason
 
 ## Step 4: Build Pool Catalog
