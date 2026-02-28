@@ -55,7 +55,12 @@ Fill all sections. Write "N/A" if truly irrelevant — do NOT leave sections emp
 - MAJOR: {count}
 - MINOR: {count}
 
-## Tribunal Review (if activated)
+## Tribunal Review
+
+{If tribunal was NOT activated, use this block and skip sub-sections:}
+> Tribunal not triggered. DA Aggregate Verdict: SUFFICIENT. All recommendations carry DA-approved status.
+
+{If tribunal WAS activated, fill below:}
 - Trigger: {reason}
 - Consensus: {X} unanimous, {Y} w/caveats, {Z} w/dissent
 

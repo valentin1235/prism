@@ -175,7 +175,13 @@ Selection rules:
 - `{AVAILABILITY_MODE}` = `optional`
 - `{CALLER_CONTEXT}` = `"incident analysis"`
 
-If `ONTOLOGY_AVAILABLE=false` → skip to Phase 1. All analysts get `{ONTOLOGY_SCOPE}` = "N/A — ontology-docs not available".
+If `ONTOLOGY_AVAILABLE=false` → skip to Phase 1. All analysts get `{ONTOLOGY_SCOPE}` = the following block:
+
+```
+No ontology-docs available for this analysis.
+DO NOT call any mcp__ontology-docs__* tools — they will fail or timeout.
+Analyze using available evidence only (logs, code, metrics, stack traces).
+```
 
 #### Phase 0.6 Exit Gate
 
@@ -186,6 +192,8 @@ Shared module exit gate applies. No additional incident-specific checks required
 ## Phase 1: Team Formation
 
 ### Step 1.1
+
+Generate `{short-id}`: run `uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-8` (e.g., `a3f7b2c1`). Generate ONCE and reuse throughout all phases.
 
 ```
 TeamCreate(team_name: "incident-analysis-{short-id}", description: "Incident: {summary}")
@@ -218,8 +226,14 @@ MUST read prompt files before spawning. Files are relative to this SKILL.md's di
 | Root Cause | `prompts/core-archetypes.md` | § Root Cause Lens |
 | Systems & Architecture | `prompts/core-archetypes.md` | § Systems Lens |
 | Impact | `prompts/core-archetypes.md` | § Impact Lens |
-| Security / Data Integrity / Performance | `prompts/extended-archetypes.md` | § respective section |
-| Deployment / Network / Concurrency / Dependency / UX | `prompts/extended-archetypes.md` | § respective section |
+| Security | `prompts/extended-archetypes.md` | § Security Lens |
+| Data Integrity | `prompts/extended-archetypes.md` | § Data Integrity Lens |
+| Performance | `prompts/extended-archetypes.md` | § Performance Lens |
+| UX | `prompts/extended-archetypes.md` | § UX Lens |
+| Deployment | `prompts/extended-archetypes.md` | § Deployment |
+| Network | `prompts/extended-archetypes.md` | § Network |
+| Concurrency | `prompts/extended-archetypes.md` | § Concurrency |
+| Dependency | `prompts/extended-archetypes.md` | § Dependency |
 | Custom | `prompts/extended-archetypes.md` | § Custom Lens |
 
 **Spawn pattern:**
@@ -271,6 +285,11 @@ Monitor via `TaskList`. Forward findings between analysts. Unblock stuck analyst
 
 → Apply `../shared/clarity-enforcement.md` with `{EVIDENCE_FORMAT}` = `"file:function:line"`.
 
+**Rework procedure** when analyst output matches a rejection pattern (MUST occur before analyst marks task `completed` and before DA spawning in Step 1.4):
+1. Send feedback via `SendMessage(recipient: "{analyst-name}", content: "{rejection message from clarity enforcement table}")`.
+2. Analyst addresses feedback and re-sends findings (task remains `in_progress` throughout).
+3. Max 2 rework cycles per analyst. After 2nd rejection, accept with caveat and note for DA.
+
 ### Step 2.3: Cross-Perspective Validation
 
 | Signal | Action |
@@ -304,6 +323,8 @@ The DA evaluates analyst findings using the evaluation protocol (`shared/da-eval
 
 Orchestrator tracks round count. Maximum 2 challenge-response rounds before escalation.
 
+**How to read DA verdict**: DA's SendMessage contains a "### Tribunal Trigger Assessment" section with exactly one checked item (`[x]`). Parse the checked line to determine: `SUFFICIENT`, `NOT SUFFICIENT`, or `NEEDS TRIBUNAL`. If no checked item found, ask DA to clarify via SendMessage.
+
 ### Phase 2 Exit Gate
 
 MUST NOT proceed until ALL verified:
@@ -332,8 +353,15 @@ If NONE → announce "DA: analysis sufficient. Proceeding to report." → skip t
 
 ### Execution
 
-1. Compile findings package (~10-15K tokens): summary, key findings, recommendations, DA Fallacy Check Results, contradictions, trigger reason
-2. Shut down completed analysts (keep DA)
+1. Compile findings package (~10-15K tokens) using this structure:
+   - **Incident Summary**: 2-3 sentence recap from Phase 0
+   - **Key Findings by Perspective**: For each analyst — perspective name, top 3 findings with evidence
+   - **Root Cause Hypothesis**: Primary hypothesis with supporting evidence and code references
+   - **Recommendations**: Numbered list of all proposed recommendations
+   - **DA Fallacy Check Results**: Per-claim verdict table (FAIL items only — BLOCKING + MAJOR)
+   - **Unresolved Contradictions**: Cross-perspective conflicts that triggered tribunal
+   - **Tribunal Trigger**: Specific condition from Trigger check that activated tribunal
+2. Shut down completed analysts (keep DA): for each analyst, call `SendMessage(type: "shutdown_request", recipient: "{analyst-name}", content: "Analysis complete, proceeding to tribunal.")` and await `shutdown_response(approve=true)` before proceeding. DA remains active for tribunal review.
 3. Read `prompts/tribunal.md` for critic prompts
 3.5. Replace placeholders in tribunal prompts:
    - `{FINDINGS_PACKAGE}` → compiled findings from step 1
@@ -349,7 +377,7 @@ If NONE → announce "DA: analysis sufficient. Proceeding to report." → skip t
 | Caveat | 1 APPROVE, 1 CONDITIONAL | `[Approved w/caveat]` |
 | Split | 1+ REJECT | `[No consensus]` → user decision |
 
-Split → share rationale, 1 final round only. Still split → present to user.
+Split → share rationale, 1 final round only. Still split → present to user via `AskUserQuestion` with options: "{UX Critic position}" / "{Eng Critic position}" / "Defer". If user selects "Defer", apply per-recommendation tiebreaker: adopt the position of the critic whose rationale aligns with the DA's findings for that specific recommendation.
 
 7. Compile verdict, shut down critics, proceed to Phase 3.
 
@@ -371,7 +399,9 @@ Read `templates/report.md` and fill all sections with synthesized findings.
 - "Is the analysis complete?"
 - Options: "Complete" / "Need deeper investigation" / "Request Tribunal" / "Add recommendations" / "Share with team"
 
-**Deeper investigation re-entry:**
+**Deeper investigation re-entry (max 2 loops):**
+
+Before re-entry, increment `investigation_loops` counter in `.omc/state/incident-{short-id}/context.md`. If counter ≥ 2, inform user: "Maximum investigation depth reached. Proceeding with current findings." and auto-select "Complete".
 
 1. Write current findings to `.omc/state/incident-{short-id}/analyst-findings.md` and DA evaluation to `da-evaluation.md`
 2. Append iteration summary to `prior-iterations.md`
@@ -381,7 +411,7 @@ Read `templates/report.md` and fill all sections with synthesized findings.
 4. New analyst runs → DA re-evaluates with cumulative findings (`analyst-findings.md` appended + `prior-iterations.md` for context via `{PRIOR_ITERATION_CONTEXT}`)
 5. Return to Phase 3 synthesis with expanded findings
 
-Max 2 deeper investigation loops. Tribunal → Phase 2.5.
+Tribunal → Phase 2.5.
 
 ---
 
