@@ -58,8 +58,8 @@ Fill all sections. Write "N/A" if truly irrelevant — do NOT leave sections emp
 |-------------|----------------|-------------------|-----------------|
 
 ### Ontology Scope Critique
-| Perspective | Mapped Docs | Missed Docs? | Evidence Gap |
-|-------------|-------------|-------------|--------------|
+| Perspective | Mapped Sources | Missed Sources? | Evidence Gap |
+|-------------|---------------|----------------|--------------|
 
 ### Unanswered Questions
 {Questions identified by DA that remain open for committee resolution}
@@ -141,8 +141,8 @@ Gate: {Proceed to Phase 3 only if...}
 |-------------|---------------------|-----------|
 
 ### Ontology Catalog
-| # | Path | Domain | Summary |
-|---|------|--------|---------|
+| # | Source | Type | Path/URL | Domain | Summary |
+|---|--------|------|----------|--------|---------|
 
 ### Full Analyst Reports (if requested)
 ### Committee Debate Transcript Summary

@@ -125,8 +125,8 @@ Apply YOUR METHOD (above) to each area below. These tell you WHERE to audit — 
 |-------------|----------------|-------------------|---------------------|
 
 ### Ontology Scope Critique
-| Perspective | Mapped Docs | Missed Docs? | Evidence Gap |
-|-------------|-------------|-------------|--------------|
+| Perspective | Mapped Sources | Missed Sources? | Evidence Gap |
+|-------------|---------------|----------------|--------------|
 
 ### Unanswered Questions
 - [Questions that MUST be answered before findings can be considered verified]
