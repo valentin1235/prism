@@ -5,12 +5,11 @@
 - [Parameters](#parameters)
 - [Phase A: Build Ontology Pool](#phase-a-build-ontology-pool)
   - [Pool Source Rules](#pool-source-rules)
-  - [Step 1: Discover and Characterize](#step-1-discover-and-characterize-document-sources)
-  - [Step 2: Screen 1 — MCP Document Selection](#step-2-screen-1--mcp-document-selection)
-  - [Step 3: Screen 2 — MCP Data Source Selection](#step-3-screen-2--mcp-data-source-selection)
-  - [Step 4: Screen 3 — External Source Addition](#step-4-screen-3--external-source-addition)
-  - [Step 5: Screen 4 — Pool Configuration Confirmation](#step-5-screen-4--pool-configuration-confirmation)
-  - [Step 6: Build Final Pool Catalog](#step-6-build-final-pool-catalog)
+  - [Step 1: Check ontology-docs MCP Availability](#step-1-check-ontology-docs-mcp-availability)
+  - [Step 2: Screen 1 — MCP Data Source Selection](#step-2-screen-1--mcp-data-source-selection)
+  - [Step 3: Screen 2 — External Source Addition](#step-3-screen-2--external-source-addition)
+  - [Step 4: Screen 3 — Pool Configuration Confirmation](#step-4-screen-3--pool-configuration-confirmation)
+  - [Step 5: Build Final Pool Catalog](#step-5-build-final-pool-catalog)
 - [Phase B: Generate Scoped References](#phase-b-generate-scoped-references)
 - [Exit Gate](#exit-gate)
 
@@ -30,9 +29,9 @@
 ### Pool Source Rules
 
 #### Document Source
-- ONLY documents registered in the `ontology-docs` global MCP server can enter the pool
-- `mcp__ontology-docs__directory_tree` only returns paths within allowed directories — no additional verification needed
-- Documents outside allowed paths MUST NOT be included
+- The `ontology-docs` global MCP server is registered as a **single pool entry** when available
+- No pre-selection of individual directories — analysts explore the MCP directly at reasoning time using `search_files`, `read_file`, `list_directory`, etc.
+- The lead captures `ALLOWED_ROOTS[]` from `list_allowed_directories` and passes them to analysts as exploration starting points
 
 #### MCP Data Source
 - Any registered MCP server (excluding `ontology-docs` and internal plugin tools) can be added as a queryable data source
@@ -42,74 +41,28 @@
 - Analysts MUST call `ToolSearch(query="select:<tool_name>")` to load deferred MCP tools before calling them
 
 #### Web Source
-- ONLY user-provided URLs (collected in Screen 3) can enter the pool
+- ONLY user-provided URLs (collected in Screen 2) can enter the pool
 - Each URL is fetched and summarized at pool build time
 - URLs that fail to fetch are marked as `unavailable` in the catalog
 
 #### File Source
-- ONLY user-provided file paths (collected in Screen 3) can enter the pool
+- ONLY user-provided file paths (collected in Screen 2) can enter the pool
 - Each file is read and summarized at pool build time
 - Files that fail to read are marked as `unavailable` in the catalog
 
-### Step 1: Discover and Characterize Document Sources
+### Step 1: Check ontology-docs MCP Availability
 
-Call `mcp__ontology-docs__directory_tree` on root to discover top-level structure.
+Call `mcp__ontology-docs__list_allowed_directories` to check if the ontology-docs MCP server is reachable.
 
 | Result | {AVAILABILITY_MODE}=optional | {AVAILABILITY_MODE}=required |
 |--------|------------------------------|------------------------------|
-| Success | `ONTOLOGY_AVAILABLE=true`. Proceed to characterize. | Proceed to characterize. |
-| Error / MCP not configured | `ONTOLOGY_AVAILABLE=false`. Warn: "ontology-docs MCP not configured. Pool will contain MCP data sources and external sources only." Skip to Step 3. | Error: "ontology-docs MCP not configured. See plugin README for setup." **STOP.** |
+| Success (returns 1+ paths) | `ONTOLOGY_AVAILABLE=true`. Record returned paths as `ALLOWED_ROOTS[]`. Proceed to Step 2. | Record returned paths as `ALLOWED_ROOTS[]`. Proceed to Step 2. |
+| Success (returns 0 paths) | `ONTOLOGY_AVAILABLE=false`. Warn: "ontology-docs MCP is configured but has no allowed directories. Pool will contain MCP data sources and external sources only." Proceed to Step 2. | Error: "ontology-docs MCP is configured but has no allowed directories. Check MCP server configuration." **STOP.** |
+| Error / MCP not configured | `ONTOLOGY_AVAILABLE=false`. Warn: "ontology-docs MCP not configured. Pool will contain MCP data sources and external sources only." Proceed to Step 2. | Error: "ontology-docs MCP not configured. See plugin README for setup." **STOP.** |
 
-For each top-level directory discovered:
-1. Attempt to read `{dir}/README.md` via `mcp__ontology-docs__read_text_file`
-2. If not found, attempt `{dir}/CLAUDE.md`
-3. If neither exists, use `mcp__ontology-docs__list_directory` to inspect file listing and infer the domain
+**That's it.** No directory enumeration, classification, or characterization. Analysts will explore ontology-docs directly at reasoning time using the MCP tools available to them.
 
-Record per directory: path, domain, summary (1-2 lines), key topics (3-5 keywords).
-
-Store as `DISCOVERED_ENTRIES[]`.
-
-### Step 2: Screen 1 — MCP Document Selection
-
-If `ONTOLOGY_AVAILABLE=false` → skip to Step 3 with warning: "No MCP documents available. MCP data sources and external sources can still be added."
-
-Present discovered entries for user selection via `AskUserQuestion` with `multiSelect: true`.
-
-#### Screen 1A — Single page (entries ≤ 3)
-
-```
-AskUserQuestion(
-  header: "Ontology Pool",
-  question: "Select ontology documents for {CALLER_CONTEXT}. (multiple selection)",
-  multiSelect: true,
-  options: [
-    {label: "{domain}", description: "{path} — {summary}"},
-    ...per discovered entry
-  ]
-)
-```
-
-#### Screen 1B — Pagination (entries > 3)
-
-Present in batches of 3, with a 4th option to include all on the page:
-
-```
-AskUserQuestion(
-  header: "Ontology Pool (page/total)",
-  question: "Include these documents in the ontology pool? (select to include)",
-  multiSelect: true,
-  options: [
-    {label: "{domain_1}", description: "{path_1} — {summary_1}"},
-    {label: "{domain_2}", description: "{path_2} — {summary_2}"},
-    {label: "{domain_3}", description: "{path_3} — {summary_3}"},
-    {label: "Include all", description: "Include all documents on this page"}
-  ]
-)
-```
-
-Repeat for each page. Collect all selected entries into `SELECTED_ENTRIES[]`.
-
-### Step 3: Screen 2 — MCP Data Source Selection
+### Step 2: Screen 1 — MCP Data Source Selection
 
 Discover available MCP servers that can provide queryable data (databases, monitoring, error tracking, project management, etc.).
 
@@ -132,7 +85,7 @@ Two-pronged discovery to ensure all MCP servers are found:
 
 Store as `DISCOVERED_MCP_SERVERS[]`.
 
-If no MCP data sources are discovered → skip to Step 4 with note: "No queryable MCP data sources found."
+If no MCP data sources are discovered → skip to Step 3 with note: "No queryable MCP data sources found."
 
 #### Selection
 
@@ -151,14 +104,14 @@ AskUserQuestion(
 )
 ```
 
-If user selects "Skip" or no servers → proceed to Step 4 with empty `SELECTED_MCP_SERVERS[]`.
+If user selects "Skip" or no servers → proceed to Step 3 with empty `SELECTED_MCP_SERVERS[]`.
 
 Otherwise, for each selected server:
 1. Record full tool list (call additional `ToolSearch(query="+<server_name>")` if the initial discovery was incomplete)
 2. Generate a brief capability summary describing what analysts can query
 3. Add to `SELECTED_MCP_SERVERS[]` with: server name, full tool list, description, capability summary
 
-### Step 4: Screen 3 — External Source Addition
+### Step 3: Screen 2 — External Source Addition
 
 ```
 AskUserQuestion(
@@ -180,7 +133,7 @@ AskUserQuestion(
 4. Cache the extracted summary for analyst prompt injection
 5. If fetch fails → mark as `unavailable` with reason
 6. Add to `WEB_ENTRIES[]`
-7. Return to Screen 3 (repeat loop)
+7. Return to Screen 2 (repeat loop)
 
 #### Add file path
 1. Collect file path from user input
@@ -189,12 +142,12 @@ AskUserQuestion(
 4. Cache the extracted summary for analyst prompt injection
 5. If read fails → mark as `unavailable` with reason
 6. Add to `FILE_ENTRIES[]`
-7. Return to Screen 3 (repeat loop)
+7. Return to Screen 2 (repeat loop)
 
 #### None — proceed
-Exit loop, proceed to Step 5.
+Exit loop, proceed to Step 4.
 
-### Step 5: Screen 4 — Pool Configuration Confirmation
+### Step 4: Screen 3 — Pool Configuration Confirmation
 
 Output the assembled catalog as text:
 
@@ -202,11 +155,11 @@ Output the assembled catalog as text:
 Ontology Pool Configuration:
 | # | Source | Type | Path/URL | Domain | Summary | Status |
 |---|--------|------|----------|--------|---------|--------|
-| 1 | mcp    | doc  | ...      | ...    | ...     | available |
+| 1 | mcp    | doc  | ontology-docs MCP | (analyst-explored) | Analysts explore directly | available |
 | 2 | mcp    | query| mysql    | ...    | ...     | available |
 | 3 | web    | url  | ...      | ...    | ...     | available |
 | 4 | file   | file | ...      | ...    | ...     | available |
-Total N sources (MCP Docs: n, MCP Data: n, Web: n, File: n)
+Total N sources (MCP Docs: {0 or 1}, MCP Data: n, Web: n, File: n)
 ```
 
 Then confirm:
@@ -218,9 +171,8 @@ AskUserQuestion(
   multiSelect: false,
   options: [
     {label: "Confirm — proceed", description: "Start {CALLER_CONTEXT} with this configuration"},
-    {label: "Reselect documents", description: "Go back to MCP document selection (Screen 1)"},
-    {label: "Reselect data sources", description: "Go back to data source selection (Screen 2)"},  // ONLY show if Screen 2 was presented (MCP data sources were discovered)
-    {label: "Add sources", description: "Go back to external source addition (Screen 3)"},
+    {label: "Reselect data sources", description: "Go back to data source selection (Screen 1)"},  // ONLY show if Screen 1 was presented (MCP data sources were discovered)
+    {label: "Add sources", description: "Go back to external source addition (Screen 2)"},
     {label: "Cancel", description: "Proceed without ontology pool"}
   ]
 )
@@ -228,14 +180,13 @@ AskUserQuestion(
 
 | Selection | Action |
 |-----------|--------|
-| Confirm — proceed | Proceed to Step 6 |
-| Reselect documents | Return to Step 2 (Screen 1) |
-| Reselect data sources | Return to Step 3 (Screen 2). **Only show this option if Screen 2 was presented (MCP data sources were discovered).** |
-| Add sources | Return to Step 4 (Screen 3) |
-| Cancel + `{AVAILABILITY_MODE}`=`required` | Warn: "Ontology pool is required. Add at least one source." Return to Step 4 (Screen 3) to add external sources. If no sources added → return to Step 2 (Screen 1). Maximum 2 cancel-retry cycles — after 2nd cancel without adding any source, error: "Cannot proceed without at least one ontology source in required mode." **STOP.** |
+| Confirm — proceed | Proceed to Step 5 |
+| Reselect data sources | Return to Step 2 (Screen 1). **Only show this option if Screen 1 was presented (MCP data sources were discovered).** |
+| Add sources | Return to Step 3 (Screen 2) |
+| Cancel + `{AVAILABILITY_MODE}`=`required` | Warn: "Ontology pool is required. Add at least one source." Return to Step 3 (Screen 2) to add external sources. Maximum 2 cancel-retry cycles — after 2nd cancel without adding any source, error: "Cannot proceed without at least one ontology source in required mode." **STOP.** |
 | Cancel + `{AVAILABILITY_MODE}`=`optional` | Warn: "Proceeding without ontology pool." Pool Catalog is empty. Proceed |
 
-### Step 6: Build Final Pool Catalog
+### Step 5: Build Final Pool Catalog
 
 Combine all sources into a unified catalog:
 
@@ -244,7 +195,7 @@ Combine all sources into a unified catalog:
 
 | # | Source | Type | Path/URL | Domain | Summary | Key Topics | Status |
 |---|--------|------|----------|--------|---------|------------|--------|
-| 1 | mcp | doc | {dir}/ | {domain} | {1-2 line summary} | {3-5 keywords} | available |
+| 1 | mcp | doc | ontology-docs | (analyst-explored) | Full MCP access | search_files, read_file, list_directory | available |
 | 2 | mcp | query | {server_name} | {domain} | {description} | {key tools} | available |
 | 3 | web | url | {url} | {domain} | {1-2 line summary} | {3-5 keywords} | available |
 | 4 | file | file | {path} | {domain} | {1-2 line summary} | {3-5 keywords} | available |
@@ -271,10 +222,15 @@ All perspectives (analysts) receive the **full pool** — no per-perspective fil
 
 Generate `{ONTOLOGY_SCOPE}` block containing all available pool entries:
 
-For **document sources** (mcp doc):
+For **document sources** (ontology-docs MCP):
 ```
-- doc: {path}: {domain} — {summary}
-  Access: Use mcp__ontology-docs__ tools (search_files, read_file, read_text_file) to explore.
+- doc: ontology-docs MCP (available)
+  Allowed roots: {ALLOWED_ROOTS[] joined by ", "}
+  Access: Use mcp__ontology-docs__ tools to explore documentation at reasoning time.
+  Discovery: Call list_directory on the allowed roots above to browse structure,
+             search_files to find relevant documents by keyword,
+             read_file or read_text_file to read content.
+  Note: No pre-selected directories — explore the full MCP scope through your perspective's lens.
 ```
 
 For **MCP data sources** (mcp query):
@@ -317,8 +273,8 @@ You have access to ALL pool entries. Verify analysts explored thoroughly.
 Full Ontology Pool:
 {complete pool catalog table — available entries only}
 
-Check: Did each analyst find relevant evidence in the pool documents?
-Check: Are there documents or sections that no analyst explored?
+Check: Did each analyst find relevant evidence in the ontology-docs MCP?
+Check: Are there documents or sections within ontology-docs that no analyst explored?
 Check: Did analysts effectively query the available MCP data sources?
 Check: Are there MCP data sources that could have provided additional evidence but were not queried?
 Check: Did analysts reference relevant web sources from the pool?
@@ -329,16 +285,15 @@ Check: Did analysts reference relevant file sources from the pool?
 
 ## Exit Gate
 
-- [ ] All ontology-docs MCP directories discovered and characterized (or `ONTOLOGY_AVAILABLE=false`)
-- [ ] User selected MCP documents via Screen 1 (or skipped if MCP unavailable)
-- [ ] MCP data sources discovered via `ToolSearch` and presented to user via Screen 2 (or none available)
+- [ ] ontology-docs MCP availability checked via `list_allowed_directories` (or `ONTOLOGY_AVAILABLE=false`)
+- [ ] `ALLOWED_ROOTS[]` captured and included in `{ONTOLOGY_SCOPE}` doc source block (if available)
+- [ ] MCP data sources discovered via `ToolSearch` and presented to user via Screen 1 (or none available)
 - [ ] Selected MCP servers recorded with full tool lists and capability summaries
-- [ ] External sources collected via Screen 3 (or explicitly skipped)
-- [ ] Pool configuration confirmed via Screen 4
+- [ ] External sources collected via Screen 2 (or explicitly skipped)
+- [ ] Pool configuration confirmed via Screen 3
 - [ ] Pool Catalog generated with Source, Type, and Status for every entry
-- [ ] No MCP document sources included from outside ontology-docs allowed paths (web, file, and MCP data sources are exempt)
 - [ ] Web source summaries cached for analyst prompt use
 - [ ] File source summaries cached for analyst prompt use
 - [ ] MCP data source access instructions generated with tool loading steps (`ToolSearch` → direct call)
 - [ ] Full-pool `{ONTOLOGY_SCOPE}` block generated for all analysts with correct access instructions per source type
-- [ ] DA full-scope block generated with verification mission (including MCP data source utilization check)
+- [ ] DA full-scope block generated with verification mission (including ontology-docs and MCP data source utilization check)
