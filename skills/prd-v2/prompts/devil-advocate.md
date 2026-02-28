@@ -21,7 +21,7 @@ Task(
 All prompts use these placeholders:
 - `{ALL_ANALYST_FINDINGS}` — compiled findings from all analysts
 - `{PRD_CONTEXT}` — PRD content and sibling files from Phase 1
-- `{ONTOLOGY_SCOPE}` — full-scope ontology reference from Phase 1.4
+- `{ONTOLOGY_SCOPE}` — full-scope ontology reference from Phase 1.3
 
 ---
 

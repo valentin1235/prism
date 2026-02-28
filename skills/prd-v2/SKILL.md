@@ -200,7 +200,7 @@ Task(
 Placeholder replacements:
 - `{ALL_ANALYST_FINDINGS}` → compiled findings from all analysts
 - `{PRD_CONTEXT}` → PRD content and sibling files from Phase 1
-- `{ONTOLOGY_SCOPE}` → full-scope ontology reference from Phase 1.4 (all docs, not perspective-filtered)
+- `{ONTOLOGY_SCOPE}` → full-scope ontology reference from Phase 1.3 (all docs, not perspective-filtered)
 
 DA receives analyst findings for **evaluation** — NOT synthesis tasks. DA is a logic auditor only.
 
