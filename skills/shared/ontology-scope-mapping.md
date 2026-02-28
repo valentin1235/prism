@@ -6,6 +6,12 @@
 - [Phase A: Build Ontology Pool](#phase-a-build-ontology-pool)
   - [Pool Source Rules](#pool-source-rules)
   - [Step 1: Discover and Characterize](#step-1-discover-and-characterize-document-sources)
+    - [1A. Probe MCP Availability](#1a-probe-mcp-availability)
+    - [1B. Enumerate Top-Level Entries](#1b-enumerate-top-level-entries)
+    - [1C. Classify Entries via 3-Category Heuristic](#1c-classify-entries-via-3-category-heuristic)
+    - [1D. Depth-2 Probe for UNKNOWN Entries](#1d-depth-2-probe-for-unknown-entries)
+    - [1E. Characterize KEEP Entries](#1e-characterize-keep-entries)
+    - [1F. Scoped search_files Fallback](#1f-scoped-search_files-fallback-rare--last-resort)
   - [Step 2: Screen 1 — MCP Document Selection](#step-2-screen-1--mcp-document-selection)
   - [Step 3: Screen 2 — MCP Data Source Selection](#step-3-screen-2--mcp-data-source-selection)
   - [Step 4: Screen 3 — External Source Addition](#step-4-screen-3--external-source-addition)
@@ -31,7 +37,8 @@
 
 #### Document Source
 - ONLY documents registered in the `ontology-docs` global MCP server can enter the pool
-- `mcp__ontology-docs__directory_tree` only returns paths within allowed directories — no additional verification needed
+- Discovery uses `list_allowed_directories` + `list_directory` with 3-category heuristic (KEEP/SKIP/UNKNOWN) — see Step 1 for details
+- `search_files` is reserved as a last-resort fallback within already-scoped directories only
 - Documents outside allowed paths MUST NOT be included
 
 #### MCP Data Source
@@ -53,21 +60,102 @@
 
 ### Step 1: Discover and Characterize Document Sources
 
-Call `mcp__ontology-docs__directory_tree` on root to discover top-level structure.
+#### 1A. Probe MCP Availability
+
+Call `mcp__ontology-docs__list_allowed_directories` to discover the root paths registered in ontology-docs.
 
 | Result | {AVAILABILITY_MODE}=optional | {AVAILABILITY_MODE}=required |
 |--------|------------------------------|------------------------------|
-| Success | `ONTOLOGY_AVAILABLE=true`. Proceed to characterize. | Proceed to characterize. |
+| Success (returns 1+ paths) | `ONTOLOGY_AVAILABLE=true`. Record paths as `ALLOWED_ROOTS[]`. Proceed to 1B. | Record paths as `ALLOWED_ROOTS[]`. Proceed to 1B. |
 | Error / MCP not configured | `ONTOLOGY_AVAILABLE=false`. Warn: "ontology-docs MCP not configured. Pool will contain MCP data sources and external sources only." Skip to Step 3. | Error: "ontology-docs MCP not configured. See plugin README for setup." **STOP.** |
 
-For each top-level directory discovered:
-1. Attempt to read `{dir}/README.md` via `mcp__ontology-docs__read_text_file`
-2. If not found, attempt `{dir}/CLAUDE.md`
-3. If neither exists, use `mcp__ontology-docs__list_directory` to inspect file listing and infer the domain
+#### 1B. Enumerate Top-Level Entries
 
-Record per directory: path, domain, summary (1-2 lines), key topics (3-5 keywords).
+For each path in `ALLOWED_ROOTS[]`, call `mcp__ontology-docs__list_directory(path)`.
+
+Collect every returned entry (directories and files) into `RAW_ENTRIES[]`. Each entry has: name, full path, type (directory or file).
+
+**Circuit Breaker:** Track cumulative MCP calls in a counter `MCP_CALL_COUNT`. Initialize to the calls already made (list_allowed_directories + one list_directory per root). Hard ceiling: **100 MCP calls total** for the entire Step 1. If the ceiling is reached at any point, stop discovery, emit warning: "Discovery budget reached ({MCP_CALL_COUNT}/100 calls). Proceeding with {N} entries discovered so far." Skip to 1E with whatever entries have been classified.
+
+#### 1C. Classify Entries via 3-Category Heuristic
+
+Classify each directory entry in `RAW_ENTRIES[]` into exactly one category: **KEEP**, **SKIP**, or **UNKNOWN**.
+
+File entries (non-directories) at the top level are collected separately as `TOP_LEVEL_FILES[]` and are not classified (they are included as-is in discovery results if relevant, e.g., a standalone README.md).
+
+##### Classification Table
+
+| Category | Rule | Examples |
+|----------|------|---------|
+| **KEEP** | Name matches a doc keyword at a **word boundary**. A word boundary is defined as: start/end of string, or adjacent to `-`, `_`, `/`, or `.` (i.e., the keyword appears as a complete segment in a hyphen-, underscore-, dot-, or slash-delimited name). The doc keywords are: `docs`, `doc`, `documentation`, `wiki`, `knowledge`, `kb`, `handbook`, `manual`, `guide`, `guides`, `reference`, `references`, `specs`, `spec`, `runbook`, `runbooks`, `playbook`, `playbooks`, `notes`, `ontology`, `glossary`, `faq`, `howto`, `tutorials`, `tutorial`, `articles`, `blog` | `podo-docs`, `api-docs`, `docs`, `my_wiki`, `knowledge-base`, `user-guide`, `project.docs` |
+| **SKIP** | Name starts with `.` (hidden), OR name exactly matches a known non-doc directory. Known non-doc list: `node_modules`, `vendor`, `dist`, `build`, `out`, `target`, `.git`, `.svn`, `.hg`, `__pycache__`, `.cache`, `.bun`, `.terraform`, `.next`, `.nuxt`, `coverage`, `tmp`, `temp`, `log`, `logs`, `bin`, `obj`, `pkg`, `.idea`, `.vscode`, `.settings`, `bower_components`, `jspm_packages`, `.gradle`, `.mvn`, `.cargo`, `.rustup`, `venv`, `.venv`, `env`, `.env`, `site-packages`, `Pods`, `DerivedData`, `.DS_Store`, `Thumbs.db` | `.git`, `node_modules`, `.terraform`, `.bun`, `dist`, `.cache` |
+| **UNKNOWN** | Everything else — does not match KEEP or SKIP | `podo-backend`, `infra`, `services`, `src`, `packages`, `apps`, `lib`, `core` |
+
+##### Doc Keyword False-Positive Prevention
+
+The following names are **explicitly excluded** from KEEP despite containing doc substrings, because they are not documentation directories:
+
+| Name Pattern | Why Excluded |
+|--------------|-------------|
+| `docker`, `dockerfile`, `docker-compose` | Contains `doc` but is container configuration |
+| `docusaurus` | Build tool, not a doc root itself (its content dirs like `docs/` will be caught separately) |
+| `docket` | Contains `doc` but is unrelated |
+
+Implementation: Before applying KEEP rules, check if the name (lowercased) starts with `docker` or exactly matches `docusaurus` or `docket`. If so, classify as UNKNOWN (not KEEP).
+
+Store classified entries as `KEEP_ENTRIES[]`, `SKIP_ENTRIES[]`, `UNKNOWN_ENTRIES[]`.
+
+#### 1D. Depth-2 Probe for UNKNOWN Entries
+
+For each directory in `UNKNOWN_ENTRIES[]`, call `mcp__ontology-docs__list_directory(path)` (increment `MCP_CALL_COUNT`; respect the 100-call ceiling).
+
+For each child directory returned:
+1. Apply the same KEEP/SKIP classification from the table in 1C.
+2. If a child matches **KEEP**, record the **child path** (not the parent) as a doc root. Add it to `KEEP_ENTRIES[]` with a note: `"discovered via depth-2 probe of {parent}"`.
+3. If no children match KEEP, the UNKNOWN parent is discarded (not included in discovery results).
+
+**Key rule:** The doc root is the most specific matching directory. If `podo-backend/podo-docs` matches KEEP, the doc root is `podo-backend/podo-docs`, NOT `podo-backend`.
+
+Do NOT recurse beyond depth 2 (i.e., do not probe children of children).
+
+#### 1E. Characterize KEEP Entries
+
+For each directory in `KEEP_ENTRIES[]` (both directly matched and depth-2 discovered):
+
+1. Attempt to read `{dir}/README.md` via `mcp__ontology-docs__read_text_file` (increment `MCP_CALL_COUNT`).
+2. If not found, attempt `{dir}/CLAUDE.md`.
+3. If neither exists, call `mcp__ontology-docs__list_directory(dir)` to inspect file listing and infer the domain from filenames and directory structure.
+
+Record per entry: path, domain, summary (1-2 lines), key topics (3-5 keywords), discovery method (`direct` or `depth-2:{parent}`).
 
 Store as `DISCOVERED_ENTRIES[]`.
+
+#### 1F. Scoped search_files Fallback (Rare — Last Resort)
+
+**Condition:** Only execute this sub-step if `DISCOVERED_ENTRIES[]` is empty after 1E AND there are UNKNOWN entries that were discarded (had no KEEP children at depth-2). This is a fallback to catch unconventionally named doc directories.
+
+For each ALLOWED_ROOT where no KEEP entries were found, call `mcp__ontology-docs__search_files(path={ALLOWED_ROOT}, pattern="README.md")` (increment `MCP_CALL_COUNT`; respect ceiling).
+
+**Result size guard:** If the search returns more than **200 results**, discard the results and emit warning: "search_files returned {N} results for {ALLOWED_ROOT} — too broad to process. Skipping automated refinement." Proceed without these results.
+
+If results are within the 200 limit, extract unique parent directories from the matched file paths. For each unique parent:
+1. Apply KEEP/SKIP/UNKNOWN classification from 1C.
+2. KEEP matches are added to `KEEP_ENTRIES[]` and characterized per 1E.
+3. SKIP and UNKNOWN matches are discarded.
+
+**This sub-step is NOT the primary discovery mechanism.** It only runs as a last-resort fallback when the heuristic in 1C/1D found nothing.
+
+#### Step 1 Cost Summary
+
+| Sub-step | Purpose | MCP Calls (typical) |
+|----------|---------|-------------------|
+| 1A | Discover allowed roots | 1 |
+| 1B | List top-level entries per root | 1 per root |
+| 1C | Classify KEEP/SKIP/UNKNOWN | 0 (pure logic) |
+| 1D | Probe UNKNOWN children | 1 per UNKNOWN dir |
+| 1E | Characterize KEEP entries | 1-2 per KEEP entry |
+| 1F | Fallback search (rare) | 1 per root (if triggered) |
+| **Total** | | **Typically 10-30, hard max 100** |
 
 ### Step 2: Screen 1 — MCP Document Selection
 
@@ -329,7 +417,12 @@ Check: Did analysts reference relevant file sources from the pool?
 
 ## Exit Gate
 
-- [ ] All ontology-docs MCP directories discovered and characterized (or `ONTOLOGY_AVAILABLE=false`)
+- [ ] Allowed roots discovered via `list_allowed_directories` (or `ONTOLOGY_AVAILABLE=false`)
+- [ ] Top-level entries classified via 3-category heuristic (KEEP/SKIP/UNKNOWN)
+- [ ] UNKNOWN entries probed at depth-2; doc roots recorded at most-specific matching path
+- [ ] All KEEP entries characterized with domain, summary, and key topics
+- [ ] MCP call count stayed within 100-call ceiling
+- [ ] `search_files` only used as last-resort fallback (1F), not as primary discovery
 - [ ] User selected MCP documents via Screen 1 (or skipped if MCP unavailable)
 - [ ] MCP data sources discovered via `ToolSearch` and presented to user via Screen 2 (or none available)
 - [ ] Selected MCP servers recorded with full tool lists and capability summaries
