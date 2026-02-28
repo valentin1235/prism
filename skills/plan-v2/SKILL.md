@@ -430,7 +430,7 @@ When consensus fails:
 3. **If adding perspective**:
    a. **Shutdown old committee**, append iteration summary to `prior-iterations.md`
    b. Add new perspective, create new task for the NEW perspective only + pre-assign owner (Phase 2.2-2.3 pattern). Previously completed analyst findings are preserved in `analyst-findings.md` — do NOT re-run existing perspectives.
-   c. **Phase 3 (new analyst only) → Phase 4 (DA re-runs with cumulative findings) → Phase 5** cycle repeats — DA reads `analyst-findings.md` (appended with new analyst output) + `prior-iterations.md` for full context
+   c. **Phase 3 (new analyst only) → Phase 4 (DA re-runs with cumulative findings) → Phase 5** cycle repeats — DA reads `analyst-findings.md` (appended with new analyst output) + `prior-iterations.md` for full context. Re-create committee tasks (Step 2.2, item 3) + pre-assign owners (Step 2.3) before re-entering Phase 5.
 
 **Normal mode**: max 2 feedback loops, then Phase 6 with current state. **Hell Mode**: no iteration limit — loops until 3/3 unanimous on ALL plan elements.
 

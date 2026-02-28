@@ -14,6 +14,7 @@ All prompts use these placeholders:
 - `{INCIDENT_CONTEXT}` — Phase 0 incident details (symptoms, timeline, blast radius, evidence)
 - `{ACTIVE_PERSPECTIVES}` — list of active perspectives with lens name, analyst name, and key questions
 - `{ALL_ANALYST_FINDINGS}` — compiled findings from all completed analysts
+- `{PRIOR_ITERATION_CONTEXT}` — empty on first pass; on deeper investigation loops includes previous DA evaluation + iteration summaries
 - `{ONTOLOGY_SCOPE}` — DA variant: full-pool ontology reference with verification mission, or "N/A" if unavailable
 
 ## Prompt
@@ -63,6 +64,9 @@ ACTIVE PERSPECTIVES:
 
 ALL ANALYST FINDINGS:
 {ALL_ANALYST_FINDINGS}
+
+PRIOR ITERATION CONTEXT (if deeper investigation loop):
+{PRIOR_ITERATION_CONTEXT}
 
 ### Reference Documents
 {ONTOLOGY_SCOPE}
