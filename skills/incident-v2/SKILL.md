@@ -20,6 +20,17 @@ allowed-tools: Task, SendMessage, TeamCreate, TeamDelete, TaskCreate, TaskUpdate
 
 Prompt templates and report template are in subdirectories relative to this file. Read them at spawn time — do NOT preload into memory.
 
+## Artifact Persistence
+
+MUST persist phase outputs to `.omc/state/incident-{short-id}/` (created in Phase 1). On deeper investigation re-entry, agents MUST `Read` artifact files — do NOT rely solely on prompt context.
+
+| File | Written | Read By |
+|------|---------|---------|
+| `context.md` | Phase 1 | All agents |
+| `analyst-findings.md` | Phase 2 exit | DA |
+| `da-evaluation.md` | Phase 2.4 exit (DA) | Phase 3 synthesis |
+| `prior-iterations.md` | Each re-entry (append) | DA (cumulative history) |
+
 ## Prerequisite: Agent Team Mode (HARD GATE)
 
 → Read and execute `../shared/prerequisite-gate.md`. Set `{PROCEED_TO}` = "Phase 0".
@@ -185,11 +196,10 @@ Write Phase 0 incident context to `.omc/state/incident-{short-id}/context.md`.
 
 ### Step 1.2
 
-Create tasks: one per perspective + DA + Synthesis.
+Create tasks: one per perspective + DA.
 
 - **Per-perspective analyst tasks**: one per selected archetype
 - **DA task**: with `addBlockedBy` depending on ALL analyst task IDs (DA cannot start until all analysts complete)
-- **Synthesis task**: for final report compilation
 
 ### Step 1.2.1: Pre-assign Owners
 
@@ -245,7 +255,7 @@ Task(
   team_name="incident-analysis-{short-id}",
   model="opus",
   run_in_background=true,
-  prompt="{DA prompt with {INCIDENT_CONTEXT}, {ACTIVE_PERSPECTIVES}, {ALL_ANALYST_FINDINGS}, and {ONTOLOGY_SCOPE} (DA variant) replaced}"
+  prompt="{DA prompt with {INCIDENT_CONTEXT}, {ACTIVE_PERSPECTIVES}, {ALL_ANALYST_FINDINGS}, {PRIOR_ITERATION_CONTEXT}, and {ONTOLOGY_SCOPE} (DA variant) replaced}"
 )
 ```
 
@@ -361,7 +371,17 @@ Read `templates/report.md` and fill all sections with synthesized findings.
 - "Is the analysis complete?"
 - Options: "Complete" / "Need deeper investigation" / "Request Tribunal" / "Add recommendations" / "Share with team"
 
-Deeper investigation → Phase 2. Tribunal → Phase 2.5.
+**Deeper investigation re-entry:**
+
+1. Write current findings to `.omc/state/incident-{short-id}/analyst-findings.md` and DA evaluation to `da-evaluation.md`
+2. Append iteration summary to `prior-iterations.md`
+3. Identify gaps via `AskUserQuestion` (header: "Investigation Gaps"):
+   - "Add new perspective" → spawn new analyst only (existing findings preserved in `analyst-findings.md`)
+   - "Re-examine with focus" → user specifies focus area → targeted follow-up tasks
+4. New analyst runs → DA re-evaluates with cumulative findings (`analyst-findings.md` appended + `prior-iterations.md` for context via `{PRIOR_ITERATION_CONTEXT}`)
+5. Return to Phase 3 synthesis with expanded findings
+
+Max 2 deeper investigation loops. Tribunal → Phase 2.5.
 
 ---
 
