@@ -22,7 +22,7 @@ Prompt templates and report template are in subdirectories relative to this file
 
 ## Artifact Persistence
 
-MUST persist phase outputs to `.omc/state/incident-{short-id}/` (created in Phase 1). On deeper investigation re-entry, agents MUST `Read` artifact files — do NOT rely solely on prompt context.
+MUST persist phase outputs to `.omc/state/incident-{short-id}/` (created in Phase 0.5, Step 0.5.5). On deeper investigation re-entry, agents MUST `Read` artifact files — do NOT rely solely on prompt context.
 
 | File | Written | Read By |
 |------|---------|---------|
@@ -30,6 +30,9 @@ MUST persist phase outputs to `.omc/state/incident-{short-id}/` (created in Phas
 | `analyst-findings.md` | Phase 2 exit | DA |
 | `da-evaluation.md` | Phase 2.4 exit (DA) | Phase 3 synthesis |
 | `prior-iterations.md` | Each re-entry (append) | DA (cumulative history) |
+| `ontology-catalog.md` | Phase 0.6 | All agents |
+| `ontology-scope-analyst.md` | Phase 0.6 | All analysts |
+| `ontology-scope-da.md` | Phase 0.6 | DA |
 
 ## Prerequisite: Agent Team Mode (HARD GATE)
 
@@ -143,7 +146,7 @@ Use this mapping as starting point, then refine based on specific evidence.
 
 | Condition | Track |
 |-----------|-------|
-| SEV1 OR Active | **FAST TRACK**: Lock 4 core archetypes (Timeline + Root Cause + Systems + Impact) + DA. Skip to Phase 0.6 (ontology mapping runs normally). If urgency demands skipping Phase 0.6, set `{ONTOLOGY_SCOPE}` = "N/A — Fast Track, ontology mapping deferred." Then proceed to Phase 1. DA is created with `blockedBy` on all analysts — "immediately" means tasks are created together, DA executes after analysts complete. |
+| SEV1 OR Active | **FAST TRACK**: Lock 4 core archetypes (Timeline + Root Cause + Systems + Impact) + DA. Execute Step 0.5.5 (generate session ID + state directory). Then proceed to Phase 0.6 (ontology mapping runs normally). If urgency demands skipping Phase 0.6, set `{ONTOLOGY_SCOPE}` = "N/A — Fast Track, ontology mapping deferred." Then proceed to Phase 1. DA is created with `blockedBy` on all analysts — "immediately" means tasks are created together, DA executes after analysts complete. |
 | Otherwise | **PERSPECTIVE TRACK**: Continue below |
 
 ### Perspective Track
@@ -173,6 +176,14 @@ Selection rules:
 
 **0.5.4** Lock roster: archetype, model, key questions, rationale per perspective.
 
+### Step 0.5.5: Generate Session ID and State Directory
+
+Generate `{short-id}`: `Bash(uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-8)` (e.g., `a3f7b2c1`). Generate ONCE and reuse throughout all phases.
+
+Create state directory: `Bash(mkdir -p .omc/state/incident-{short-id})`
+
+**This step MUST execute on BOTH tracks** (Fast Track and Perspective Track). It is placed here — after track selection completes but before Phase 0.6 or Phase 1 — so that `{short-id}` and the state directory are always available regardless of whether Phase 0.6 is skipped.
+
 ---
 
 ## Phase 0.6: Ontology Scope Mapping
@@ -180,6 +191,7 @@ Selection rules:
 → Read and execute `../shared/ontology-scope-mapping.md` with:
 - `{AVAILABILITY_MODE}` = `optional`
 - `{CALLER_CONTEXT}` = `"incident analysis"`
+- `{STATE_DIR}` = `.omc/state/incident-{short-id}`
 
 If `ONTOLOGY_AVAILABLE=false` → skip to Phase 1. All analysts get `{ONTOLOGY_SCOPE}` = the following block:
 
@@ -199,11 +211,10 @@ Shared module exit gate applies. No additional incident-specific checks required
 
 ### Step 1.1
 
-Generate `{short-id}`: run `uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-8` (e.g., `a3f7b2c1`). Generate ONCE and reuse throughout all phases.
+`{short-id}` and state directory already exist from Step 0.5.5.
 
 ```
 TeamCreate(team_name: "incident-analysis-{short-id}", description: "Incident: {summary}")
-Bash(mkdir -p .omc/state/incident-{short-id})
 ```
 
 Write Phase 0 incident context to `.omc/state/incident-{short-id}/context.md`.
@@ -260,7 +271,7 @@ Task(
 - `{WORK_ACTION}` = `"Investigate the incident from your assigned perspective. Answer ALL key questions with evidence and code references. If ontology docs are available (see REFERENCE DOCUMENTS), explore them for relevant policies and documentation."`
 
 MUST replace `{INCIDENT_CONTEXT}` in every prompt with actual Phase 0 details.
-MUST replace `{ONTOLOGY_SCOPE}` with the **full-pool scoped reference** from Phase 0.6 (analyst variant). DA gets the DA variant with verification mission.
+MUST replace `{ONTOLOGY_SCOPE}`: Orchestrator `Read`s `.omc/state/incident-{short-id}/ontology-scope-analyst.md` and injects file contents. If file not found (e.g., fast track skipped Phase 0.6), inject "N/A — ontology scope not available. Analyze using available evidence only."
 
 ### Step 1.4: Spawn Devil's Advocate
 
@@ -275,9 +286,11 @@ Task(
   team_name="incident-analysis-{short-id}",
   model="opus",
   run_in_background=true,
-  prompt="{DA prompt with {INCIDENT_CONTEXT}, {ACTIVE_PERSPECTIVES}, {ALL_ANALYST_FINDINGS}, {PRIOR_ITERATION_CONTEXT}, and {ONTOLOGY_SCOPE} (DA variant) replaced}"
+  prompt="{DA prompt with {INCIDENT_CONTEXT}, {ACTIVE_PERSPECTIVES}, {ALL_ANALYST_FINDINGS}, {PRIOR_ITERATION_CONTEXT}, and {ONTOLOGY_SCOPE} replaced}"
 )
 ```
+
+`{ONTOLOGY_SCOPE}` for DA: Orchestrator `Read`s `.omc/state/incident-{short-id}/ontology-scope-da.md` and injects file contents. If file not found, inject "N/A" fallback.
 
 ---
 

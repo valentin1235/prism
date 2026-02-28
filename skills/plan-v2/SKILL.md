@@ -28,12 +28,14 @@ Prompt templates and output template are in subdirectories relative to this file
 
 ## Artifact Persistence
 
-MUST persist phase outputs to `.omc/state/plan-{short-id}/` (create in Phase 2). On feedback loop re-entry, agents MUST `Read` artifact files — do NOT rely solely on prompt context.
+MUST persist phase outputs to `.omc/state/plan-{short-id}/` (created in Phase 1, Step 1.5.1). On feedback loop re-entry, agents MUST `Read` artifact files — do NOT rely solely on prompt context.
 
 | File | Written | Read By |
 |------|---------|---------|
 | `context.md` | Phase 2 | All agents |
 | `ontology-catalog.md` | Phase 1, Step 1.6 | All analysts |
+| `ontology-scope-analyst.md` | Phase 1, Step 1.6 | All analysts, committee |
+| `ontology-scope-da.md` | Phase 1, Step 1.6 | DA |
 | `analyst-findings.md` | Phase 3 exit | DA |
 | `da-evaluation.md` | Phase 4 exit (DA) | Committee |
 | `da-verified-briefing.md` | Phase 4 exit (orchestrator) | Committee |
@@ -151,15 +153,22 @@ Repeat 1.3 until user selects "Proceed". Warn if <3 perspectives: "Fewer than 3 
 
 Lock final perspective roster: ID, name, scope, key questions, model, agent type, rationale.
 
+### Step 1.5.1: Generate Session ID and State Directory
+
+Generate `{short-id}`: `Bash(uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-8)` (e.g., `a3f7b2c1`). Generate ONCE and reuse throughout all phases.
+
+Create state directory: `Bash(mkdir -p .omc/state/plan-{short-id})`
+
 ### Step 1.6: Ontology Scope Mapping
 
 → Read and execute `../shared/ontology-scope-mapping.md` with:
 - `{AVAILABILITY_MODE}` = `optional`
 - `{CALLER_CONTEXT}` = `"analysis"`
+- `{STATE_DIR}` = `.omc/state/plan-{short-id}`
 
 If `ONTOLOGY_AVAILABLE=false` → analysts get `{ONTOLOGY_SCOPE}` = "N/A — ontology-docs not available".
 
-Save catalog to `.omc/state/plan-{short-id}/ontology-catalog.md`. Catalog MUST show all source types (mcp, web, file) if present.
+Catalog MUST show all source types (mcp, web, file) if present. (Catalog persistence handled by shared module.)
 
 ### Phase 1 Exit Gate
 
@@ -179,8 +188,8 @@ MUST NOT proceed until:
 
 ```
 TeamCreate(team_name: "plan-committee-{short-id}", description: "Plan: {goal summary}")
-Bash(mkdir -p .omc/state/plan-{short-id})
 ```
+(State directory already exists from Step 1.5.1.)
 
 Write Phase 0 extracted context to `.omc/state/plan-{short-id}/context.md`. MUST include Hell Mode flag if active.
 
@@ -244,7 +253,7 @@ Placeholder replacements:
 - `{PERSPECTIVE_SCOPE}` → perspective scope description
 - `{KEY_QUESTIONS}` → numbered list of key questions
 - `{PLAN_CONTEXT}` → full Phase 0 extracted context (goal, scope, constraints, raw input)
-- `{ONTOLOGY_SCOPE}` → **full-pool scoped reference** from Phase 1.6
+- `{ONTOLOGY_SCOPE}` → Orchestrator `Read`s `.omc/state/plan-{short-id}/ontology-scope-analyst.md` and injects file contents here. If file not found, inject "N/A — ontology scope not available."
 
 ### Step 3.3: Analyst Prompt Structure
 
@@ -303,7 +312,7 @@ Placeholder replacements:
 - `{ALL_ANALYST_FINDINGS}` → compiled findings from all analysts
 - `{PLAN_CONTEXT}` → Phase 0 context
 - `{PRIOR_ITERATION_CONTEXT}` → empty string on first pass; on feedback loop iterations, include previous DA evaluation + committee debate results + gap analysis
-- `{ONTOLOGY_SCOPE}` → DA full-scope ontology reference from Phase 1.6
+- `{ONTOLOGY_SCOPE}` → Orchestrator `Read`s `.omc/state/plan-{short-id}/ontology-scope-da.md` and injects file contents here. If file not found, inject "N/A — ontology scope not available."
 
 DA receives analyst findings for **evaluation** — NOT synthesis tasks. DA is a logic auditor only.
 
@@ -376,7 +385,7 @@ Send `shutdown_request` to all completed analysts and DA. Keep team active for c
 | Engineering Critic | `architect` | `engineering-critic` | opus |
 | Planner | `planner` | `planner` | opus |
 
-All spawn with `run_in_background=true`, `team_name="plan-committee-{short-id}"`. MUST replace `{DA_VERIFIED_BRIEFING}`, `{PLAN_CONTEXT}`, `{PRIOR_DEBATE_CONTEXT}`, and `{ONTOLOGY_SCOPE}` in each prompt.
+All spawn with `run_in_background=true`, `team_name="plan-committee-{short-id}"`. MUST replace `{DA_VERIFIED_BRIEFING}`, `{PLAN_CONTEXT}`, `{PRIOR_DEBATE_CONTEXT}`, and `{ONTOLOGY_SCOPE}` (orchestrator `Read`s `.omc/state/plan-{short-id}/ontology-scope-analyst.md` and injects contents; if file not found, inject "N/A") in each prompt. Committee receives the analyst variant because they evaluate the plan itself (not verifying analyst exploration coverage), so they need the same ontology context analysts had.
 
 ### Step 5.5: Collect Initial Positions
 

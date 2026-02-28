@@ -23,6 +23,16 @@ Analyst rules are defined inline. DA prompt is in `prompts/devil-advocate.md`. R
 
 → Read and execute `../shared/prerequisite-gate.md`. Set `{PROCEED_TO}` = "Phase 0".
 
+## Artifact Persistence
+
+MUST persist phase outputs to `.omc/state/prd-{short-id}/` (created in Phase 1, Step 1.2.5). On re-entry, agents MUST `Read` artifact files — do NOT rely solely on prompt context.
+
+| File | Written | Read By |
+|------|---------|---------|
+| `ontology-catalog.md` | Phase 1.3 | All analysts |
+| `ontology-scope-analyst.md` | Phase 1.3 | All analysts |
+| `ontology-scope-da.md` | Phase 1.3 | DA |
+
 ---
 
 ## Phase 0: Input
@@ -77,11 +87,18 @@ PRD sections: {FR-N, NFR-N, etc.}
 
 → Apply `../shared/perspective-quality-gate.md` with `{DOMAIN}` = "prd", `{EVIDENCE_SOURCE}` = "PRD content and ontology docs".
 
+### 1.2.5 Generate Session ID and State Directory
+
+Generate `{short-id}`: `Bash(uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-8)` (e.g., `a3f7b2c1`). Generate ONCE and reuse throughout all phases.
+
+Create state directory: `Bash(mkdir -p .omc/state/prd-{short-id})`
+
 ### 1.3 Ontology Scope Mapping
 
 → Read and execute `../shared/ontology-scope-mapping.md` with:
 - `{AVAILABILITY_MODE}` = `required`
 - `{CALLER_CONTEXT}` = `"PRD analysis"`
+- `{STATE_DIR}` = `.omc/state/prd-{short-id}`
 
 PRD analysis requires policy document references — MCP unavailability stops execution.
 
@@ -98,7 +115,7 @@ Additional check beyond shared module exit gate:
 
 ```json
 {
-  "team_name": "prd-policy-review",
+  "team_name": "prd-policy-review-{short-id}",
   "description": "PRD multi-perspective policy analysis: {PRD title}"
 }
 ```
@@ -140,7 +157,7 @@ Spawn all analysts **in parallel**.
 Task(
   subagent_type="oh-my-claudecode:analyst",
   model="opus",
-  team_name="prd-policy-review",
+  team_name="prd-policy-review-{short-id}",
   name="{perspective-slug}-analyst",
   run_in_background=true,
   prompt="{worker preamble + analyst prompt}"
@@ -152,7 +169,7 @@ All analysts use `analyst` (opus) — PRD policy conflict analysis requires deep
 ### 3.2 Analyst Prompt Structure
 
 → Apply worker preamble from `../shared/worker-preamble.md` with:
-- `{TEAM_NAME}` = `"prd-policy-review"`
+- `{TEAM_NAME}` = `"prd-policy-review-{short-id}"`
 - `{WORKER_NAME}` = `"{perspective-slug}-analyst"`
 - `{WORK_ACTION}` = `"Use ontology-docs MCP tools to explore and read the ontology pool documents (see ONTOLOGY SCOPE below), then cross-reference PRD sections against docs to find policy conflicts/ambiguities"`
 
@@ -162,6 +179,8 @@ Then include the ontology scope block:
 == ONTOLOGY SCOPE ==
 {ONTOLOGY_SCOPE}
 ```
+
+The orchestrator `Read`s `.omc/state/prd-{short-id}/ontology-scope-analyst.md` and injects its contents as `{ONTOLOGY_SCOPE}`. If file not found, error: "Ontology scope files missing. Re-run Phase 1.3." (prd-v2 uses `required` mode — file-not-found is an error, not a silent fallback.)
 
 Analyst behavior rules (include in prompt):
 ```
@@ -190,7 +209,7 @@ Read `prompts/devil-advocate.md` (relative to this SKILL.md) + `shared/da-evalua
 Task(
   subagent_type="oh-my-claudecode:critic",
   model="opus",
-  team_name="prd-policy-review",
+  team_name="prd-policy-review-{short-id}",
   name="devils-advocate",
   run_in_background=true,
   prompt="{worker preamble + DA prompt from prompts/devil-advocate.md}"
@@ -200,7 +219,7 @@ Task(
 Placeholder replacements:
 - `{ALL_ANALYST_FINDINGS}` → compiled findings from all analysts
 - `{PRD_CONTEXT}` → PRD content and sibling files from Phase 1
-- `{ONTOLOGY_SCOPE}` → full-scope ontology reference from Phase 1.3 (all docs, not perspective-filtered)
+- `{ONTOLOGY_SCOPE}` → Orchestrator `Read`s `.omc/state/prd-{short-id}/ontology-scope-da.md` and injects file contents. If file not found, error: "Ontology scope files missing. Re-run Phase 1.3."
 
 DA receives analyst findings for **evaluation** — NOT synthesis tasks. DA is a logic auditor only.
 
