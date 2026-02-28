@@ -57,6 +57,7 @@ Call `mcp__ontology-docs__list_allowed_directories` to check if the ontology-doc
 | Result | {AVAILABILITY_MODE}=optional | {AVAILABILITY_MODE}=required |
 |--------|------------------------------|------------------------------|
 | Success (returns 1+ paths) | `ONTOLOGY_AVAILABLE=true`. Record returned paths as `ALLOWED_ROOTS[]`. Proceed to Step 2. | Record returned paths as `ALLOWED_ROOTS[]`. Proceed to Step 2. |
+| Success (returns 0 paths) | `ONTOLOGY_AVAILABLE=false`. Warn: "ontology-docs MCP is configured but has no allowed directories. Pool will contain MCP data sources and external sources only." Proceed to Step 2. | Error: "ontology-docs MCP is configured but has no allowed directories. Check MCP server configuration." **STOP.** |
 | Error / MCP not configured | `ONTOLOGY_AVAILABLE=false`. Warn: "ontology-docs MCP not configured. Pool will contain MCP data sources and external sources only." Proceed to Step 2. | Error: "ontology-docs MCP not configured. See plugin README for setup." **STOP.** |
 
 **That's it.** No directory enumeration, classification, or characterization. Analysts will explore ontology-docs directly at reasoning time using the MCP tools available to them.
@@ -158,7 +159,7 @@ Ontology Pool Configuration:
 | 2 | mcp    | query| mysql    | ...    | ...     | available |
 | 3 | web    | url  | ...      | ...    | ...     | available |
 | 4 | file   | file | ...      | ...    | ...     | available |
-Total N sources (MCP Docs: 1, MCP Data: n, Web: n, File: n)
+Total N sources (MCP Docs: {0 or 1}, MCP Data: n, Web: n, File: n)
 ```
 
 Then confirm:
