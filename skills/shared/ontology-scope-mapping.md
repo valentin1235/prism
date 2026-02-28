@@ -118,7 +118,7 @@ Discover available MCP servers that can provide queryable data (databases, monit
 Two-pronged discovery to ensure all MCP servers are found:
 
 1. Call `ListMcpResourcesTool()` (no server filter) to discover all resource-based MCP servers. Extract unique server names from the `server` field in results.
-2. Call `ToolSearch(query="mcp", max_results=50)` to discover tool-based MCP servers. Extract unique server names from tool name patterns: `mcp__<server_name>__<tool_name>`.
+2. Call `ToolSearch(query="mcp", max_results=200)` to discover tool-based MCP servers. Extract unique server names from tool name patterns: `mcp__<server_name>__<tool_name>`.
 3. Combine server names from steps 1 and 2. Deduplicate.
 4. **Exclude** these servers from the data source list:
    - `ontology-docs` (handled as Document Source in Step 1)
