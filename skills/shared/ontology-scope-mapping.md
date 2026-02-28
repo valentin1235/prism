@@ -58,7 +58,7 @@ Call `mcp__ontology-docs__directory_tree` on root to discover top-level structur
 | Result | {AVAILABILITY_MODE}=optional | {AVAILABILITY_MODE}=required |
 |--------|------------------------------|------------------------------|
 | Success | `ONTOLOGY_AVAILABLE=true`. Proceed to characterize. | Proceed to characterize. |
-| Error / MCP not configured | `ONTOLOGY_AVAILABLE=false`. Warn: "ontology-docs MCP not configured. Pool will contain external sources only." Skip to Step 3. | Error: "ontology-docs MCP not configured. See plugin README for setup." **STOP.** |
+| Error / MCP not configured | `ONTOLOGY_AVAILABLE=false`. Warn: "ontology-docs MCP not configured. Pool will contain MCP data sources and external sources only." Skip to Step 3. | Error: "ontology-docs MCP not configured. See plugin README for setup." **STOP.** |
 
 For each top-level directory discovered:
 1. Attempt to read `{dir}/README.md` via `mcp__ontology-docs__read_text_file`
@@ -71,7 +71,7 @@ Store as `DISCOVERED_ENTRIES[]`.
 
 ### Step 2: Screen 1 — MCP Document Selection
 
-If `ONTOLOGY_AVAILABLE=false` → skip to Step 3 with warning: "No MCP documents available. Only external sources can be added."
+If `ONTOLOGY_AVAILABLE=false` → skip to Step 3 with warning: "No MCP documents available. MCP data sources and external sources can still be added."
 
 Present discovered entries for user selection via `AskUserQuestion` with `multiSelect: true`.
 
@@ -118,7 +118,7 @@ Discover available MCP servers that can provide queryable data (databases, monit
 Two-pronged discovery to ensure all MCP servers are found:
 
 1. Call `ListMcpResourcesTool()` (no server filter) to discover all resource-based MCP servers. Extract unique server names from the `server` field in results.
-2. Call `ToolSearch(query="mcp", max_results=20)` to discover tool-based MCP servers. Extract unique server names from tool name patterns: `mcp__<server_name>__<tool_name>`.
+2. Call `ToolSearch(query="mcp", max_results=50)` to discover tool-based MCP servers. Extract unique server names from tool name patterns: `mcp__<server_name>__<tool_name>`.
 3. Combine server names from steps 1 and 2. Deduplicate.
 4. **Exclude** these servers from the data source list:
    - `ontology-docs` (handled as Document Source in Step 1)
@@ -128,7 +128,7 @@ Two-pronged discovery to ensure all MCP servers are found:
    - **Tool count**: number of tools discovered for this server
    - **Key tools**: up to 5 most relevant tool names (without the `mcp__<server>__` prefix for readability)
    - **Description**: infer purpose from tool names (e.g., `run_query` + `get_table_schema` → "Database queries and schema inspection"). If purpose cannot be confidently inferred, use: "Query {server_name} via {tool_count} available tools"
-   - **Read-only tools**: filter out obvious write/mutation tools (names containing `create`, `update`, `delete`, `patch`, `post`) for the analyst tool list. Record full list separately for reference.
+   - **Read-only tools**: filter out obvious write/mutation tools (names containing `create`, `update`, `delete`, `patch`, `post`) for the analyst tool list. For query-execution tools like `run_query` or `run_select_query`, keep them but add a safety note: "Use SELECT queries only. Do NOT execute INSERT, UPDATE, DELETE, or DDL statements." Record full list separately for reference.
 
 Store as `DISCOVERED_MCP_SERVERS[]`.
 
@@ -219,7 +219,7 @@ AskUserQuestion(
   options: [
     {label: "Confirm — proceed", description: "Start {CALLER_CONTEXT} with this configuration"},
     {label: "Reselect documents", description: "Go back to MCP document selection (Screen 1)"},
-    {label: "Reselect data sources", description: "Go back to data source selection (Screen 2)"},  // ONLY show if SELECTED_MCP_SERVERS[] is non-empty or Screen 2 was not auto-skipped
+    {label: "Reselect data sources", description: "Go back to data source selection (Screen 2)"},  // ONLY show if Screen 2 was presented (MCP data sources were discovered)
     {label: "Add sources", description: "Go back to external source addition (Screen 3)"},
     {label: "Cancel", description: "Proceed without ontology pool"}
   ]

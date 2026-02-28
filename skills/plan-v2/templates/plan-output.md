@@ -141,8 +141,8 @@ Gate: {Proceed to Phase 3 only if...}
 |-------------|---------------------|-----------|
 
 ### Ontology Catalog
-| # | Path | Domain | Summary |
-|---|------|--------|---------|
+| # | Source | Type | Path/URL | Domain | Summary |
+|---|--------|------|----------|--------|---------|
 
 ### Full Analyst Reports (if requested)
 ### Committee Debate Transcript Summary
