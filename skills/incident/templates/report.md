@@ -31,9 +31,25 @@ Fill all sections. Write "N/A" if truly irrelevant — do NOT leave sections emp
 - **Emergent Insights**: Findings only visible when combining perspectives
 
 ## Devil's Advocate Findings
-### Challenges & Responses
+### Fallacy Check Results
+| # | Analyst | Claim | Verdict | Fallacy / Issue | Severity | Detail |
+|---|---------|-------|---------|-----------------|----------|--------|
+
+### Cross-Analyst Contradictions
+| Analyst A Claims | Analyst B Claims | Contradiction | Question to Resolve |
+|-----------------|-----------------|---------------|-------------------|
+
 ### Perspective Critique
-### Remaining Uncertainties
+| Perspective | Appropriateness | What It Might Miss | Question for Analyst |
+|-------------|----------------|-------------------|---------------------|
+
+### Unanswered Questions
+- [Questions that MUST be answered before conclusions can be drawn]
+
+### Aggregate Verdict
+- BLOCKING: {count}
+- MAJOR: {count}
+- MINOR: {count}
 
 ## Tribunal Review (if activated)
 - Trigger: {reason}

@@ -209,7 +209,7 @@ MUST read prompt files before spawning. Files are relative to this SKILL.md's di
 
 | Agent | Prompt File | Section |
 |-------|-------------|---------|
-| Devil's Advocate (ALWAYS) | `prompts/devil-advocate.md` | full file |
+| Devil's Advocate (ALWAYS) | `prompts/devil-advocate.md` + `shared/da-evaluation-protocol.md` | full file + inline protocol |
 | Timeline | `prompts/core-archetypes.md` | § Timeline Lens |
 | Root Cause | `prompts/core-archetypes.md` | § Root Cause Lens |
 | Systems & Architecture | `prompts/core-archetypes.md` | § Systems Lens |
@@ -257,6 +257,31 @@ Monitor via `TaskList`. Forward findings between analysts. Unblock stuck analyst
 | Divergence | Route to DA + analysts for resolution |
 | Blind spot | Targeted follow-up or spawn specialist |
 
+### Step 2.4: DA Challenge-Response Loop
+
+The DA evaluates analyst findings using the evaluation protocol (`shared/da-evaluation-protocol.md`). The orchestrator mediates a multi-round loop:
+
+**Round 1:**
+1. DA receives analyst findings and produces Fallacy Check Results (per-claim verdicts with severity)
+2. Orchestrator extracts FAIL items (BLOCKING and MAJOR)
+3. Orchestrator forwards each FAIL item to the responsible analyst via `SendMessage`, including the fallacy name and explanation
+4. Analysts respond with corrected reasoning, additional evidence, or acknowledged limitations
+
+**Round N (if needed):**
+5. Orchestrator forwards analyst responses to DA for re-evaluation
+6. DA marks each item: RESOLVED / PARTIALLY RESOLVED / UNRESOLVED
+7. If UNRESOLVED items remain → repeat from step 3
+
+**Termination:**
+
+| DA Aggregate Verdict | Condition | Action |
+|---------------------|-----------|--------|
+| SUFFICIENT | Zero BLOCKING + all MAJOR resolved or acknowledged | → Proceed to Phase 2 Exit Gate |
+| NOT SUFFICIENT | BLOCKING items remain | → Continue loop (next round) |
+| NEEDS TRIBUNAL | BLOCKING persists after 2 rounds | → Proceed to Phase 2.5 |
+
+Orchestrator tracks round count. Maximum 2 challenge-response rounds before escalation.
+
 ### Phase 2 Exit Gate
 
 MUST NOT proceed until ALL verified:
@@ -264,11 +289,12 @@ MUST NOT proceed until ALL verified:
 - [ ] All perspective key questions answered
 - [ ] No unexplained timeline gaps
 - [ ] ≥1 root cause hypothesis with strong evidence + code references
-- [ ] ALL DA challenges addressed with evidence
+- [ ] DA Aggregate Verdict is SUFFICIENT (zero BLOCKING, all MAJOR resolved or acknowledged)
 - [ ] All cross-perspective discrepancies resolved
 - [ ] Impact quantified with actual data
 
-If ANY fails → create follow-up tasks, continue Phase 2. Error: "Cannot synthesize: {item} not satisfied."
+If DA Aggregate Verdict is NEEDS TRIBUNAL → skip Exit Gate, proceed directly to Phase 2.5.
+If ANY other item fails → create follow-up tasks, continue Phase 2. Error: "Cannot synthesize: {item} not satisfied."
 
 ---
 
@@ -284,7 +310,7 @@ If NONE → announce "DA: analysis sufficient. Proceeding to report." → skip t
 
 ### Execution
 
-1. Compile findings package (~10-15K tokens): summary, key findings, recommendations, DA challenges, contradictions, trigger reason
+1. Compile findings package (~10-15K tokens): summary, key findings, recommendations, DA Fallacy Check Results, contradictions, trigger reason
 2. Shut down completed analysts (keep DA)
 3. Read `prompts/tribunal.md` for critic prompts
 3.5. Replace placeholders in tribunal prompts:
