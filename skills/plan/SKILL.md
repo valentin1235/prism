@@ -89,7 +89,7 @@ Parse input to extract:
 
 ### Step 0.4: Fill Gaps via User Interview
 
-If ANY required element is missing, use `AskUserQuestion` per element (header: element name, options: inferred value / "I'll describe it differently"). Maximum 3 rounds.
+If ANY required element is missing, use `AskUserQuestion` per element (header: element name, options: "{inferred value}" / "Not applicable"). Users can select "Other" to provide a custom value. After each answer, IMMEDIATELY proceed to the next missing element or exit gate. Maximum 3 rounds.
 
 ### Phase 0 Exit Gate
 

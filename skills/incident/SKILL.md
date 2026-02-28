@@ -105,10 +105,16 @@ MUST complete ALL steps. Skipping intake → unfocused analysis.
 
 ### Step 0.1: Collect Incident
 
-`AskUserQuestion`:
-- "What is the incident? Describe symptoms, affected systems, and business impact."
-- Header: "Incident"
-- Options: "I'll describe it now" / "I have logs/links" / "It's in a document/ticket"
+If the user provided an incident description via `$ARGUMENTS`, use it directly and skip to Step 0.2.
+
+Otherwise, ask the user to describe the incident:
+
+"Please describe the incident:
+- What symptoms are you observing?
+- Which systems are affected?
+- What is the business impact?"
+
+After receiving the user's description, proceed IMMEDIATELY to Step 0.2 — do NOT stop or wait for additional input.
 
 ### Step 0.2: Severity & Context
 
