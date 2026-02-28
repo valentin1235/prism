@@ -3,7 +3,7 @@ name: prd-v2
 description: Multi-perspective PRD policy conflict analysis with ontology-scoped analysis
 version: 1.0.0
 user-invocable: true
-allowed-tools: Task, SendMessage, TeamCreate, TeamDelete, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion, Read, Glob, Grep, Bash, Write, WebFetch, WebSearch, mcp__ontology-docs__directory_tree, mcp__ontology-docs__list_directory, mcp__ontology-docs__read_file, mcp__ontology-docs__read_text_file, mcp__ontology-docs__read_multiple_files, mcp__ontology-docs__search_files
+allowed-tools: Task, SendMessage, TeamCreate, TeamDelete, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion, Read, Glob, Grep, Bash, Write, WebFetch, WebSearch, ToolSearch, ListMcpResourcesTool, mcp__ontology-docs__directory_tree, mcp__ontology-docs__list_directory, mcp__ontology-docs__read_file, mcp__ontology-docs__read_text_file, mcp__ontology-docs__read_multiple_files, mcp__ontology-docs__search_files
 ---
 
 # Table of Contents
@@ -169,7 +169,7 @@ Analyst behavior rules (include in prompt):
 - Report ONLY planning-level policy conflicts/ambiguities. Exclude dev implementation details.
 - Format: "PRD says X, but docs say Y" — always cite both sides.
 - Severity: CRITICAL (policy conflict, feature blocking) / HIGH (ambiguous, multiple interpretations) / MEDIUM (undefined, edge case)
-- MUST cite ontology-docs filename and section as evidence.
+- MUST cite evidence source: ontology-docs filename:section, mcp-query:server:detail, url:section, or file:path:section.
 
 == REPORT FORMAT ==
 Per issue:
@@ -229,7 +229,7 @@ MUST NOT proceed until:
 MUST NOT proceed until ALL verified:
 
 - [ ] All analyst tasks in `completed` status
-- [ ] Every analyst cited ontology-docs filename and section as evidence
+- [ ] Every analyst cited evidence sources (ontology-docs, mcp-query, web, or file references)
 - [ ] DA evaluation complete (Step 3.5 exit gate passed)
 
 If ANY analyst incomplete → check via `TaskList`, send status query. Error: "Cannot synthesize: {analyst} not completed."
@@ -313,8 +313,8 @@ Include in report:
 ## Ontology Scope Mapping
 
 ### Ontology Catalog
-| # | Path | Domain | Summary |
-|---|------|--------|---------|
+| # | Source | Type | Path/URL | Domain | Summary |
+|---|--------|------|----------|--------|---------|
 
 ### DA Ontology Audit
 {DA ontology scope audit results — under-explored documents, missed sections}
@@ -323,7 +323,7 @@ Include in report:
 ### Report Rules
 
 - TOP 10 items MUST include `Decision needed` as checklist (`- [ ]`)
-- All issues MUST cite ontology-docs filename and section as evidence
+- All issues MUST cite evidence source (ontology-docs filename:section, mcp-query:server:detail, url:section, or file:path:section)
 - Dev-level downgrade section MUST explain why PM decision is unnecessary
 
 ## Phase 6: Team Teardown

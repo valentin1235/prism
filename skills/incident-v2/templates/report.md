@@ -44,8 +44,8 @@ Fill all sections. Write "N/A" if truly irrelevant — do NOT leave sections emp
 |-------------|----------------|-------------------|---------------------|
 
 ### Ontology Scope Critique
-| Perspective | Mapped Docs | Missed Docs? | Evidence Gap |
-|-------------|-------------|-------------|--------------|
+| Perspective | Mapped Sources | Missed Sources? | Evidence Gap |
+|-------------|---------------|----------------|--------------|
 
 ### Unanswered Questions
 - [Questions that MUST be answered before conclusions can be drawn]
@@ -98,8 +98,8 @@ Fill all sections. Write "N/A" if truly irrelevant — do NOT leave sections emp
 |-------------|---------------------|-----------|
 
 ### Ontology Catalog
-| # | Path | Domain | Summary |
-|---|------|--------|---------|
+| # | Source | Type | Path/URL | Domain | Summary |
+|---|--------|------|----------|--------|---------|
 
 ### Raw Evidence Links
 ### Related Past Incidents
