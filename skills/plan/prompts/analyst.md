@@ -1,5 +1,8 @@
 # Dynamic Analyst Prompt Template
 
+- [Analyst Prompt](#analyst-prompt)
+- [Reference Documents](#reference-documents--ontology-analysis-target)
+
 This is a parameterized template. Replace ALL placeholders before spawning.
 
 All prompts use these placeholders:

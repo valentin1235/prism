@@ -7,7 +7,7 @@
 - [Ontology Analysis](#ontology-analysis)
 - [Perspective Findings](#perspective-findings)
 - [Integrated Analysis](#integrated-analysis)
-- [Devil's Advocate Findings](#devils-advocate-findings)
+- [Devil's Advocate Evaluation](#devils-advocate-evaluation)
 - [Committee Debate Results](#committee-debate-results)
 - [Execution Plan](#execution-plan)
 - [Recommendations](#recommendations)
@@ -63,16 +63,27 @@ Fill all sections. Write "N/A" if truly irrelevant — do NOT leave sections emp
 - **Divergence**: Where they interpreted the same documents differently + how resolved
 - **Emergent Insights**: Findings only visible when combining perspectives on shared ontology
 
-## Devil's Advocate Findings
-### Challenges & Responses
-{Key challenges raised and how they were addressed}
-### Blind Spots Identified
-{What the analysis initially missed}
-### Ontology Audit
-{DA's cross-perspective ontology comparison — interpretation conflicts, coverage gaps, missed evidence}
-### Risk Register
-| # | Risk | Severity | Likelihood | Mitigation | Status |
-|---|------|----------|-----------|------------|--------|
+## Devil's Advocate Evaluation
+### Fallacy Check Results
+| # | Analyst | Claim | Verdict | Fallacy / Issue | Severity | Detail |
+|---|---------|-------|---------|-----------------|----------|--------|
+
+### Cross-Analyst Contradictions
+| Analyst A Claims | Analyst B Claims | Contradiction | Resolution |
+|-----------------|-----------------|---------------|------------|
+
+### Perspective Critique
+| Perspective | Appropriateness | What It Might Miss | Analyst Response |
+|-------------|----------------|-------------------|-----------------|
+
+### Unanswered Questions
+{Questions identified by DA that remain open for committee resolution}
+
+### Aggregate Verdict
+- **BLOCKING**: {count} — {list or "None"}
+- **MAJOR**: {count} — {list or "None"}
+- **MINOR**: {count}
+- **Overall**: {SUFFICIENT / NEEDS TRIBUNAL}
 
 ## Committee Debate Results
 

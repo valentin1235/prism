@@ -13,7 +13,7 @@ allowed-tools: Task, SendMessage, TeamCreate, TeamDelete, TaskCreate, TaskUpdate
 - [Phase 1: Dynamic Perspective Generation](#phase-1-dynamic-perspective-generation)
 - [Phase 2: Team Formation](#phase-2-team-formation)
 - [Phase 3: Parallel Multi-Perspective Analysis](#phase-3-parallel-multi-perspective-analysis)
-- [Phase 4: Devil's Advocate Synthesis](#phase-4-devils-advocate-synthesis)
+- [Phase 4: Devil's Advocate Evaluation](#phase-4-devils-advocate-evaluation)
 - [Phase 5: Committee Debate](#phase-5-committee-debate)
 - [Phase 6: Plan Output](#phase-6-plan-output)
 - [Phase 7: Cleanup](#phase-7-cleanup)
@@ -35,7 +35,8 @@ MUST persist phase outputs to `.omc/state/plan-{short-id}/` (create in Phase 2).
 | `context.md` | Phase 2 | All agents |
 | `ontology-catalog.md` | Phase 1.7 | All analysts |
 | `analyst-findings.md` | Phase 3 exit | DA |
-| `da-synthesis.md` | Phase 4 exit | Committee |
+| `da-evaluation.md` | Phase 4 exit (DA) | Committee |
+| `da-verified-briefing.md` | Phase 4 exit (orchestrator) | Committee |
 | `committee-debate.md` | Phase 5 exit | Analysts (re-entry) |
 | `prior-iterations.md` | Each iteration (append) | All (cumulative history) |
 
@@ -140,20 +141,7 @@ Rationale: {1-2 sentences: why THIS plan demands this perspective}
 
 ### Step 1.3: Present to User
 
-`AskUserQuestion`:
-```
-question: "I recommend these {N} perspectives for analysis. How to proceed?"
-header: "Perspectives"
-options:
-  - label: "Proceed"
-    description: "Start analysis with these perspectives"
-  - label: "Add perspective"
-    description: "I want an additional analysis angle"
-  - label: "Remove perspective"
-    description: "Drop one of the proposed perspectives"
-  - label: "Modify perspective"
-    description: "Adjust scope or questions of a perspective"
-```
+`AskUserQuestion` (header: "Perspectives", question: "I recommend these {N} perspectives for analysis. How to proceed?", options: "Proceed" / "Add perspective" / "Remove perspective" / "Modify perspective")
 
 ### Step 1.4: Iterate Until Approved
 
@@ -165,24 +153,10 @@ Lock final perspective roster: ID, name, scope, key questions, model, agent type
 
 ### Step 1.6: Collect External References
 
-`AskUserQuestion`:
-```
-question: "분석에 참고할 외부 링크(URL)가 있나요? 웹 문서, 기술 블로그, API 문서 등을 온톨로지 풀에 추가할 수 있습니다."
-header: "External References"
-options:
-  - label: "링크 추가"
-    description: "참고할 URL을 입력합니다"
-  - label: "없음 — 바로 진행"
-    description: "ontology-docs MCP 문서만으로 진행합니다"
-```
+`AskUserQuestion` (header: "External References", question: "분석에 참고할 외부 링크(URL)가 있나요? 웹 문서, 기술 블로그, API 문서 등을 온톨로지 풀에 추가할 수 있습니다.", options: "링크 추가" / "없음 — 바로 진행")
 
-If user selects "링크 추가":
-1. Collect URLs from user input (comma or newline separated)
-2. Store as `{WEB_LINKS}` list (e.g., `["https://...", "https://..."]`)
-3. Ask again: "더 추가할 링크가 있나요?" — repeat until user says no
-
-If user selects "없음 — 바로 진행":
-- Set `{WEB_LINKS}` = `[]`
+If "링크 추가": collect URLs, store as `{WEB_LINKS}` list, ask "더 추가할 링크가 있나요?" — repeat until done.
+If "없음 — 바로 진행": set `{WEB_LINKS}` = `[]`.
 
 ### Step 1.7: Ontology Scope Mapping
 
@@ -229,10 +203,10 @@ Create tasks in this order:
    - ActiveForm: `Analyzing {perspective-name}`
 
 2. **Devil's Advocate task** (1 task)
-   - Subject: `Devil's Advocate Synthesis`
+   - Subject: `Devil's Advocate Evaluation`
    - `addBlockedBy`: ALL analyst task IDs
-   - Description: Synthesize all analyst findings, challenge assumptions, identify gaps
-   - ActiveForm: `Synthesizing and challenging findings`
+   - Description: Evaluate analyst reasoning for logical fallacies and overclaims (logic auditor, NOT synthesizer)
+   - ActiveForm: `Evaluating analyst reasoning`
 
 3. **Committee tasks** (3 tasks)
    - UX Critic, Engineering Critic, Planner
@@ -246,7 +220,7 @@ MUST pre-assign owners via `TaskUpdate(owner="{worker-name}")` BEFORE spawning:
 | Task | Owner Name |
 |------|-----------|
 | {perspective-id} Analysis | `{perspective-id}-analyst` |
-| DA Synthesis | `devils-advocate` |
+| DA Evaluation | `devils-advocate` |
 | UX Critic | `ux-critic` |
 | Engineering Critic | `engineering-critic` |
 | Planner | `planner` |
@@ -315,11 +289,11 @@ Write compiled analyst findings to `.omc/state/plan-{short-id}/analyst-findings.
 
 ---
 
-## Phase 4: Devil's Advocate Synthesis
+## Phase 4: Devil's Advocate Evaluation
 
 ### Step 4.1: Read DA Prompt
 
-Read `prompts/devil-advocate.md` (relative to this SKILL.md).
+Read `prompts/devil-advocate.md` (relative to this SKILL.md) + `shared/da-evaluation-protocol.md`.
 
 ### Step 4.2: Spawn Devil's Advocate
 
@@ -337,26 +311,51 @@ Task(
 Placeholder replacements:
 - `{ALL_ANALYST_FINDINGS}` → compiled findings from all analysts
 - `{PLAN_CONTEXT}` → Phase 0 context
-- `{PRIOR_ITERATION_CONTEXT}` → empty string on first pass; on feedback loop iterations, include previous DA synthesis + committee debate results + gap analysis
+- `{PRIOR_ITERATION_CONTEXT}` → empty string on first pass; on feedback loop iterations, include previous DA evaluation + committee debate results + gap analysis
 - `{ONTOLOGY_SCOPE}` → DA full-scope ontology reference from Phase 1.7
 
-### Step 4.3: Monitor DA
+DA receives analyst findings for **evaluation** — NOT synthesis tasks. DA is a logic auditor only.
 
-Wait for DA completion. DA output = **synthesis package** for committee. Write to `da-synthesis.md`.
+### Step 4.3: DA Challenge-Response Loop
+
+Orchestrator-mediated loop, max 2 rounds:
+
+1. **Round 1**: DA evaluates analyst findings → produces verdict table with BLOCKING/MAJOR/MINOR issues
+2. **If NOT SUFFICIENT**: Orchestrator forwards DA challenges to relevant analysts (via `SendMessage`)
+3. **Round 2**: Analysts respond → orchestrator sends responses to DA → DA re-evaluates → updated verdict
+4. **Termination**:
+   - All BLOCKING resolved → **SUFFICIENT** → proceed to Step 4.4
+   - BLOCKING persists after 2 rounds → **NEEDS TRIBUNAL** → record as open question for committee
+   - MAJOR unresolved after 2 rounds → record as acknowledged limitation
+
+Write DA evaluation to `.omc/state/plan-{short-id}/da-evaluation.md`.
+
+### Step 4.4: Orchestrator Synthesis
+
+After DA verdict is SUFFICIENT (or NEEDS TRIBUNAL items recorded), orchestrator compiles committee briefing:
+
+1. **Merge & deduplicate** analyst findings by theme
+2. **Compile briefing package** containing:
+   - DA-verified findings (with verdict status)
+   - DA aggregate verdict and any NEEDS TRIBUNAL items
+   - Cross-analyst contradictions identified by DA
+   - Open questions from DA evaluation
+3. Write briefing to `.omc/state/plan-{short-id}/da-verified-briefing.md`
 
 ### Phase 4 Exit Gate
 
 MUST NOT proceed until:
 
-- [ ] DA task in `completed` status
-- [ ] Synthesis package contains: merged findings, challenges, blind spots, risk assessment, preliminary recommendations
-- [ ] All analyst challenges have DA responses
+- [ ] DA verdict is SUFFICIENT (or NEEDS TRIBUNAL items recorded as open questions)
+- [ ] Challenge-response loop completed (max 2 rounds)
+- [ ] Orchestrator-compiled briefing written to `da-verified-briefing.md`
+- [ ] Briefing contains: DA-verified findings, aggregate verdict, open questions
 
 ---
 
 ## Phase 5: Committee Debate
 
-Three committee members debate the synthesis package via SendMessage, with Lead as mediator.
+Three committee members debate the DA-verified briefing via SendMessage, with Lead as mediator.
 
 ### Step 5.1: Read Committee Prompts
 
@@ -369,9 +368,9 @@ Read all three prompt files (relative to this SKILL.md):
 
 Compile for committee members (~10-15K tokens max):
 - Planning goal and constraints (from Phase 0)
-- Synthesis package (from Phase 4 DA output)
-- Key disagreements and open questions
-- Preliminary recommendations to evaluate
+- DA-verified findings and aggregate verdict (from Phase 4 `da-verified-briefing.md`)
+- Cross-analyst contradictions and open questions (from DA evaluation)
+- NEEDS TRIBUNAL items (if any) for committee resolution
 
 ### Step 5.3: Shutdown Completed Analysts
 
@@ -385,7 +384,7 @@ Send `shutdown_request` to all completed analysts and DA. Keep team active for c
 | Engineering Critic | `architect` | `engineering-critic` | opus |
 | Planner | `planner` | `planner` | opus |
 
-All spawn with `run_in_background=true`, `team_name="plan-committee-{short-id}"`. MUST replace `{SYNTHESIS_PACKAGE}`, `{PLAN_CONTEXT}`, `{PRIOR_DEBATE_CONTEXT}` in each prompt.
+All spawn with `run_in_background=true`, `team_name="plan-committee-{short-id}"`. MUST replace `{DA_VERIFIED_BRIEFING}`, `{PLAN_CONTEXT}`, `{PRIOR_DEBATE_CONTEXT}` in each prompt.
 
 ### Step 5.5: Collect Initial Positions
 
@@ -475,7 +474,7 @@ If file already exists → `plan-{short-id}.md` to avoid overwrite.
 Fill the output template with:
 - Phase 0 context (goal, scope, constraints)
 - Analyst findings (organized by perspective)
-- DA synthesis (challenges, blind spots, risk)
+- DA evaluation (fallacy check results, aggregate verdict, open questions)
 - Committee positions and consensus results
 - Dissenting views (attributed)
 - Open items requiring future decision
@@ -497,10 +496,4 @@ After writing the file, output to chat: Goal, File path, Consensus level (% of e
 
 ## Gate Summary
 
-```
-Prerequisite → Phase 0 [5-item] → Phase 1 [6-item, incl. external refs + ontology mapping] → Phase 2 → Phase 3 [4-item] → Phase 4 [3-item] → Phase 5 [consensus] → Phase 6 → Phase 7
-                                                                                  ↓ (ONTOLOGY_AVAILABLE=false)
-                                                                                  └─ Analysts get {ONTOLOGY_SCOPE}="N/A", proceed normally
-```
-
-No Consensus at Phase 5 → feedback loop to Phase 3. Every gate specifies exact missing items — fix before proceeding.
+Prerequisite → Phase 0 [5-item] → Phase 1 [6-item, incl. external refs + ontology mapping] → Phase 2 → Phase 3 [4-item] → Phase 4 [4-item, DA evaluation + challenge-response loop + orchestrator synthesis] → Phase 5 [consensus] → Phase 6 → Phase 7. If ONTOLOGY_AVAILABLE=false → analysts get {ONTOLOGY_SCOPE}="N/A", proceed normally. No Consensus at Phase 5 → feedback loop to Phase 3. Every gate specifies exact missing items — fix before proceeding.

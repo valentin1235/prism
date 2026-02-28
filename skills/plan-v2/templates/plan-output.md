@@ -6,7 +6,7 @@
 - [Context & Background](#context--background)
 - [Perspective Findings](#perspective-findings)
 - [Integrated Analysis](#integrated-analysis)
-- [Devil's Advocate Findings](#devils-advocate-findings)
+- [Devil's Advocate Evaluation](#devils-advocate-evaluation)
 - [Committee Debate Results](#committee-debate-results)
 - [Execution Plan](#execution-plan)
 - [Recommendations](#recommendations)
@@ -44,16 +44,31 @@ Fill all sections. Write "N/A" if truly irrelevant — do NOT leave sections emp
 - **Divergence**: Where they disagreed + how resolved
 - **Emergent Insights**: Findings only visible when combining perspectives
 
-## Devil's Advocate Findings
-### Challenges & Responses
-{Key challenges raised and how they were addressed}
-### Blind Spots Identified
-{What the analysis initially missed}
-### Ontology Scope Audit
-{DA's assessment of whether analysts explored the right docs — or "N/A" if ontology-docs unavailable}
-### Risk Register
-| # | Risk | Severity | Likelihood | Mitigation | Status |
-|---|------|----------|-----------|------------|--------|
+## Devil's Advocate Evaluation
+### Fallacy Check Results
+| # | Analyst | Claim | Verdict | Fallacy / Issue | Severity | Detail |
+|---|---------|-------|---------|-----------------|----------|--------|
+
+### Cross-Analyst Contradictions
+| Analyst A Claims | Analyst B Claims | Contradiction | Resolution |
+|-----------------|-----------------|---------------|------------|
+
+### Perspective Critique
+| Perspective | Appropriateness | What It Might Miss | Analyst Response |
+|-------------|----------------|-------------------|-----------------|
+
+### Ontology Scope Critique
+| Perspective | Mapped Docs | Missed Docs? | Evidence Gap |
+|-------------|-------------|-------------|--------------|
+
+### Unanswered Questions
+{Questions identified by DA that remain open for committee resolution}
+
+### Aggregate Verdict
+- **BLOCKING**: {count} — {list or "None"}
+- **MAJOR**: {count} — {list or "None"}
+- **MINOR**: {count}
+- **Overall**: {SUFFICIENT / NEEDS TRIBUNAL}
 
 ## Committee Debate Results
 

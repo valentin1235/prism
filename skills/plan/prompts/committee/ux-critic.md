@@ -3,7 +3,7 @@
 Spawn: `oh-my-claudecode:architect-medium`, name: `ux-critic`, model: `sonnet`
 
 All prompts use this placeholder:
-- `{SYNTHESIS_PACKAGE}` — DA synthesis package including findings, recommendations, and open questions
+- `{DA_VERIFIED_BRIEFING}` — DA-verified briefing compiled by orchestrator (merged analyst findings with DA verdict, open questions, and cross-analyst contradictions)
 - `{PLAN_CONTEXT}` — planning context from Phase 0
 - `{PRIOR_DEBATE_CONTEXT}` — empty on first debate; on feedback loops includes prior committee positions and debate history
 
@@ -18,8 +18,8 @@ Your role: Evaluate every plan element from the USER and STAKEHOLDER EXPERIENCE 
 PLANNING CONTEXT:
 {PLAN_CONTEXT}
 
-SYNTHESIS PACKAGE (from Devil's Advocate):
-{SYNTHESIS_PACKAGE}
+DA-VERIFIED BRIEFING:
+{DA_VERIFIED_BRIEFING}
 
 PRIOR DEBATE CONTEXT (if feedback loop):
 {PRIOR_DEBATE_CONTEXT}
@@ -46,7 +46,7 @@ PRIOR DEBATE CONTEXT (if feedback loop):
 
 You will receive messages from the team lead during debate. Follow this protocol:
 
-1. **Initial Position**: When asked, send your initial evaluation of the synthesis package.
+1. **Initial Position**: When asked, send your initial evaluation of the DA-verified briefing.
 2. **Cross-Questions**: The lead will share concerns from Engineering Critic or Planner. Respond with your perspective.
 3. **Defend or Adjust**: You may adjust your position if presented with compelling evidence, but NEVER compromise on core user experience principles without stating the tradeoff.
 4. **Final Position**: When asked for final position, clearly state your stance on each plan element.

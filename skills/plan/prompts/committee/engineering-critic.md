@@ -10,7 +10,7 @@
 Spawn: `oh-my-claudecode:architect`, name: `engineering-critic`, model: `opus`
 
 All prompts use this placeholder:
-- `{SYNTHESIS_PACKAGE}` — DA synthesis package including findings, recommendations, and open questions
+- `{DA_VERIFIED_BRIEFING}` — DA-verified briefing compiled by orchestrator (merged analyst findings with DA verdict, open questions, and cross-analyst contradictions)
 - `{PLAN_CONTEXT}` — planning context from Phase 0
 - `{PRIOR_DEBATE_CONTEXT}` — empty on first debate; on feedback loops includes prior committee positions and debate history
 
@@ -25,8 +25,8 @@ Your role: Evaluate every plan element from a TECHNICAL FEASIBILITY and IMPLEMEN
 PLANNING CONTEXT:
 {PLAN_CONTEXT}
 
-SYNTHESIS PACKAGE (from Devil's Advocate):
-{SYNTHESIS_PACKAGE}
+DA-VERIFIED BRIEFING:
+{DA_VERIFIED_BRIEFING}
 
 PRIOR DEBATE CONTEXT (if feedback loop):
 {PRIOR_DEBATE_CONTEXT}
@@ -61,7 +61,7 @@ PRIOR DEBATE CONTEXT (if feedback loop):
 
 You will receive messages from the team lead during debate. Follow this protocol:
 
-1. **Initial Position**: When asked, send your technical evaluation of the synthesis package.
+1. **Initial Position**: When asked, send your technical evaluation of the DA-verified briefing.
 2. **Cross-Questions**: The lead will share concerns from UX Critic or Planner. Respond with technical perspective.
 3. **Propose Alternatives**: When you REJECT an element, MUST propose a technically viable alternative.
 4. **Final Position**: When asked for final position, clearly state your stance with effort estimates.

@@ -1,6 +1,6 @@
 ---
 name: prd
-description: Multi-perspective PRD policy conflict analysis with devil's advocate verification
+description: Multi-perspective PRD policy conflict analysis with devil's advocate evaluation
 version: 1.0.0
 user-invocable: true
 allowed-tools: Task, SendMessage, TeamCreate, TeamDelete, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion, Read, Glob, Grep, Bash, Write, ToolSearch, mcp__ontology-docs__directory_tree, mcp__ontology-docs__list_directory, mcp__ontology-docs__read_file, mcp__ontology-docs__read_text_file, mcp__ontology-docs__read_multiple_files, mcp__ontology-docs__search_files
@@ -191,6 +191,8 @@ Per issue:
 
 After all analysts complete (DA task blockedBy resolved), spawn DA.
 
+Read `prompts/devil-advocate.md` (relative to this SKILL.md) + `shared/da-evaluation-protocol.md`.
+
 ```
 Task(
   subagent_type="oh-my-claudecode:critic",
@@ -198,46 +200,64 @@ Task(
   team_name="prd-policy-review",
   name="devils-advocate",
   run_in_background=true,
-  prompt="{worker preamble + DA prompt}"
+  prompt="{worker preamble + DA prompt from prompts/devil-advocate.md}"
 )
 ```
 
-DA prompt core:
-```
-== DA MISSION ==
-Synthesize all analyst reports:
-1. Merge duplicates: consolidate same issue reported from different perspectives
-2. Severity calibration: adjust over/under-rated severities (evidence required)
-3. Dev-level downgrade: identify items that don't need PM decision (devs can decide)
-4. Gap discovery: find policy conflicts/ambiguities analysts missed
-5. PRD internal contradictions: find self-contradictions within the PRD itself
-6. TOP 10 PM decisions: rank the most urgent PM decision items
+Placeholder replacements:
+- `{ALL_ANALYST_FINDINGS}` → compiled findings from all analysts
+- `{PRD_CONTEXT}` → PRD content and sibling files from Phase 1
+- `{ONTOLOGY_TREE}` → ontology-docs directory tree (call `mcp__ontology-docs__directory_tree` at spawn time)
 
-== CHALLENGE CRITERIA ==
-- Filter: "Is this really a planning-level decision, or can devs just decide?"
-- REJECT issues without evidence
-- When upgrading or downgrading severity, MUST state the reason
+DA receives analyst findings for **evaluation** — NOT synthesis tasks. DA is a logic auditor only.
 
-== REPORT FORMAT ==
-1. Statistics summary (original count, post-merge count, upgrades/downgrades, dev-level downgrades, new discoveries)
-2. TOP 10 PM decisions (ranked with rationale)
-3. PRD internal contradictions list
-4. Dev-level downgrade list
-```
+### 3.4 DA Challenge-Response Loop
+
+Orchestrator-mediated loop, max 2 rounds:
+
+1. **Round 1**: DA evaluates analyst findings → produces verdict table with BLOCKING/MAJOR/MINOR issues
+2. **If NOT SUFFICIENT**: Orchestrator forwards DA challenges to relevant analysts (via `SendMessage`)
+3. **Round 2**: Analysts respond → orchestrator sends responses to DA → DA re-evaluates → updated verdict
+4. **Termination**:
+   - All BLOCKING resolved → **SUFFICIENT** → proceed
+   - BLOCKING persists after 2 rounds → **NEEDS TRIBUNAL** → record as open question for Phase 5
+   - MAJOR unresolved after 2 rounds → record as acknowledged limitation
+
+### 3.5 DA Exit Gate
+
+MUST NOT proceed until:
+
+- [ ] DA verdict is SUFFICIENT (or NEEDS TRIBUNAL items recorded as open questions)
+- [ ] Challenge-response loop completed (max 2 rounds)
+- [ ] DA evaluation report received with: fallacy check results, cross-analyst contradictions, perspective critique, aggregate verdict, tribunal trigger assessment
 
 ## Phase 4: Monitoring
 
 Lead receives messages automatically from teammates.
 
 - Analyst completion report received → record content
-- All analysts complete → verify DA task unblocked → spawn DA
-- DA completion report received → proceed to Phase 5
+- All analysts complete → verify DA task unblocked → spawn DA (Phase 3.3)
+- DA challenge-response loop mediated by lead (Phase 3.4) → forward challenges to analysts, collect responses
+- DA evaluation complete (Phase 3.5 exit gate) → proceed to Phase 5
 
 MUST: Periodically check `TaskList`. If any task stays `in_progress` for 5+ minutes without messages, send status check via `SendMessage`.
 
 ## Phase 5: Report Synthesis
 
-After DA report received, lead synthesizes the final .md report via `Write`.
+After DA evaluation complete, lead performs synthesis and writes the final report.
+
+### Step 5.1: Lead Synthesis
+
+Lead uses DA-verified analyst findings to perform (tasks previously in DA scope, now orchestrator responsibility):
+
+1. **Merge duplicates**: Consolidate same issue reported from different perspectives
+2. **Severity calibration**: Adjust over/under-rated severities based on DA verdict (evidence required for changes)
+3. **Dev-level downgrade**: Identify items that don't need PM decision (devs can decide)
+4. **Gap discovery**: Compare all analyst reports to find policy conflicts/ambiguities analysts missed
+5. **PRD internal contradictions**: Find self-contradictions within the PRD itself
+6. **TOP 10 PM decisions**: Rank the most urgent PM decision items based on DA-verified findings
+
+### Step 5.2: Write Report
 
 MUST: Write report to **PRD file's directory** as `prd-policy-review-report.md`.
 MUST: Report content in **{REPORT_LANGUAGE}** (detected in Phase 1.0).
@@ -259,13 +279,13 @@ MUST: Report content in **{REPORT_LANGUAGE}** (detected in Phase 1.0).
 2. TOP 10 PM Decisions Required
 3. PRD Internal Contradictions
 4~{N+3}. Per-Perspective Analysis Results
-{N+4}. Devil's Advocate Verification
+{N+4}. Devil's Advocate Evaluation
 {N+5}. Dev-Level Downgrades (No PM Decision Needed)
 {N+6}. Recommendations
 ```
 
 MUST: Write all section headers and content in {REPORT_LANGUAGE}.
-If Korean: use the following header mappings: "Analysis Overview" → "분석 개요", "TOP 10 PM Decisions Required" → "PM 필수 의사결정 TOP 10", "PRD Internal Contradictions" → "PRD 내부 자기 모순", "Per-Perspective Analysis Results" → "각 관점별 분석 결과", "Devil's Advocate Verification" → "Devil's Advocate 검증 결과", "Dev-Level Downgrades" → "개발 레벨 다운그레이드", "Recommendations" → "권고 사항".
+If Korean: use the following header mappings: "Analysis Overview" → "분석 개요", "TOP 10 PM Decisions Required" → "PM 필수 의사결정 TOP 10", "PRD Internal Contradictions" → "PRD 내부 자기 모순", "Per-Perspective Analysis Results" → "각 관점별 분석 결과", "Devil's Advocate Evaluation" → "Devil's Advocate 평가 결과", "Dev-Level Downgrades" → "개발 레벨 다운그레이드", "Recommendations" → "권고 사항".
 
 ### Report Rules
 
@@ -287,7 +307,8 @@ If Korean: use the following header mappings: "Analysis Overview" → "분석 �
 MUST verify before outputting report:
 
 - [ ] All analyst tasks in `completed` status
-- [ ] DA task in `completed` status
+- [ ] DA task in `completed` status with SUFFICIENT verdict (or NEEDS TRIBUNAL items recorded)
+- [ ] DA challenge-response loop completed (max 2 rounds)
 - [ ] Every TOP 10 item has `Decision needed` checklist
 - [ ] Every issue has ontology-docs citation evidence
 - [ ] PRD contradictions section exists (state "None found" if 0)

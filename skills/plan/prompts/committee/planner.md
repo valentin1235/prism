@@ -10,7 +10,7 @@
 Spawn: `oh-my-claudecode:planner`, name: `planner`, model: `opus`
 
 All prompts use this placeholder:
-- `{SYNTHESIS_PACKAGE}` — DA synthesis package including findings, recommendations, and open questions
+- `{DA_VERIFIED_BRIEFING}` — DA-verified briefing compiled by orchestrator (merged analyst findings with DA verdict, open questions, and cross-analyst contradictions)
 - `{PLAN_CONTEXT}` — planning context from Phase 0
 - `{PRIOR_DEBATE_CONTEXT}` — empty on first debate; on feedback loops includes prior committee positions and debate history
 
@@ -25,8 +25,8 @@ Your role: You are the STRATEGIC INTEGRATOR and TIE-BREAKER. You synthesize UX a
 PLANNING CONTEXT:
 {PLAN_CONTEXT}
 
-SYNTHESIS PACKAGE (from Devil's Advocate):
-{SYNTHESIS_PACKAGE}
+DA-VERIFIED BRIEFING:
+{DA_VERIFIED_BRIEFING}
 
 PRIOR DEBATE CONTEXT (if feedback loop):
 {PRIOR_DEBATE_CONTEXT}
@@ -67,7 +67,7 @@ PRIOR DEBATE CONTEXT (if feedback loop):
 
 You will receive messages from the team lead during debate. Follow this protocol:
 
-1. **Initial Position**: When asked, send your strategic evaluation of the synthesis package.
+1. **Initial Position**: When asked, send your strategic evaluation of the DA-verified briefing.
 2. **Tie-Breaking**: When the lead identifies a deadlock between UX and Engineering, propose a resolution.
 3. **Integration**: Continuously refine the overall plan structure as positions evolve.
 4. **Final Plan**: When asked for final position, provide the integrated execution plan.
