@@ -10,6 +10,12 @@ Task(
 )
 ```
 
+All prompts use these placeholders:
+- `{INCIDENT_CONTEXT}` — Phase 0 incident details (symptoms, timeline, blast radius, evidence)
+- `{ACTIVE_PERSPECTIVES}` — list of active perspectives with lens name, analyst name, and key questions
+- `{ALL_ANALYST_FINDINGS}` — compiled findings from all completed analysts
+- `{ONTOLOGY_SCOPE}` — DA variant: full-pool ontology reference with verification mission, or "N/A" if unavailable
+
 ## Prompt
 
 You are the DEVIL'S ADVOCATE for a critical incident investigation.
@@ -53,9 +59,12 @@ INCIDENT CONTEXT:
 {INCIDENT_CONTEXT}
 
 ACTIVE PERSPECTIVES:
-{list each: **{Lens Name}** ({analyst name}): key questions}
+{ACTIVE_PERSPECTIVES}
 
-### Codebase Reference
+ALL ANALYST FINDINGS:
+{ALL_ANALYST_FINDINGS}
+
+### Reference Documents
 {ONTOLOGY_SCOPE}
 
 ## WHERE TO LOOK FOR FALLACIES

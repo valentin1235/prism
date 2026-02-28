@@ -3,7 +3,7 @@ name: incident-v2
 description: Multi-perspective agent team incident postmortem with ontology-scoped analysis
 version: 1.0.0
 user-invocable: true
-allowed-tools: Task, SendMessage, TeamCreate, TeamDelete, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion, Read, Glob, Grep, Bash, WebFetch, WebSearch, mcp__ontology-docs__search_files, mcp__ontology-docs__read_file, mcp__ontology-docs__read_text_file, mcp__ontology-docs__read_multiple_files, mcp__ontology-docs__list_directory, mcp__ontology-docs__directory_tree
+allowed-tools: Task, SendMessage, TeamCreate, TeamDelete, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion, Read, Glob, Grep, Bash, Write, WebFetch, WebSearch, mcp__ontology-docs__search_files, mcp__ontology-docs__read_file, mcp__ontology-docs__read_text_file, mcp__ontology-docs__read_multiple_files, mcp__ontology-docs__list_directory, mcp__ontology-docs__directory_tree
 ---
 
 # Table of Contents
@@ -11,8 +11,7 @@ allowed-tools: Task, SendMessage, TeamCreate, TeamDelete, TaskCreate, TaskUpdate
 - [Archetype Index](#archetype-index)
 - [Phase 0: Problem Intake](#phase-0-problem-intake)
 - [Phase 0.5: Perspective Generation](#phase-05-perspective-generation)
-- [Phase 0.6: Collect External References](#phase-06-collect-external-references)
-- [Phase 0.7: Ontology Scope Mapping](#phase-07-ontology-scope-mapping)
+- [Phase 0.6: Ontology Scope Mapping](#phase-06-ontology-scope-mapping)
 - [Phase 1: Team Formation](#phase-1-team-formation)
 - [Phase 2: Analysis Execution](#phase-2-analysis-execution)
 - [Phase 2.5: Conditional Tribunal](#phase-25-conditional-tribunal)
@@ -127,12 +126,12 @@ Use this mapping as starting point, then refine based on specific evidence.
 
 | Condition | Track |
 |-----------|-------|
-| SEV1 OR Active | **FAST TRACK**: Deploy Timeline + Root Cause + Systems + Impact + DA immediately → Phase 1 |
+| SEV1 OR Active | **FAST TRACK**: Lock 4 core archetypes (Timeline + Root Cause + Systems + Impact) + DA. Skip to Phase 0.6 (ontology mapping runs normally). If urgency demands skipping Phase 0.6, set `{ONTOLOGY_SCOPE}` = "N/A — Fast Track, ontology mapping deferred." Then proceed to Phase 1. DA is created with `blockedBy` on all analysts — "immediately" means tasks are created together, DA executes after analysts complete. |
 | Otherwise | **PERSPECTIVE TRACK**: Continue below |
 
 ### Perspective Track
 
-**0.5.1** Select 3-5 archetypes using Seed Analysis mapping + Archetype Index.
+**0.5.1** Select 3-5 archetypes using Seed Analysis mapping + Archetype Index. If selected archetypes exceed 5, reduce to 5 — DA is always additional (max team = DA + 5 = 6). Inform user of the cap.
 
 Per selected archetype, document:
 - **Lens Name**: From Archetype Index
@@ -159,35 +158,17 @@ Selection rules:
 
 ---
 
-## Phase 0.6: Collect External References
-
-`AskUserQuestion`:
-```
-question: "분석에 참고할 외부 링크(URL)가 있나요? 장애 관련 문서, 모니터링 대시보드, 이슈 트래커 링크 등을 온톨로지 풀에 추가할 수 있습니다."
-header: "External References"
-options:
-  - label: "링크 추가"
-    description: "참고할 URL을 입력합니다"
-  - label: "없음 — 바로 진행"
-    description: "ontology-docs MCP 문서만으로 진행합니다"
-```
-
-If user selects "링크 추가":
-1. Collect URLs from user input (comma or newline separated)
-2. Store as `{WEB_LINKS}` list (e.g., `["https://...", "https://..."]`)
-3. Ask again: "더 추가할 링크가 있나요?" — repeat until user says no
-
-If user selects "없음 — 바로 진행":
-- Set `{WEB_LINKS}` = `[]`
-
-## Phase 0.7: Ontology Scope Mapping
+## Phase 0.6: Ontology Scope Mapping
 
 → Read and execute `../shared/ontology-scope-mapping.md` with:
 - `{AVAILABILITY_MODE}` = `optional`
-- `{UNMAPPED_POLICY}` = `allowed`
-- `{WEB_LINKS}` = (collected from Phase 0.6, default `[]`)
+- `{CALLER_CONTEXT}` = `"incident analysis"`
 
 If `ONTOLOGY_AVAILABLE=false` → skip to Phase 1. All analysts get `{ONTOLOGY_SCOPE}` = "N/A — ontology-docs not available".
+
+#### Phase 0.6 Exit Gate
+
+Shared module exit gate applies. No additional incident-specific checks required.
 
 ---
 
@@ -197,13 +178,26 @@ If `ONTOLOGY_AVAILABLE=false` → skip to Phase 1. All analysts get `{ONTOLOGY_S
 
 ```
 TeamCreate(team_name: "incident-analysis-{short-id}", description: "Incident: {summary}")
+Bash(mkdir -p .omc/state/incident-{short-id})
 ```
+
+Write Phase 0 incident context to `.omc/state/incident-{short-id}/context.md`.
 
 ### Step 1.2
 
 Create tasks: one per perspective + DA + Synthesis.
 
-### Step 1.3: Spawn ALL Teammates in Parallel
+- **Per-perspective analyst tasks**: one per selected archetype
+- **DA task**: with `addBlockedBy` depending on ALL analyst task IDs (DA cannot start until all analysts complete)
+- **Synthesis task**: for final report compilation
+
+### Step 1.2.1: Pre-assign Owners
+
+MUST pre-assign owners via `TaskUpdate(owner="{worker-name}")` BEFORE spawning.
+
+### Step 1.3: Spawn Analysts in Parallel
+
+Spawn all **analyst** agents in parallel. DA is spawned separately after analysts complete (Step 1.4).
 
 MUST read prompt files before spawning. Files are relative to this SKILL.md's directory.
 
@@ -223,8 +217,9 @@ MUST read prompt files before spawning. Files are relative to this SKILL.md's di
 Task(
   subagent_type="oh-my-claudecode:{agent_type}",
   name="{archetype-id}-analyst",
-  team_name="incident-analysis-{id}",
+  team_name="incident-analysis-{short-id}",
   model="{model}",
+  run_in_background=true,
   prompt="{prompt from file with {INCIDENT_CONTEXT} and {ONTOLOGY_SCOPE} replaced}"
 )
 ```
@@ -232,10 +227,27 @@ Task(
 → Apply worker preamble from `../shared/worker-preamble.md` to each analyst prompt with:
 - `{TEAM_NAME}` = `"incident-analysis-{short-id}"`
 - `{WORKER_NAME}` = `"{archetype-id}-analyst"`
-- `{WORK_ACTION}` = `"Investigate the incident from your assigned perspective. Answer ALL key questions with evidence and code references."`
+- `{WORK_ACTION}` = `"Investigate the incident from your assigned perspective. Answer ALL key questions with evidence and code references. If ontology docs are available (see REFERENCE DOCUMENTS), explore them for relevant policies and documentation."`
 
 MUST replace `{INCIDENT_CONTEXT}` in every prompt with actual Phase 0 details.
-MUST replace `{ONTOLOGY_SCOPE}` with the **perspective-specific scoped reference** from Phase 0.7 — NOT a generic reference. DA gets the full-scope reference.
+MUST replace `{ONTOLOGY_SCOPE}` with the **full-pool scoped reference** from Phase 0.6 (analyst variant). DA gets the DA variant with verification mission.
+
+### Step 1.4: Spawn Devil's Advocate
+
+After all analysts complete (DA task `blockedBy` resolved), spawn DA.
+
+The lead MUST compile all analyst findings into `{ALL_ANALYST_FINDINGS}` before spawning DA. Collect findings from analyst `SendMessage` reports received during Phase 2.
+
+```
+Task(
+  subagent_type="oh-my-claudecode:critic",
+  name="devils-advocate",
+  team_name="incident-analysis-{short-id}",
+  model="opus",
+  run_in_background=true,
+  prompt="{DA prompt with {INCIDENT_CONTEXT}, {ACTIVE_PERSPECTIVES}, {ALL_ANALYST_FINDINGS}, and {ONTOLOGY_SCOPE} (DA variant) replaced}"
+)
+```
 
 ---
 
@@ -362,9 +374,9 @@ Deeper investigation → Phase 2. Tribunal → Phase 2.5.
 ## Gate Summary
 
 ```
-Phase 0 ──[5-item gate]──→ Phase 0.5 ──→ Phase 0.6 ──→ Phase 0.7 ──[exit gate]──→ Phase 1 ──→ Phase 2 ──[6-item gate]──→ Phase 2.5? ──→ Phase 3 ──→ Phase 4
-                                                        ↓ (ONTOLOGY_AVAILABLE=false)
-                                                        └──→ Phase 1 (skip 0.7)
+Phase 0 ──[5-item gate]──→ Phase 0.5 ──→ Phase 0.6 ──[exit gate]──→ Phase 1 [create tasks + spawn analysts] ──→ Phase 2 [analysts complete → compile findings → spawn DA (Step 1.4) → DA runs → 6-item gate] ──→ Phase 2.5? ──→ Phase 3 ──→ Phase 4
+                                          ↓ (ONTOLOGY_AVAILABLE=false)
+                                          └──→ Phase 1 (skip 0.6)
 ```
 
 Every gate specifies exact missing items. Fix before proceeding.

@@ -33,7 +33,7 @@ MUST persist phase outputs to `.omc/state/plan-{short-id}/` (create in Phase 2).
 | File | Written | Read By |
 |------|---------|---------|
 | `context.md` | Phase 2 | All agents |
-| `ontology-catalog.md` | Phase 1.7 | All analysts |
+| `ontology-catalog.md` | Phase 1, Step 1.6 | All analysts |
 | `analyst-findings.md` | Phase 3 exit | DA |
 | `da-evaluation.md` | Phase 4 exit (DA) | Committee |
 | `da-verified-briefing.md` | Phase 4 exit (orchestrator) | Committee |
@@ -151,23 +151,15 @@ Repeat 1.3 until user selects "Proceed". Warn if <3 perspectives: "Fewer than 3 
 
 Lock final perspective roster: ID, name, scope, key questions, model, agent type, rationale.
 
-### Step 1.6: Collect External References
-
-`AskUserQuestion` (header: "External References", question: "분석에 참고할 외부 링크(URL)가 있나요? 웹 문서, 기술 블로그, API 문서 등을 온톨로지 풀에 추가할 수 있습니다.", options: "링크 추가" / "없음 — 바로 진행")
-
-If "링크 추가": collect URLs, store as `{WEB_LINKS}` list, ask "더 추가할 링크가 있나요?" — repeat until done.
-If "없음 — 바로 진행": set `{WEB_LINKS}` = `[]`.
-
-### Step 1.7: Ontology Scope Mapping
+### Step 1.6: Ontology Scope Mapping
 
 → Read and execute `../shared/ontology-scope-mapping.md` with:
 - `{AVAILABILITY_MODE}` = `optional`
-- `{UNMAPPED_POLICY}` = `allowed`
-- `{WEB_LINKS}` = (collected from Step 1.6, default `[]`)
+- `{CALLER_CONTEXT}` = `"analysis"`
 
 If `ONTOLOGY_AVAILABLE=false` → analysts get `{ONTOLOGY_SCOPE}` = "N/A — ontology-docs not available".
 
-Save catalog to `.omc/state/plan-{short-id}/ontology-catalog.md`. If web sources were included, catalog MUST show both `mcp` and `web` type entries.
+Save catalog to `.omc/state/plan-{short-id}/ontology-catalog.md`. Catalog MUST show all source types (mcp, web, file) if present.
 
 ### Phase 1 Exit Gate
 
@@ -177,7 +169,6 @@ MUST NOT proceed until:
 - [ ] Each passes Quality Gate
 - [ ] User approved the roster
 - [ ] Roster locked (no further changes)
-- [ ] External references collected (or explicitly skipped by user)
 - [ ] Ontology scope mapping complete (or explicitly skipped if MCP unavailable)
 
 ---
@@ -253,14 +244,14 @@ Placeholder replacements:
 - `{PERSPECTIVE_SCOPE}` → perspective scope description
 - `{KEY_QUESTIONS}` → numbered list of key questions
 - `{PLAN_CONTEXT}` → full Phase 0 extracted context (goal, scope, constraints, raw input)
-- `{ONTOLOGY_SCOPE}` → **perspective-specific scoped reference** from Phase 1.7
+- `{ONTOLOGY_SCOPE}` → **full-pool scoped reference** from Phase 1.6
 
 ### Step 3.3: Analyst Prompt Structure
 
 → Apply worker preamble from `../shared/worker-preamble.md` with:
 - `{TEAM_NAME}` = `"plan-committee-{short-id}"`
 - `{WORKER_NAME}` = `"{perspective-id}-analyst"`
-- `{WORK_ACTION}` = `"Analyze the planning context from your assigned perspective. Answer ALL key questions with evidence and reasoning."`
+- `{WORK_ACTION}` = `"Analyze the planning context from your assigned perspective. Answer ALL key questions with evidence and reasoning. If ontology docs are available (see ONTOLOGY SCOPE), explore them through your perspective's lens."`
 
 Followed by the perspective-specific prompt from `prompts/analyst.md`.
 
@@ -312,7 +303,7 @@ Placeholder replacements:
 - `{ALL_ANALYST_FINDINGS}` → compiled findings from all analysts
 - `{PLAN_CONTEXT}` → Phase 0 context
 - `{PRIOR_ITERATION_CONTEXT}` → empty string on first pass; on feedback loop iterations, include previous DA evaluation + committee debate results + gap analysis
-- `{ONTOLOGY_SCOPE}` → DA full-scope ontology reference from Phase 1.7
+- `{ONTOLOGY_SCOPE}` → DA full-scope ontology reference from Phase 1.6
 
 DA receives analyst findings for **evaluation** — NOT synthesis tasks. DA is a logic auditor only.
 
@@ -371,6 +362,7 @@ Compile for committee members (~10-15K tokens max):
 - DA-verified findings and aggregate verdict (from Phase 4 `da-verified-briefing.md`)
 - Cross-analyst contradictions and open questions (from DA evaluation)
 - NEEDS TRIBUNAL items (if any) for committee resolution
+- Ontology scope reference from Phase 1.6 (for independent verification)
 
 ### Step 5.3: Shutdown Completed Analysts
 
@@ -384,7 +376,7 @@ Send `shutdown_request` to all completed analysts and DA. Keep team active for c
 | Engineering Critic | `architect` | `engineering-critic` | opus |
 | Planner | `planner` | `planner` | opus |
 
-All spawn with `run_in_background=true`, `team_name="plan-committee-{short-id}"`. MUST replace `{DA_VERIFIED_BRIEFING}`, `{PLAN_CONTEXT}`, `{PRIOR_DEBATE_CONTEXT}` in each prompt.
+All spawn with `run_in_background=true`, `team_name="plan-committee-{short-id}"`. MUST replace `{DA_VERIFIED_BRIEFING}`, `{PLAN_CONTEXT}`, `{PRIOR_DEBATE_CONTEXT}`, and `{ONTOLOGY_SCOPE}` in each prompt.
 
 ### Step 5.5: Collect Initial Positions
 
@@ -437,8 +429,8 @@ When consensus fails:
    - "Stop" → Phase 6 with current results
 3. **If adding perspective**:
    a. **Shutdown old committee**, append iteration summary to `prior-iterations.md`
-   b. Add new perspective, create new tasks + pre-assign owners (Phase 2.2-2.3 pattern)
-   c. **Phase 3 → 4 → 5** cycle repeats — agents read artifact files for cumulative context
+   b. Add new perspective, create new task for the NEW perspective only + pre-assign owner (Phase 2.2-2.3 pattern). Previously completed analyst findings are preserved in `analyst-findings.md` — do NOT re-run existing perspectives.
+   c. **Phase 3 (new analyst only) → Phase 4 (DA re-runs with cumulative findings) → Phase 5** cycle repeats — DA reads `analyst-findings.md` (appended with new analyst output) + `prior-iterations.md` for full context
 
 **Normal mode**: max 2 feedback loops, then Phase 6 with current state. **Hell Mode**: no iteration limit — loops until 3/3 unanimous on ALL plan elements.
 
@@ -478,7 +470,7 @@ Fill the output template with:
 - Committee positions and consensus results
 - Dissenting views (attributed)
 - Open items requiring future decision
-- Ontology scope mapping (catalog + perspective mapping)
+- Ontology scope mapping (catalog)
 
 Write via `Write` tool in the detected report language.
 
@@ -496,4 +488,10 @@ After writing the file, output to chat: Goal, File path, Consensus level (% of e
 
 ## Gate Summary
 
-Prerequisite → Phase 0 [5-item] → Phase 1 [6-item, incl. external refs + ontology mapping] → Phase 2 → Phase 3 [4-item] → Phase 4 [4-item, DA evaluation + challenge-response loop + orchestrator synthesis] → Phase 5 [consensus] → Phase 6 → Phase 7. If ONTOLOGY_AVAILABLE=false → analysts get {ONTOLOGY_SCOPE}="N/A", proceed normally. No Consensus at Phase 5 → feedback loop to Phase 3. Every gate specifies exact missing items — fix before proceeding.
+```
+Prerequisite → Phase 0 [5-item] → Phase 1 [5-item, incl. ontology mapping] → Phase 2 → Phase 3 [4-item] → Phase 4 [4-item, DA evaluation + challenge-response loop + orchestrator synthesis] → Phase 5 [consensus] → Phase 6 → Phase 7
+                                                                                  ↓ (ONTOLOGY_AVAILABLE=false)
+                                                                                  └─ Analysts get {ONTOLOGY_SCOPE}="N/A", proceed normally
+```
+
+No Consensus at Phase 5 → feedback loop to Phase 3. Every gate specifies exact missing items — fix before proceeding.

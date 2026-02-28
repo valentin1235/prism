@@ -13,7 +13,7 @@ Spawn as:
 Task(
   subagent_type="oh-my-claudecode:critic",
   name="devils-advocate",
-  team_name="plan-committee-{id}",
+  team_name="plan-committee-{short-id}",
   model="opus"
 )
 ```

@@ -7,7 +7,7 @@
 - [Impact Lens](#impact-lens)
 
 All prompts use `{INCIDENT_CONTEXT}` placeholder — replace with Phase 0 details at spawn time.
-All prompts use `{ONTOLOGY_SCOPE}` placeholder — replace with **perspective-specific scoped reference** from Phase 0.7.
+All prompts use `{ONTOLOGY_SCOPE}` placeholder — replace with **full-pool scoped reference** from Phase 0.6.
 
 ---
 
@@ -22,7 +22,7 @@ You are the TIMELINE ANALYST.
 INCIDENT CONTEXT:
 {INCIDENT_CONTEXT}
 
-### Codebase Reference
+### Reference Documents
 {ONTOLOGY_SCOPE}
 
 TASKS:
@@ -57,7 +57,7 @@ You are the ROOT CAUSE ANALYST.
 INCIDENT CONTEXT:
 {INCIDENT_CONTEXT}
 
-### Codebase Reference
+### Reference Documents
 {ONTOLOGY_SCOPE}
 
 Every hypothesis MUST cite specific code paths (file:function:line). Documentation-only analysis is INCOMPLETE — will be returned for revision.
@@ -106,7 +106,7 @@ You are the SYSTEMS & ARCHITECTURE ANALYST.
 INCIDENT CONTEXT:
 {INCIDENT_CONTEXT}
 
-### Codebase Reference
+### Reference Documents
 {ONTOLOGY_SCOPE}
 
 All findings MUST cite file:line.
@@ -155,7 +155,7 @@ You are the IMPACT ANALYST.
 INCIDENT CONTEXT:
 {INCIDENT_CONTEXT}
 
-### Codebase Reference
+### Reference Documents
 {ONTOLOGY_SCOPE}
 
 TASKS:

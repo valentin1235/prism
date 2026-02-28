@@ -3,7 +3,7 @@ name: prd-v2
 description: Multi-perspective PRD policy conflict analysis with ontology-scoped analysis
 version: 1.0.0
 user-invocable: true
-allowed-tools: Task, SendMessage, TeamCreate, TeamDelete, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion, Read, Glob, Grep, Bash, Write, ToolSearch, mcp__ontology-docs__directory_tree, mcp__ontology-docs__list_directory, mcp__ontology-docs__read_file, mcp__ontology-docs__read_text_file, mcp__ontology-docs__read_multiple_files, mcp__ontology-docs__search_files
+allowed-tools: Task, SendMessage, TeamCreate, TeamDelete, TaskCreate, TaskUpdate, TaskList, TaskGet, AskUserQuestion, Read, Glob, Grep, Bash, Write, WebFetch, WebSearch, mcp__ontology-docs__directory_tree, mcp__ontology-docs__list_directory, mcp__ontology-docs__read_file, mcp__ontology-docs__read_text_file, mcp__ontology-docs__read_multiple_files, mcp__ontology-docs__search_files
 ---
 
 # Table of Contents
@@ -19,7 +19,7 @@ allowed-tools: Task, SendMessage, TeamCreate, TeamDelete, TaskCreate, TaskUpdate
 
 Analyst rules are defined inline. DA prompt is in `prompts/devil-advocate.md`. Read shared modules at execution time — do NOT preload into memory.
 
-## Prerequisite: Agent Team Mode (HARD GATE)
+## Prerequisite
 
 → Read and execute `../shared/prerequisite-gate.md`. Set `{PROCEED_TO}` = "Phase 0".
 
@@ -77,40 +77,20 @@ PRD sections: {FR-N, NFR-N, etc.}
 
 → Apply `../shared/perspective-quality-gate.md` with `{DOMAIN}` = "prd", `{EVIDENCE_SOURCE}` = "PRD content and ontology docs".
 
-### 1.3 Collect External References
-
-`AskUserQuestion`:
-```
-question: "PRD 분석에 참고할 외부 링크(URL)가 있나요? 정책 문서, 기획 레퍼런스, 경쟁사 분석 등을 온톨로지 풀에 추가할 수 있습니다."
-header: "External References"
-options:
-  - label: "링크 추가"
-    description: "참고할 URL을 입력합니다"
-  - label: "없음 — 바로 진행"
-    description: "ontology-docs MCP 문서만으로 진행합니다"
-```
-
-If user selects "링크 추가":
-1. Collect URLs from user input (comma or newline separated)
-2. Store as `{WEB_LINKS}` list (e.g., `["https://...", "https://..."]`)
-3. Ask again: "더 추가할 링크가 있나요?" — repeat until user says no
-
-If user selects "없음 — 바로 진행":
-- Set `{WEB_LINKS}` = `[]`
-
-### 1.4 Ontology Scope Mapping
+### 1.3 Ontology Scope Mapping
 
 → Read and execute `../shared/ontology-scope-mapping.md` with:
 - `{AVAILABILITY_MODE}` = `required`
-- `{UNMAPPED_POLICY}` = `forbidden`
-- `{WEB_LINKS}` = (collected from Step 1.3, default `[]`)
+- `{CALLER_CONTEXT}` = `"PRD analysis"`
 
-PRD analysis requires policy document references — MCP unavailability stops execution, and unmapped perspectives must be reassessed.
+PRD analysis requires policy document references — MCP unavailability stops execution.
 
-#### Phase 1.4 Exit Gate
+**Note:** This skill requires the `ontology-docs` MCP server to be configured. If not set up, run the `podo-plugin:install-docs` skill or see the plugin README for configuration instructions.
+
+#### Phase 1.3 Exit Gate
 
 Additional check beyond shared module exit gate:
-- [ ] Every perspective has ≥1 ontology doc mapped (required for PRD analysis)
+- [ ] Pool Catalog is non-empty (required for PRD analysis)
 
 ## Phase 2: Team Setup & Task Assignment
 
@@ -174,9 +154,14 @@ All analysts use `analyst` (opus) — PRD policy conflict analysis requires deep
 → Apply worker preamble from `../shared/worker-preamble.md` with:
 - `{TEAM_NAME}` = `"prd-policy-review"`
 - `{WORKER_NAME}` = `"{perspective-slug}-analyst"`
-- `{WORK_ACTION}` = `"Use ontology-docs MCP tools to explore and read your assigned ontology docs (see ONTOLOGY SCOPE below), then cross-reference PRD sections against docs to find policy conflicts/ambiguities"`
+- `{WORK_ACTION}` = `"Use ontology-docs MCP tools to explore and read the ontology pool documents (see ONTOLOGY SCOPE below), then cross-reference PRD sections against docs to find policy conflicts/ambiguities"`
 
-Then include `{ONTOLOGY_SCOPE}` block from Phase 1.4.
+Then include the ontology scope block:
+
+```
+== ONTOLOGY SCOPE ==
+{ONTOLOGY_SCOPE}
+```
 
 Analyst behavior rules (include in prompt):
 ```
@@ -331,12 +316,8 @@ Include in report:
 | # | Path | Domain | Summary |
 |---|------|--------|---------|
 
-### Perspective → Ontology Mapping
-| Perspective | Assigned Ontology Docs | Reasoning |
-|-------------|----------------------|-----------|
-
 ### DA Ontology Audit
-{DA ontology scope audit results — missed docs, under-explored areas}
+{DA ontology scope audit results — under-explored documents, missed sections}
 ```
 
 ### Report Rules

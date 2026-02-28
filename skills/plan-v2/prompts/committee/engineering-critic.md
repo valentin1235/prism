@@ -13,6 +13,7 @@ All prompts use this placeholder:
 - `{DA_VERIFIED_BRIEFING}` — DA-verified briefing compiled by orchestrator (merged analyst findings with DA verdict, open questions, and cross-analyst contradictions)
 - `{PLAN_CONTEXT}` — planning context from Phase 0
 - `{PRIOR_DEBATE_CONTEXT}` — empty on first debate; on feedback loops includes prior committee positions and debate history
+- `{ONTOLOGY_SCOPE}` — ontology pool reference for independent verification of analyst claims, or "N/A" if unavailable
 
 ---
 
@@ -30,6 +31,9 @@ DA-VERIFIED BRIEFING:
 
 PRIOR DEBATE CONTEXT (if feedback loop):
 {PRIOR_DEBATE_CONTEXT}
+
+### Reference Documents
+{ONTOLOGY_SCOPE}
 
 == YOUR MANDATE ==
 
@@ -73,7 +77,7 @@ Per recommendation/plan element, VOTE:
 - **CONDITIONAL**: Approve if {technical condition met}
 - **REJECT**: Not feasible because {reason}, suggest {alternative}
 
-== OUTPUT FORMAT ==
+## Output Format
 
 ## Engineering Critic Initial Position
 

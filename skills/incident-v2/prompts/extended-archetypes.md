@@ -13,7 +13,7 @@
 - [Custom Lens](#custom-lens)
 
 All prompts: replace `{INCIDENT_CONTEXT}` with Phase 0 details.
-All prompts: replace `{ONTOLOGY_SCOPE}` with **perspective-specific scoped reference** from Phase 0.7.
+All prompts: replace `{ONTOLOGY_SCOPE}` with **full-pool scoped reference** from Phase 0.6.
 
 ---
 
@@ -28,7 +28,7 @@ You are the SECURITY & THREAT ANALYST.
 INCIDENT CONTEXT:
 {INCIDENT_CONTEXT}
 
-### Codebase Reference
+### Reference Documents
 {ONTOLOGY_SCOPE}
 
 TASKS:
@@ -74,7 +74,7 @@ You are the DATA INTEGRITY ANALYST.
 INCIDENT CONTEXT:
 {INCIDENT_CONTEXT}
 
-### Codebase Reference
+### Reference Documents
 {ONTOLOGY_SCOPE}
 
 TASKS:
@@ -119,7 +119,7 @@ You are the PERFORMANCE & CAPACITY ANALYST.
 INCIDENT CONTEXT:
 {INCIDENT_CONTEXT}
 
-### Codebase Reference
+### Reference Documents
 {ONTOLOGY_SCOPE}
 
 TASKS:
@@ -159,7 +159,7 @@ You are the USER EXPERIENCE ANALYST.
 INCIDENT CONTEXT:
 {INCIDENT_CONTEXT}
 
-### Codebase Reference
+### Reference Documents
 {ONTOLOGY_SCOPE}
 
 TASKS:
@@ -206,7 +206,7 @@ You are the {LENS NAME} ANALYST.
 INCIDENT CONTEXT:
 {INCIDENT_CONTEXT}
 
-### Codebase Reference
+### Reference Documents
 {ONTOLOGY_SCOPE}
 
 TASKS:
@@ -224,7 +224,10 @@ Read TaskGet, mark in_progress → completed. Send findings via SendMessage.
 
 Spawn: `oh-my-claudecode:architect-medium`, name: `deployment-analyst`, model: `sonnet`
 
-### Codebase Reference
+INCIDENT CONTEXT:
+{INCIDENT_CONTEXT}
+
+### Reference Documents
 {ONTOLOGY_SCOPE}
 
 Tasks: (1) Correlate timeline with recent deploys/config changes (2) Audit deployment pipeline compliance (3) Diff configs before/after (4) Evaluate rollback options and speed (5) Assess canary/gradual rollout coverage
@@ -235,7 +238,10 @@ Output: Change Correlation Timeline, Pipeline Audit, Config Diff, Rollback Asses
 
 Spawn: `oh-my-claudecode:architect-medium`, name: `network-analyst`, model: `sonnet`
 
-### Codebase Reference
+INCIDENT CONTEXT:
+{INCIDENT_CONTEXT}
+
+### Reference Documents
 {ONTOLOGY_SCOPE}
 
 Tasks: (1) Map network topology (2) Trace connectivity failures (3) Analyze DNS resolution + TTL (4) Evaluate LB health checks and routing (5) Cross-AZ/region failover assessment
@@ -246,7 +252,10 @@ Output: Topology Map, Connectivity Trace, DNS Analysis, LB Assessment, Recommend
 
 Spawn: `oh-my-claudecode:architect`, name: `concurrency-analyst`, model: `opus`
 
-### Codebase Reference
+INCIDENT CONTEXT:
+{INCIDENT_CONTEXT}
+
+### Reference Documents
 {ONTOLOGY_SCOPE}
 
 Tasks: (1) Concurrent access patterns involved (2) Lock ordering + deadlock cycles (3) Happens-before in distributed ops (4) Transaction isolation verification (5) State mutation trace under concurrency
@@ -257,7 +266,10 @@ Output: Concurrency Model, Lock/Contention Map, Race Condition ID, State Mutatio
 
 Spawn: `oh-my-claudecode:architect-medium`, name: `dependency-analyst`, model: `sonnet`
 
-### Codebase Reference
+INCIDENT CONTEXT:
+{INCIDENT_CONTEXT}
+
+### Reference Documents
 {ONTOLOGY_SCOPE}
 
 Tasks: (1) Full dependency chain map (2) Vendor status page correlation (3) Fallback/degraded-mode behavior (4) Timeout/retry/circuit-breaker configs with values (5) Coupling strength + blast radius

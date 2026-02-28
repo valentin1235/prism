@@ -7,7 +7,7 @@ All prompts use these placeholders:
 - `{PERSPECTIVE_SCOPE}` — what this perspective examines
 - `{KEY_QUESTIONS}` — numbered list of key questions to answer
 - `{PLAN_CONTEXT}` — full planning context from Phase 0
-- `{ONTOLOGY_SCOPE}` — perspective-specific ontology docs scope from Phase 1.6, or "N/A" if unavailable
+- `{ONTOLOGY_SCOPE}` — full-pool ontology docs scope from Phase 1.6, or "N/A" if unavailable
 
 ---
 
