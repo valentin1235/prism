@@ -4,6 +4,8 @@ Shared module for delegating heavy early-phase computation to an isolated agent 
 
 **Execution context:** This module can be executed by a setup agent spawned from any v2 skill orchestrator. The `{STATE_DIR}` parameter determines where output files are written.
 
+**CRITICAL: The setup agent MUST be spawned as a foreground (blocking) subagent — do NOT use `run_in_background=true`.** Foreground subagents can use `AskUserQuestion` (passed through to the user). Background subagents cannot — `AskUserQuestion` calls will fail silently, breaking the entire setup flow.
+
 ## Table of Contents
 
 - [Parameters](#parameters)
@@ -49,6 +51,15 @@ This replaces passing large structured data as spawn parameters. The setup agent
 
 ## Phase S1: Seed Analysis
 
+### Input Validation & Gap Filling
+
+Before seed analysis, validate `{INPUT_CONTEXT}` completeness:
+
+- **plan**: If required elements are missing (goal, scope, constraints), use `AskUserQuestion` per missing element to collect from user. Maximum 3 rounds. (Equivalent to plan-v2 Phase 0, Step 0.4.)
+  - **Hell Mode**: If `{INPUT_CONTEXT}` contains `--hell` or `hell`, activate Hell Mode (unanimous consensus required). Record this flag in `context.md`.
+- **incident**: If `{INPUT_CONTEXT}` is empty (no `$ARGUMENTS` provided), ask the user to describe the incident via `AskUserQuestion`: "Please describe the incident: What symptoms? Which systems affected? Business impact?" Then proceed to the Fast Track Check.
+- **prd**: If `{INPUT_CONTEXT}` contains a file path, `Read` the PRD file. If file not found, error: "PRD file not found: {path}".
+
 ### Fast Track Check (only when `{FAST_TRACK_ELIGIBLE}=true`)
 
 For incident-v2 only:
@@ -60,6 +71,7 @@ For incident-v2 only:
    - Set `track = FAST_TRACK`
    - Lock 4 core archetypes (Timeline + Root Cause + Systems + Impact) + DA
    - Skip Phase S2 (perspective approval)
+   - Write locked 4-core roster to `{STATE_DIR}/perspectives.md` immediately (Phase S2 is skipped, but the file is required)
    - Determine ontology mapping: run Phase S3 by default. If urgency demands skipping, set `ONTOLOGY_SCOPE = "N/A — Fast Track, ontology mapping deferred."`
 3. Otherwise: set `track = PERSPECTIVE_TRACK`, continue with normal flow
 
@@ -194,6 +206,29 @@ Content:
 - {filename} — {reason, e.g. "Fast track: ontology mapping deferred"}
 ```
 
+**Error format** (when setup fails, e.g., ontology required mode failure):
+
+```markdown
+# Setup Failed
+
+## Timestamp
+{ISO 8601 timestamp}
+
+## Skill
+{plan / incident / prd}
+
+## Error
+{error description, e.g. "ontology-docs MCP not configured. Required for PRD analysis."}
+
+## Files Written Before Failure
+- {any files successfully written before the error}
+
+## Recommendation
+{action for the user, e.g. "Run podo-plugin:install-docs to configure ontology-docs MCP."}
+```
+
+The setup agent MUST attempt to write the sentinel file even on error, so the orchestrator can distinguish "agent crashed" (no sentinel) from "setup failed with known error" (error sentinel).
+
 **Terminate after writing sentinel file.**
 
 ---
@@ -202,7 +237,7 @@ Content:
 
 | File | Content | Required |
 |------|---------|----------|
-| `{STATE_DIR}/seed-analysis.md` | Internal seed analysis results | YES (internal only) |
+| `{STATE_DIR}/seed-analysis.md` | Internal seed analysis results | YES (internal — not read by orchestrator) |
 | `{STATE_DIR}/perspectives.md` | Locked perspective roster | YES |
 | `{STATE_DIR}/context.md` | Extracted planning/incident/PRD context | YES |
 | `{STATE_DIR}/ontology-catalog.md` | Pool catalog table | NO (skipped on fast track or MCP unavailable in optional mode) |

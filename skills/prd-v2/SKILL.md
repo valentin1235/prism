@@ -30,6 +30,7 @@ MUST persist phase outputs to `.omc/state/prd-{short-id}/` (created in Phase 1, 
 | File | Written | Read By |
 |------|---------|---------|
 | `setup-complete.md` | Setup agent (last) | Orchestrator (before reading other files) |
+| `seed-analysis.md` | Setup agent (internal) | Setup agent only |
 | `perspectives.md` | Setup agent | Orchestrator (Phase 2) |
 | `context.md` | Setup agent | All agents |
 | `ontology-catalog.md` | Setup agent | All analysts |
@@ -145,6 +146,8 @@ Task(
 ```
 
 NO `team_name` — runs in isolated session. Blocks until setup agent completes and returns.
+
+**CRITICAL: Do NOT add `run_in_background=true`.** The setup agent uses `AskUserQuestion` for ontology source selection, which only works in foreground subagents.
 
 **Step B: Verify setup completion + error handling**
 

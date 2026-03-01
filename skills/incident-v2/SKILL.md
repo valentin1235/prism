@@ -27,6 +27,7 @@ MUST persist phase outputs to `.omc/state/incident-{short-id}/` (created in Phas
 | File | Written | Read By |
 |------|---------|---------|
 | `setup-complete.md` | Setup agent (last) | Orchestrator (before reading other files) |
+| `seed-analysis.md` | Setup agent (internal) | Setup agent only |
 | `perspectives.md` | Setup agent | Orchestrator (Phase 1) |
 | `context.md` | Setup agent | All agents |
 | `analyst-findings.md` | Phase 2 exit | DA |
@@ -163,7 +164,7 @@ Use this mapping as starting point, then refine based on specific evidence.
 
 | Condition | Track |
 |-----------|-------|
-| SEV1 OR Active | **FAST TRACK**: Lock 4 core archetypes (Timeline + Root Cause + Systems + Impact) + DA. Execute Step 0.5.5 (generate session ID + state directory). Then proceed to Phase 0.6 (ontology mapping runs normally). If urgency demands skipping Phase 0.6, set `{ONTOLOGY_SCOPE}` = "N/A — Fast Track, ontology mapping deferred." Then proceed to Phase 1. DA is created with `blockedBy` on all analysts — "immediately" means tasks are created together, DA executes after analysts complete. |
+| SEV1 OR Active | **FAST TRACK**: Lock 4 core archetypes (Timeline + Root Cause + Systems + Impact) + DA. (Note: Step 0.5.5 session ID generation is handled by orchestrator before setup agent spawn.) Then proceed to Phase 0.6 (ontology mapping runs normally). If urgency demands skipping Phase 0.6, set `{ONTOLOGY_SCOPE}` = "N/A — Fast Track, ontology mapping deferred." Then proceed to Phase 1. DA is created with `blockedBy` on all analysts — "immediately" means tasks are created together, DA executes after analysts complete. |
 | Otherwise | **PERSPECTIVE TRACK**: Continue below |
 
 ### Perspective Track
