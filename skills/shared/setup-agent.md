@@ -45,8 +45,6 @@ Read `{SKILL_PATH}` to extract skill-specific configuration:
 | `incident` | Archetype Index (Core + Extended tables), Characteristic-to-Archetype Mapping table, perspective quality gate reference |
 | `prd` | PRD perspective generation rules (Step 1.2), perspective quality gate reference |
 
-This replaces passing large structured data as spawn parameters. The setup agent reads the SKILL.md directly and extracts what it needs.
-
 ---
 
 ## Phase S1: Seed Analysis
