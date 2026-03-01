@@ -28,12 +28,17 @@ Prompt templates and output template are in subdirectories relative to this file
 
 ## Artifact Persistence
 
-MUST persist phase outputs to `.omc/state/plan-{short-id}/` (create in Phase 2). On feedback loop re-entry, agents MUST `Read` artifact files — do NOT rely solely on prompt context.
+MUST persist phase outputs to `.omc/state/plan-{short-id}/` (created in Phase 1, Step 1.5.1). On feedback loop re-entry, agents MUST `Read` artifact files — do NOT rely solely on prompt context.
 
 | File | Written | Read By |
 |------|---------|---------|
-| `context.md` | Phase 2 | All agents |
-| `ontology-catalog.md` | Phase 1, Step 1.6 | All analysts |
+| `setup-complete.md` | Setup agent (last) | Orchestrator (before reading other files) |
+| `seed-analysis.md` | Setup agent (internal) | Setup agent only |
+| `perspectives.md` | Setup agent | Orchestrator (Phase 2) |
+| `context.md` | Setup agent | All agents |
+| `ontology-catalog.md` | Setup agent | All analysts |
+| `ontology-scope-analyst.md` | Setup agent | All analysts, committee |
+| `ontology-scope-da.md` | Setup agent | DA |
 | `analyst-findings.md` | Phase 3 exit | DA |
 | `da-evaluation.md` | Phase 4 exit (DA) | Committee |
 | `da-verified-briefing.md` | Phase 4 exit (orchestrator) | Committee |
@@ -42,134 +47,71 @@ MUST persist phase outputs to `.omc/state/plan-{short-id}/` (create in Phase 2).
 
 ## Phase 0: Input Analysis & Context Gathering
 
-MUST complete ALL steps. Skipping intake → unfocused analysis, wasted committee time.
-
-### Step 0.1: Detect Input Type
-
-Examine the skill invocation argument(s):
-
-| Input Type | Detection | Action |
-|-----------|-----------|--------|
-| File path | Argument matches file path pattern (`.md`, `.txt`, `.doc`, etc.) | `Read` the file |
-| URL | Argument contains `http://` or `https://` | `WebFetch` to retrieve content |
-| Text prompt | Argument is plain text (not path, not URL) | Parse as requirements |
-| No argument | Empty invocation during conversation | Summarize recent conversation context |
-| Mixed | Combination of above | Process each, then merge |
-
-If file not found → error: `"Input file not found: {path}"`. Ask user to provide valid path.
-
-**Hell Mode**: If argument contains `--hell` or `hell` → activate Hell Mode (unanimous consensus required, no iteration limit). Announce: "Hell Mode activated — committee MUST reach 3/3 unanimous consensus."
-
-### Step 0.2: Language Detection
-
-Detect the primary language of the input content.
-
-| Input Language | Report Language |
-|---------------|----------------|
-| Korean | Korean (한글) |
-| English | English |
-| Mixed | Follow majority language |
-| Ambiguous | `AskUserQuestion` to confirm |
-
-Lock report language for all subsequent phases.
-
-### Step 0.3: Extract Planning Context
-
-Parse input to extract:
-
-| Element | Description | Required |
-|---------|-------------|----------|
-| **Goal** | What the plan aims to achieve | YES |
-| **Scope** | Boundaries — what's in and out | YES |
-| **Constraints** | Technical, timeline, budget, team limitations | YES |
-| **Stakeholders** | Who is affected, who decides | NO (infer if absent) |
-| **Success criteria** | How to measure plan success | NO (derive if absent) |
-| **Existing context** | Prior decisions, dependencies, codebase state | NO |
-
-### Step 0.4: Fill Gaps via User Interview
-
-If ANY required element is missing, use `AskUserQuestion` per element (header: element name, options: "{inferred value}" / "Not applicable"). Users can select "Other" to provide a custom value. After each answer, IMMEDIATELY proceed to the next missing element or exit gate. Maximum 3 rounds.
-
-### Phase 0 Exit Gate
-
-MUST NOT proceed until ALL documented:
-
-- [ ] Goal clearly stated (1-2 sentences, no ambiguity)
-- [ ] Scope defined (explicit in/out boundaries)
-- [ ] Constraints identified (at minimum: timeline, technical)
-- [ ] Input language detected → report language locked
-- [ ] Raw input preserved for analyst reference
-
-If ANY missing → ask user. Error: "Cannot proceed: missing {item}."
-
-Summarize extracted context and confirm with user before continuing.
+> → Delegated to setup agent. Original steps: `docs/delegated-phases.md` § Phase 0.
 
 ---
 
 ## Phase 1: Dynamic Perspective Generation
 
-### Step 1.1: Seed Analysis (Internal)
+> → Delegated to setup agent (Steps 1.1-1.6). Original steps: `docs/delegated-phases.md` § Phase 1.
+> Exception: Step 1.5.1 (Session ID generation) remains in orchestrator.
 
-Evaluate the planning context across dimensions:
+### Step 1.5.1: Generate Session ID and State Directory
 
-| Dimension | Evaluate | Impact on Perspectives |
-|-----------|----------|----------------------|
-| Domain | product / technical / business / organizational | Maps to analysis domains |
-| Complexity | single-system / cross-cutting / organizational | Simple: 3 perspectives. Complex: 5-6 |
-| Risk profile | low / medium / high / critical | High risk → add risk-focused perspective |
-| Stakeholder count | few / many / cross-org | Many → add stakeholder/change management perspective |
-| Timeline | urgent / normal / long-term | Urgent → add feasibility/phasing perspective |
-| Novelty | incremental / new capability / transformational | Novel → add innovation/research perspective |
+Generate `{short-id}`: `Bash(uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-8)` (e.g., `a3f7b2c1`). Generate ONCE and reuse throughout all phases.
 
-### Step 1.2: Generate Perspectives
+Create state directory: `Bash(mkdir -p .omc/state/plan-{short-id})`
 
-Generate 3-6 orthogonal perspectives. Per perspective, define:
+### Setup Agent Invocation
+
+**Step A: Spawn setup agent**
 
 ```
-ID: {kebab-case-slug}
-Name: {Human-readable perspective name}
-Scope: {What this perspective examines}
-Key Questions: [2-4 specific questions this perspective will answer]
-Model: sonnet (standard) or opus (complex/cross-cutting)
-Agent Type: architect-medium (sonnet) or analyst (opus)
-Rationale: {1-2 sentences: why THIS plan demands this perspective}
+Task(
+  subagent_type="oh-my-claudecode:deep-executor",
+  model="opus",
+  prompt="Read and execute skills/shared/setup-agent.md with:
+    {SKILL_NAME} = 'plan'
+    {STATE_DIR} = '.omc/state/plan-{short-id}'
+    {SHORT_ID} = '{short-id}'
+    {INPUT_CONTEXT} = '{user arguments / conversation context}'
+    {CALLER_CONTEXT} = 'analysis'
+    {AVAILABILITY_MODE} = 'optional'
+    {SKILL_PATH} = '{absolute path to skills/plan-v2/SKILL.md}'
+    {FAST_TRACK_ELIGIBLE} = false"
+)
 ```
 
-#### Perspective Quality Gate
+NO `team_name` — runs in isolated session. Blocks until setup agent completes and returns.
 
-→ Apply `../shared/perspective-quality-gate.md` with `{DOMAIN}` = "plan", `{EVIDENCE_SOURCE}` = "Available input content".
+**CRITICAL: Do NOT add `run_in_background=true`.** The setup agent uses `AskUserQuestion` for perspective approval and ontology source selection, which only works in foreground subagents.
 
-### Step 1.3: Present to User
+**Step B: Verify setup completion**
 
-`AskUserQuestion` (header: "Perspectives", question: "I recommend these {N} perspectives for analysis. How to proceed?", options: "Proceed" / "Add perspective" / "Remove perspective" / "Modify perspective")
+- Read `{STATE_DIR}/setup-complete.md` — verify it exists and lists expected files
+- If missing → error: "Setup agent failed. Please retry."
 
-### Step 1.4: Iterate Until Approved
+**Step C: Read setup outputs**
 
-Repeat 1.3 until user selects "Proceed". Warn if <3 perspectives: "Fewer than 3 perspectives may produce a shallow plan. Continue anyway?"
-
-### Step 1.5: Lock Roster
-
-Lock final perspective roster: ID, name, scope, key questions, model, agent type, rationale.
-
-### Step 1.6: Ontology Scope Mapping
-
-→ Read and execute `../shared/ontology-scope-mapping.md` with:
-- `{AVAILABILITY_MODE}` = `optional`
-- `{CALLER_CONTEXT}` = `"analysis"`
-
-If `ONTOLOGY_AVAILABLE=false` → analysts get `{ONTOLOGY_SCOPE}` = "N/A — ontology-docs not available".
-
-Save catalog to `.omc/state/plan-{short-id}/ontology-catalog.md`. Catalog MUST show all source types (mcp, web, file) if present.
+- Read `.omc/state/plan-{short-id}/perspectives.md` → parse perspective roster
+- Verify `perspectives.md` exists and contains valid roster
+- If missing → error: "Perspectives file missing. Please retry."
 
 ### Phase 1 Exit Gate
 
 MUST NOT proceed until:
 
-- [ ] 3-6 orthogonal perspectives defined
-- [ ] Each passes Quality Gate
-- [ ] User approved the roster
-- [ ] Roster locked (no further changes)
-- [ ] Ontology scope mapping complete (or explicitly skipped if MCP unavailable)
+- [ ] `setup-complete.md` sentinel verified
+- [ ] `perspectives.md` parsed with 3-6 perspectives
+- [ ] Ontology scope mapping complete (check for `ontology-scope-analyst.md`) or explicitly skipped
+
+### Feedback Loop Re-entry (Phase 5.8) — EXEMPT from Setup Agent
+
+When consensus fails and a new perspective is needed, orchestrator handles directly (no setup agent):
+
+1. Identify new perspective from Gap Analysis (requires committee debate context)
+2. Create task for NEW perspective only (Phase 2.2-2.3 pattern)
+3. Ontology files already exist — no re-run needed
 
 ---
 
@@ -179,10 +121,10 @@ MUST NOT proceed until:
 
 ```
 TeamCreate(team_name: "plan-committee-{short-id}", description: "Plan: {goal summary}")
-Bash(mkdir -p .omc/state/plan-{short-id})
 ```
+(State directory already exists from Step 1.5.1.)
 
-Write Phase 0 extracted context to `.omc/state/plan-{short-id}/context.md`. MUST include Hell Mode flag if active.
+Phase 0 context is already available in `.omc/state/plan-{short-id}/context.md` (written by setup agent). Read it for team context reference.
 
 ### Step 2.2: Create Tasks
 
@@ -244,7 +186,7 @@ Placeholder replacements:
 - `{PERSPECTIVE_SCOPE}` → perspective scope description
 - `{KEY_QUESTIONS}` → numbered list of key questions
 - `{PLAN_CONTEXT}` → full Phase 0 extracted context (goal, scope, constraints, raw input)
-- `{ONTOLOGY_SCOPE}` → **full-pool scoped reference** from Phase 1.6
+- `{ONTOLOGY_SCOPE}` → Orchestrator `Read`s `.omc/state/plan-{short-id}/ontology-scope-analyst.md` and injects file contents here. If file not found, inject "N/A — ontology scope not available."
 
 ### Step 3.3: Analyst Prompt Structure
 
@@ -303,7 +245,7 @@ Placeholder replacements:
 - `{ALL_ANALYST_FINDINGS}` → compiled findings from all analysts
 - `{PLAN_CONTEXT}` → Phase 0 context
 - `{PRIOR_ITERATION_CONTEXT}` → empty string on first pass; on feedback loop iterations, include previous DA evaluation + committee debate results + gap analysis
-- `{ONTOLOGY_SCOPE}` → DA full-scope ontology reference from Phase 1.6
+- `{ONTOLOGY_SCOPE}` → Orchestrator `Read`s `.omc/state/plan-{short-id}/ontology-scope-da.md` and injects file contents here. If file not found, inject "N/A — ontology scope not available."
 
 DA receives analyst findings for **evaluation** — NOT synthesis tasks. DA is a logic auditor only.
 
@@ -376,7 +318,7 @@ Send `shutdown_request` to all completed analysts and DA. Keep team active for c
 | Engineering Critic | `architect` | `engineering-critic` | opus |
 | Planner | `planner` | `planner` | opus |
 
-All spawn with `run_in_background=true`, `team_name="plan-committee-{short-id}"`. MUST replace `{DA_VERIFIED_BRIEFING}`, `{PLAN_CONTEXT}`, `{PRIOR_DEBATE_CONTEXT}`, and `{ONTOLOGY_SCOPE}` in each prompt.
+All spawn with `run_in_background=true`, `team_name="plan-committee-{short-id}"`. MUST replace `{DA_VERIFIED_BRIEFING}`, `{PLAN_CONTEXT}`, `{PRIOR_DEBATE_CONTEXT}`, and `{ONTOLOGY_SCOPE}` (orchestrator `Read`s `.omc/state/plan-{short-id}/ontology-scope-analyst.md` and injects contents; if file not found, inject "N/A") in each prompt. Committee receives the analyst variant because they evaluate the plan itself (not verifying analyst exploration coverage), so they need the same ontology context analysts had.
 
 ### Step 5.5: Collect Initial Positions
 
@@ -489,9 +431,9 @@ After writing the file, output to chat: Goal, File path, Consensus level (% of e
 ## Gate Summary
 
 ```
-Prerequisite → Phase 0 [5-item] → Phase 1 [5-item, incl. ontology mapping] → Phase 2 → Phase 3 [4-item] → Phase 4 [4-item, DA evaluation + challenge-response loop + orchestrator synthesis] → Phase 5 [consensus] → Phase 6 → Phase 7
-                                                                                  ↓ (ONTOLOGY_AVAILABLE=false)
-                                                                                  └─ Analysts get {ONTOLOGY_SCOPE}="N/A", proceed normally
+Prerequisite → Setup Agent [Phase 0 + Phase 1] → Phase 1 Exit Gate → Phase 2 → Phase 3 [4-item] → Phase 4 [4-item, DA evaluation + challenge-response loop + orchestrator synthesis] → Phase 5 [consensus] → Phase 6 → Phase 7
+                                                                                                      ↓ (ONTOLOGY_AVAILABLE=false)
+                                                                                                      └─ Analysts get {ONTOLOGY_SCOPE}="N/A", proceed normally
 ```
 
 No Consensus at Phase 5 → feedback loop to Phase 3. Every gate specifies exact missing items — fix before proceeding.

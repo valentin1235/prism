@@ -1,5 +1,7 @@
 # Ontology Scope Mapping
 
+**Execution context:** This module can be executed either by the orchestrator directly OR by a setup agent (see `setup-agent.md`). The `{STATE_DIR}` parameter determines where output files are written. All AskUserQuestion interactions work in both contexts.
+
 ## Table of Contents
 
 - [Parameters](#parameters)
@@ -21,6 +23,7 @@
 |-------------|-------------|---------|
 | `{AVAILABILITY_MODE}` | Behavior when ontology-docs MCP is not configured | `optional` (warn and proceed) / `required` (error and stop) |
 | `{CALLER_CONTEXT}` | Context label for screen prompt customization | `"analysis"` / `"PRD analysis"` / `"incident analysis"` |
+| `{STATE_DIR}` | Absolute path to the skill's state directory for file persistence | `.omc/state/plan-abc123/` |
 
 ---
 
@@ -207,6 +210,7 @@ If catalog is empty after all steps:
 - `{AVAILABILITY_MODE}`=`required` → Error: "No ontology sources available." **STOP.**
 
 **Phase A output:** Pool Catalog (unified table of available document, MCP data, web, and file sources).
+Write the Pool Catalog to `{STATE_DIR}/ontology-catalog.md`.
 
 If Pool Catalog is empty and `{AVAILABILITY_MODE}`=`optional` → analysts get `{ONTOLOGY_SCOPE}` = "N/A — no ontology sources available". Skip to Exit Gate.
 
@@ -281,9 +285,33 @@ Check: Did analysts reference relevant web sources from the pool?
 Check: Did analysts reference relevant file sources from the pool?
 ```
 
+### Phase B Output Persistence
+
+After generating both scope block variants above, persist them to `{STATE_DIR}`:
+
+1. Write the analyst `{ONTOLOGY_SCOPE}` block to `{STATE_DIR}/ontology-scope-analyst.md`:
+   ```markdown
+   # Ontology Scope — Analyst Variant
+
+   {full analyst scope block content from "For all analysts" section above}
+   ```
+
+2. Write the DA `{ONTOLOGY_SCOPE}` block to `{STATE_DIR}/ontology-scope-da.md`:
+   ```markdown
+   # Ontology Scope — DA Variant
+
+   {full DA scope block content from "For Devil's Advocate" section above}
+   ```
+
+After writing both files, the orchestrator MAY discard the in-memory scope block data. Downstream agents obtain their scope by having the orchestrator `Read` the appropriate file and inject its contents into the `{ONTOLOGY_SCOPE}` placeholder before spawning.
+
+**Backward compatibility:** If the files do not exist at read time (e.g., older session, fast-track skip), the orchestrator injects: `{ONTOLOGY_SCOPE}` = "N/A — ontology scope files not found. Analyze using available evidence only."
+
 ---
 
 ## Exit Gate
+
+**Empty pool skip:** If Pool Catalog is empty and `{AVAILABILITY_MODE}`=`optional` (execution skipped to Exit Gate from Phase A Step 5), the three file-write items below are N/A — no files to write.
 
 - [ ] ontology-docs MCP availability checked via `list_allowed_directories` (or `ONTOLOGY_AVAILABLE=false`)
 - [ ] `ALLOWED_ROOTS[]` captured and included in `{ONTOLOGY_SCOPE}` doc source block (if available)
@@ -297,3 +325,6 @@ Check: Did analysts reference relevant file sources from the pool?
 - [ ] MCP data source access instructions generated with tool loading steps (`ToolSearch` → direct call)
 - [ ] Full-pool `{ONTOLOGY_SCOPE}` block generated for all analysts with correct access instructions per source type
 - [ ] DA full-scope block generated with verification mission (including ontology-docs and MCP data source utilization check)
+- [ ] Pool Catalog written to `{STATE_DIR}/ontology-catalog.md`
+- [ ] Analyst scope block written to `{STATE_DIR}/ontology-scope-analyst.md`
+- [ ] DA scope block written to `{STATE_DIR}/ontology-scope-da.md`

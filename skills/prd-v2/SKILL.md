@@ -23,74 +23,83 @@ Analyst rules are defined inline. DA prompt is in `prompts/devil-advocate.md`. R
 
 → Read and execute `../shared/prerequisite-gate.md`. Set `{PROCEED_TO}` = "Phase 0".
 
+## Artifact Persistence
+
+MUST persist phase outputs to `.omc/state/prd-{short-id}/` (created in Phase 1, Step 1.2.5). On re-entry, agents MUST `Read` artifact files — do NOT rely solely on prompt context.
+
+| File | Written | Read By |
+|------|---------|---------|
+| `setup-complete.md` | Setup agent (last) | Orchestrator (before reading other files) |
+| `seed-analysis.md` | Setup agent (internal) | Setup agent only |
+| `perspectives.md` | Setup agent | Orchestrator (Phase 2) |
+| `context.md` | Setup agent | All agents |
+| `ontology-catalog.md` | Setup agent | All analysts |
+| `ontology-scope-analyst.md` | Setup agent | All analysts |
+| `ontology-scope-da.md` | Setup agent | DA |
+
 ---
 
 ## Phase 0: Input
 
-### MUST: Minimum Required
-
-| Item | Required | Method |
-|------|----------|--------|
-| PRD file path | YES | Argument or `AskUserQuestion` |
-| Report output path | NO | Defaults to `prd-policy-review-report.md` in PRD file's directory |
-
-```
-/prd-v2 @path/to/prd.md
-```
-
-Reference docs are accessed via `ontology-docs` MCP — no path input needed.
-If PRD file not found, error: `"PRD file not found: {path}"`.
+> → Delegated to setup agent. Original steps: `docs/delegated-phases.md` § Phase 0.
 
 ## Phase 1: PRD Analysis & Perspective Generation
 
-### 1.0 Language Detection
+> → Delegated to setup agent (Steps 1.0-1.3). Original steps: `docs/delegated-phases.md` § Phase 1.
+> Exception: Step 1.2.5 (Session ID generation) remains in orchestrator.
 
-Detect report language from user's environment:
-1. Check if CLAUDE.md contains `Language` directive → use that language
-2. Otherwise, detect from user's input language in this session
-3. Store as `{REPORT_LANGUAGE}` for Phase 5
+### 1.2.5 Generate Session ID and State Directory
 
-Default: user's detected language.
+Generate `{short-id}`: `Bash(uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-8)` (e.g., `a3f7b2c1`). Generate ONCE and reuse throughout all phases.
 
-### 1.1 Read PRD
+Create state directory: `Bash(mkdir -p .omc/state/prd-{short-id})`
 
-Read full PRD via `Read`. Also read any sibling files (handoff, constraints) in the same directory.
+### Setup Agent Invocation
 
-### 1.2 Generate Perspectives
+**Step A: Spawn setup agent**
 
-Analyze PRD functional requirements and cross-reference with ontology-docs domains to derive **N orthogonal policy analysis perspectives**.
-
-Rules:
-- Each perspective covers a **policy ontology unit** (e.g., ticket policy, payment policy, retention policy)
-- **Orthogonality** between perspectives — no overlapping domains
-- Minimum 3, maximum 6 perspectives
-
-Perspective definition format:
 ```
-ID: {slug}
-Name: {perspective name}
-Scope: {policy domain this perspective examines}
-PRD sections: {FR-N, NFR-N, etc.}
+Task(
+  subagent_type="oh-my-claudecode:deep-executor",
+  model="opus",
+  prompt="Read and execute skills/shared/setup-agent.md with:
+    {SKILL_NAME} = 'prd'
+    {STATE_DIR} = '.omc/state/prd-{short-id}'
+    {SHORT_ID} = '{short-id}'
+    {INPUT_CONTEXT} = '{PRD file path from arguments}'
+    {CALLER_CONTEXT} = 'PRD analysis'
+    {AVAILABILITY_MODE} = 'required'
+    {SKILL_PATH} = '{absolute path to skills/prd-v2/SKILL.md}'
+    {FAST_TRACK_ELIGIBLE} = false"
+)
 ```
 
-#### Perspective Quality Gate
+NO `team_name` — runs in isolated session. Blocks until setup agent completes and returns.
 
-→ Apply `../shared/perspective-quality-gate.md` with `{DOMAIN}` = "prd", `{EVIDENCE_SOURCE}` = "PRD content and ontology docs".
+**CRITICAL: Do NOT add `run_in_background=true`.** The setup agent uses `AskUserQuestion` for ontology source selection, which only works in foreground subagents.
 
-### 1.3 Ontology Scope Mapping
+**Step B: Verify setup completion + error handling**
 
-→ Read and execute `../shared/ontology-scope-mapping.md` with:
-- `{AVAILABILITY_MODE}` = `required`
-- `{CALLER_CONTEXT}` = `"PRD analysis"`
+- Read `{STATE_DIR}/setup-complete.md`
+- If missing AND no other state files → setup agent failed (likely ontology unavailable)
+  → Surface error to user: "Setup failed. Ensure ontology-docs MCP is configured. Run `podo-plugin:install-docs` or see README." **STOP.**
+- If `setup-complete.md` lists ontology error → surface error to user, **STOP**
 
-PRD analysis requires policy document references — MCP unavailability stops execution.
+**Step C: Read setup outputs**
 
-**Note:** This skill requires the `ontology-docs` MCP server to be configured. If not set up, run the `podo-plugin:install-docs` skill or see the plugin README for configuration instructions.
+- Read `perspectives.md` → parse PRD-specific roster with PRD sections per perspective
+- Read `ontology-catalog.md` → verify non-empty (required for PRD analysis)
+- If catalog empty → error: "Ontology pool is empty. PRD analysis requires policy documents." **STOP.**
 
-#### Phase 1.3 Exit Gate
+### Phase 1 Exit Gate
 
-Additional check beyond shared module exit gate:
-- [ ] Pool Catalog is non-empty (required for PRD analysis)
+MUST NOT proceed until:
+
+- [ ] `setup-complete.md` sentinel verified
+- [ ] `perspectives.md` parsed with 3-6 perspectives
+- [ ] `ontology-catalog.md` exists and is non-empty
+- [ ] `ontology-scope-analyst.md` exists (required mode)
+- [ ] `ontology-scope-da.md` exists (required mode)
 
 ## Phase 2: Team Setup & Task Assignment
 
@@ -98,7 +107,7 @@ Additional check beyond shared module exit gate:
 
 ```json
 {
-  "team_name": "prd-policy-review",
+  "team_name": "prd-policy-review-{short-id}",
   "description": "PRD multi-perspective policy analysis: {PRD title}"
 }
 ```
@@ -140,7 +149,7 @@ Spawn all analysts **in parallel**.
 Task(
   subagent_type="oh-my-claudecode:analyst",
   model="opus",
-  team_name="prd-policy-review",
+  team_name="prd-policy-review-{short-id}",
   name="{perspective-slug}-analyst",
   run_in_background=true,
   prompt="{worker preamble + analyst prompt}"
@@ -152,7 +161,7 @@ All analysts use `analyst` (opus) — PRD policy conflict analysis requires deep
 ### 3.2 Analyst Prompt Structure
 
 → Apply worker preamble from `../shared/worker-preamble.md` with:
-- `{TEAM_NAME}` = `"prd-policy-review"`
+- `{TEAM_NAME}` = `"prd-policy-review-{short-id}"`
 - `{WORKER_NAME}` = `"{perspective-slug}-analyst"`
 - `{WORK_ACTION}` = `"Use ontology-docs MCP tools to explore and read the ontology pool documents (see ONTOLOGY SCOPE below), then cross-reference PRD sections against docs to find policy conflicts/ambiguities"`
 
@@ -162,6 +171,8 @@ Then include the ontology scope block:
 == ONTOLOGY SCOPE ==
 {ONTOLOGY_SCOPE}
 ```
+
+The orchestrator `Read`s `.omc/state/prd-{short-id}/ontology-scope-analyst.md` and injects its contents as `{ONTOLOGY_SCOPE}`. If file not found, error: "Ontology scope files missing. Re-run Phase 1.3." (prd-v2 uses `required` mode — file-not-found is an error, not a silent fallback.)
 
 Analyst behavior rules (include in prompt):
 ```
@@ -190,7 +201,7 @@ Read `prompts/devil-advocate.md` (relative to this SKILL.md) + `shared/da-evalua
 Task(
   subagent_type="oh-my-claudecode:critic",
   model="opus",
-  team_name="prd-policy-review",
+  team_name="prd-policy-review-{short-id}",
   name="devils-advocate",
   run_in_background=true,
   prompt="{worker preamble + DA prompt from prompts/devil-advocate.md}"
@@ -200,7 +211,7 @@ Task(
 Placeholder replacements:
 - `{ALL_ANALYST_FINDINGS}` → compiled findings from all analysts
 - `{PRD_CONTEXT}` → PRD content and sibling files from Phase 1
-- `{ONTOLOGY_SCOPE}` → full-scope ontology reference from Phase 1.3 (all docs, not perspective-filtered)
+- `{ONTOLOGY_SCOPE}` → Orchestrator `Read`s `.omc/state/prd-{short-id}/ontology-scope-da.md` and injects file contents. If file not found, error: "Ontology scope files missing. Re-run Phase 1.3."
 
 DA receives analyst findings for **evaluation** — NOT synthesis tasks. DA is a logic auditor only.
 
