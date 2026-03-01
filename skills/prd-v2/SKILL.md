@@ -29,13 +29,23 @@ MUST persist phase outputs to `.omc/state/prd-{short-id}/` (created in Phase 1, 
 
 | File | Written | Read By |
 |------|---------|---------|
-| `ontology-catalog.md` | Phase 1.3 | All analysts |
-| `ontology-scope-analyst.md` | Phase 1.3 | All analysts |
-| `ontology-scope-da.md` | Phase 1.3 | DA |
+| `setup-complete.md` | Setup agent (last) | Orchestrator (before reading other files) |
+| `perspectives.md` | Setup agent | Orchestrator (Phase 2) |
+| `context.md` | Setup agent | All agents |
+| `ontology-catalog.md` | Setup agent | All analysts |
+| `ontology-scope-analyst.md` | Setup agent | All analysts |
+| `ontology-scope-da.md` | Setup agent | DA |
 
 ---
 
 ## Phase 0: Input
+
+> → Delegated to setup agent. See "Setup Agent Invocation" below.
+> Original input collection is executed by the setup agent
+> in an isolated session. Orchestrator reads output files after completion.
+
+<details>
+<summary>Original Phase 0 steps (executed by setup agent)</summary>
 
 ### MUST: Minimum Required
 
@@ -51,7 +61,15 @@ MUST persist phase outputs to `.omc/state/prd-{short-id}/` (created in Phase 1, 
 Reference docs are accessed via `ontology-docs` MCP — no path input needed.
 If PRD file not found, error: `"PRD file not found: {path}"`.
 
+</details>
+
 ## Phase 1: PRD Analysis & Perspective Generation
+
+> → Delegated to setup agent (Steps 1.0-1.3).
+> Exception: Step 1.2.5 (Session ID generation) remains in orchestrator.
+
+<details>
+<summary>Original Phase 1 steps (executed by setup agent)</summary>
 
 ### 1.0 Language Detection
 
@@ -87,12 +105,6 @@ PRD sections: {FR-N, NFR-N, etc.}
 
 → Apply `../shared/perspective-quality-gate.md` with `{DOMAIN}` = "prd", `{EVIDENCE_SOURCE}` = "PRD content and ontology docs".
 
-### 1.2.5 Generate Session ID and State Directory
-
-Generate `{short-id}`: `Bash(uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-8)` (e.g., `a3f7b2c1`). Generate ONCE and reuse throughout all phases.
-
-Create state directory: `Bash(mkdir -p .omc/state/prd-{short-id})`
-
 ### 1.3 Ontology Scope Mapping
 
 → Read and execute `../shared/ontology-scope-mapping.md` with:
@@ -104,10 +116,58 @@ PRD analysis requires policy document references — MCP unavailability stops ex
 
 **Note:** This skill requires the `ontology-docs` MCP server to be configured. If not set up, run the `podo-plugin:install-docs` skill or see the plugin README for configuration instructions.
 
-#### Phase 1.3 Exit Gate
+</details>
 
-Additional check beyond shared module exit gate:
-- [ ] Pool Catalog is non-empty (required for PRD analysis)
+### 1.2.5 Generate Session ID and State Directory
+
+Generate `{short-id}`: `Bash(uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-8)` (e.g., `a3f7b2c1`). Generate ONCE and reuse throughout all phases.
+
+Create state directory: `Bash(mkdir -p .omc/state/prd-{short-id})`
+
+### Setup Agent Invocation
+
+**Step A: Spawn setup agent**
+
+```
+Task(
+  subagent_type="oh-my-claudecode:deep-executor",
+  model="opus",
+  prompt="Read and execute skills/shared/setup-agent.md with:
+    {SKILL_NAME} = 'prd'
+    {STATE_DIR} = '.omc/state/prd-{short-id}'
+    {SHORT_ID} = '{short-id}'
+    {INPUT_CONTEXT} = '{PRD file path from arguments}'
+    {CALLER_CONTEXT} = 'PRD analysis'
+    {AVAILABILITY_MODE} = 'required'
+    {SKILL_PATH} = '{absolute path to skills/prd-v2/SKILL.md}'
+    {FAST_TRACK_ELIGIBLE} = false"
+)
+```
+
+NO `team_name` — runs in isolated session. Blocks until setup agent completes and returns.
+
+**Step B: Verify setup completion + error handling**
+
+- Read `{STATE_DIR}/setup-complete.md`
+- If missing AND no other state files → setup agent failed (likely ontology unavailable)
+  → Surface error to user: "Setup failed. Ensure ontology-docs MCP is configured. Run `podo-plugin:install-docs` or see README." **STOP.**
+- If `setup-complete.md` lists ontology error → surface error to user, **STOP**
+
+**Step C: Read setup outputs**
+
+- Read `perspectives.md` → parse PRD-specific roster with PRD sections per perspective
+- Read `ontology-catalog.md` → verify non-empty (required for PRD analysis)
+- If catalog empty → error: "Ontology pool is empty. PRD analysis requires policy documents." **STOP.**
+
+### Phase 1 Exit Gate
+
+MUST NOT proceed until:
+
+- [ ] `setup-complete.md` sentinel verified
+- [ ] `perspectives.md` parsed with 3-6 perspectives
+- [ ] `ontology-catalog.md` exists and is non-empty
+- [ ] `ontology-scope-analyst.md` exists (required mode)
+- [ ] `ontology-scope-da.md` exists (required mode)
 
 ## Phase 2: Team Setup & Task Assignment
 

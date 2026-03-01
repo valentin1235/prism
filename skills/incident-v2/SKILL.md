@@ -26,13 +26,15 @@ MUST persist phase outputs to `.omc/state/incident-{short-id}/` (created in Phas
 
 | File | Written | Read By |
 |------|---------|---------|
-| `context.md` | Phase 1 | All agents |
+| `setup-complete.md` | Setup agent (last) | Orchestrator (before reading other files) |
+| `perspectives.md` | Setup agent | Orchestrator (Phase 1) |
+| `context.md` | Setup agent | All agents |
 | `analyst-findings.md` | Phase 2 exit | DA |
 | `da-evaluation.md` | Phase 2.4 exit (DA) | Phase 3 synthesis |
 | `prior-iterations.md` | Each re-entry (append) | DA (cumulative history) |
-| `ontology-catalog.md` | Phase 0.6 | All agents |
-| `ontology-scope-analyst.md` | Phase 0.6 | All analysts |
-| `ontology-scope-da.md` | Phase 0.6 | DA |
+| `ontology-catalog.md` | Setup agent | All agents |
+| `ontology-scope-analyst.md` | Setup agent | All analysts |
+| `ontology-scope-da.md` | Setup agent | DA |
 
 ## Prerequisite: Agent Team Mode (HARD GATE)
 
@@ -68,6 +70,13 @@ Team size: 3 min (DA + 2) — 6 max (DA + 5). Devil's Advocate is ALWAYS present
 ---
 
 ## Phase 0: Problem Intake
+
+> → Delegated to setup agent. See "Setup Agent Invocation" below.
+> Original steps 0.1-0.4 and seed analysis are executed by the setup agent
+> in an isolated session. Orchestrator reads output files after completion.
+
+<details>
+<summary>Original Phase 0 steps (executed by setup agent)</summary>
 
 MUST complete ALL steps. Skipping intake → unfocused analysis.
 
@@ -138,9 +147,17 @@ Evaluate the incident across 5 dimensions, then map to archetype candidates:
 
 Use this mapping as starting point, then refine based on specific evidence.
 
+</details>
+
 ---
 
 ## Phase 0.5: Perspective Generation
+
+> → Delegated to setup agent.
+> Exception: Step 0.5.5 (Session ID generation) remains in orchestrator.
+
+<details>
+<summary>Original Phase 0.5 steps (executed by setup agent)</summary>
 
 ### Track Selection
 
@@ -176,17 +193,24 @@ Selection rules:
 
 **0.5.4** Lock roster: archetype, model, key questions, rationale per perspective.
 
+</details>
+
 ### Step 0.5.5: Generate Session ID and State Directory
 
 Generate `{short-id}`: `Bash(uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-8)` (e.g., `a3f7b2c1`). Generate ONCE and reuse throughout all phases.
 
 Create state directory: `Bash(mkdir -p .omc/state/incident-{short-id})`
 
-**This step MUST execute on BOTH tracks** (Fast Track and Perspective Track). It is placed here — after track selection completes but before Phase 0.6 or Phase 1 — so that `{short-id}` and the state directory are always available regardless of whether Phase 0.6 is skipped.
+**This step MUST execute BEFORE spawning the setup agent** so that `{short-id}` and `{STATE_DIR}` are available as spawn parameters.
 
 ---
 
 ## Phase 0.6: Ontology Scope Mapping
+
+> → Delegated to setup agent.
+
+<details>
+<summary>Original Phase 0.6 steps (executed by setup agent)</summary>
 
 → Read and execute `../shared/ontology-scope-mapping.md` with:
 - `{AVAILABILITY_MODE}` = `optional`
@@ -205,6 +229,50 @@ Analyze using available evidence only (logs, code, metrics, stack traces).
 
 Shared module exit gate applies. No additional incident-specific checks required.
 
+</details>
+
+### Setup Agent Invocation
+
+**Step A: Spawn setup agent**
+
+```
+Task(
+  subagent_type="oh-my-claudecode:deep-executor",
+  model="opus",
+  prompt="Read and execute skills/shared/setup-agent.md with:
+    {SKILL_NAME} = 'incident'
+    {STATE_DIR} = '.omc/state/incident-{short-id}'
+    {SHORT_ID} = '{short-id}'
+    {INPUT_CONTEXT} = '{user arguments / conversation context}'
+    {CALLER_CONTEXT} = 'incident analysis'
+    {AVAILABILITY_MODE} = 'optional'
+    {SKILL_PATH} = '{absolute path to skills/incident-v2/SKILL.md}'
+    {FAST_TRACK_ELIGIBLE} = true"
+)
+```
+
+NO `team_name` — runs in isolated session. Blocks until setup agent completes and returns.
+
+**Step B: Verify setup completion**
+
+- Read `{STATE_DIR}/setup-complete.md` — verify it exists and check Track field
+- If missing → error: "Setup agent failed. Please retry."
+
+**Step C: Read setup outputs**
+
+- Read `perspectives.md` → check Track field
+- If `FAST_TRACK`: proceed directly to Phase 1 with locked 4-core roster
+- If `PERSPECTIVE_TRACK`: proceed with approved roster
+
+### Setup Exit Gate
+
+MUST NOT proceed until:
+
+- [ ] `setup-complete.md` sentinel verified
+- [ ] `perspectives.md` parsed with valid roster
+- [ ] Track field determined (FAST_TRACK or PERSPECTIVE_TRACK)
+- [ ] Ontology scope mapping complete (check for `ontology-scope-analyst.md`) or explicitly skipped/deferred
+
 ---
 
 ## Phase 1: Team Formation
@@ -217,7 +285,7 @@ Shared module exit gate applies. No additional incident-specific checks required
 TeamCreate(team_name: "incident-analysis-{short-id}", description: "Incident: {summary}")
 ```
 
-Write Phase 0 incident context to `.omc/state/incident-{short-id}/context.md`.
+Phase 0 incident context is already available in `.omc/state/incident-{short-id}/context.md` (written by setup agent). Read it for team context reference.
 
 ### Step 1.2
 
@@ -443,9 +511,7 @@ Tribunal → Phase 2.5.
 ## Gate Summary
 
 ```
-Phase 0 ──[5-item gate]──→ Phase 0.5 ──→ Phase 0.6 ──[exit gate]──→ Phase 1 [create tasks + spawn analysts] ──→ Phase 2 [analysts complete → compile findings → spawn DA (Step 1.4) → DA runs → 6-item gate] ──→ Phase 2.5? ──→ Phase 3 ──→ Phase 4
-                                          ↓ (ONTOLOGY_AVAILABLE=false)
-                                          └──→ Phase 1 (skip 0.6)
+Prerequisite → Step 0.5.5 [session ID] → Setup Agent [Phase 0 + 0.5 + 0.6] → Setup Exit Gate → Phase 1 [create tasks + spawn analysts] → Phase 2 [analysts complete → compile findings → spawn DA (Step 1.4) → DA runs → 6-item gate] → Phase 2.5? → Phase 3 → Phase 4
 ```
 
 Every gate specifies exact missing items. Fix before proceeding.
