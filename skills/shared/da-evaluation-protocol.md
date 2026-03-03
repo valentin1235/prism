@@ -10,6 +10,7 @@ Shared evaluation framework for Devil's Advocate agents across all skills. The D
 - [Step 3: Assign Severity](#step-3-assign-severity)
 - [Step 4: Produce Verdict](#step-4-produce-verdict)
 - [Challenge-Response Loop Protocol](#challenge-response-loop-protocol)
+- [Step 5: Classify Unanswered Questions](#step-5-classify-unanswered-questions)
 - [What the DA MUST NOT Do](#what-the-da-must-not-do)
 
 ## Core Principle
@@ -186,6 +187,46 @@ When the DA operates in a multi-turn loop (mediated by the orchestrator):
 - All BLOCKING → RESOLVED: issue SUFFICIENT verdict
 - BLOCKING persists after 2 rounds: issue NEEDS TRIBUNAL verdict
 - MAJOR persists after 2 rounds: record as acknowledged limitation, does not block
+
+---
+
+## Step 5: Classify Unanswered Questions
+
+After producing the verdict, the DA MUST classify any remaining unanswered questions. These are questions that arose during evaluation but were NOT resolved by the challenge-response loop.
+
+### Classification
+
+| Classification | Criteria | Gate Impact |
+|---------------|---------|-------------|
+| **BLOCKING_QUESTION** | Answer is required to validate the correctness of a core conclusion or recommendation. Without this answer, the plan/analysis may be built on an unverified assumption. | MUST be resolved before proceeding to next phase. Orchestrator resolves via: (1) tool-based verification, (2) forwarding to analyst, or (3) `AskUserQuestion`. |
+| **DEFERRED_QUESTION** | Answer would improve confidence or cover edge cases, but the core conclusion stands without it. Typically: long-term improvements, non-critical optimizations, or questions about scope beyond the current task. | Recorded in output as Open Items. Does NOT block. |
+
+### Classification Guide
+
+| Question Type | Classification | Example |
+|--------------|---------------|---------|
+| Factual verification of a core assumption | **BLOCKING_QUESTION** | "Does the API actually return X?" when the fix assumes X |
+| Confirmation that a fix compiles/works | **BLOCKING_QUESTION** | "Does tsc pass after this change?" |
+| Data that directly affects the recommended approach | **BLOCKING_QUESTION** | "What is the actual error rate?" when severity assessment depends on it |
+| Broader scope assessment | DEFERRED_QUESTION | "Do other schemas have the same vulnerability?" |
+| Process improvement suggestion | DEFERRED_QUESTION | "Should we add integration tests long-term?" |
+| Edge case that doesn't affect the primary fix | DEFERRED_QUESTION | "What happens if only one API returns 404?" |
+
+### Output Format for Unanswered Questions
+
+```markdown
+### Unanswered Questions
+
+**BLOCKING_QUESTION:**
+1. [Question] — Reason: [why this blocks the core conclusion]
+
+**DEFERRED_QUESTION:**
+1. [Question] — Reason: [why this can wait]
+```
+
+If there are zero BLOCKING_QUESTIONs, the DA MUST explicitly state: "BLOCKING_QUESTION: None."
+
+**IMPORTANT**: The "MUST be answered" framing means the orchestrator is responsible for resolving BLOCKING_QUESTIONs before proceeding. The DA identifies them; the orchestrator enforces them.
 
 ---
 

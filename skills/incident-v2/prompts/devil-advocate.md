@@ -133,7 +133,16 @@ Apply YOUR METHOD (above) to each area below. These tell you WHERE to audit — 
 |-------------|---------------|----------------|--------------|
 
 ### Unanswered Questions
-- [Questions that MUST be answered before conclusions can be drawn]
+
+Classify each question per Step 5 of the evaluation protocol:
+
+**BLOCKING_QUESTION:**
+- [Question] — Reason: [why this blocks the core conclusion/recommendation]
+
+**DEFERRED_QUESTION:**
+- [Question] — Reason: [why this can wait]
+
+If no BLOCKING_QUESTIONs exist, write: "BLOCKING_QUESTION: None."
 
 ### Aggregate Verdict
 - BLOCKING: {count} — {list}

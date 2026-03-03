@@ -268,12 +268,19 @@ Write DA evaluation to `.omc/state/plan-{short-id}/da-evaluation.md`.
 After DA verdict is SUFFICIENT (or NEEDS TRIBUNAL items recorded), orchestrator compiles committee briefing:
 
 1. **Merge & deduplicate** analyst findings by theme
-2. **Compile briefing package** containing:
+2. **Triage DA Unanswered Questions** — parse DA's output for BLOCKING_QUESTION and DEFERRED_QUESTION classifications:
+   - **BLOCKING_QUESTION**: Orchestrator MUST resolve BEFORE compiling briefing. Resolution methods (in priority order):
+     a. **Tool-based verification**: Use available tools (Bash, Grep, Read, MCP tools, WebSearch) to answer the question directly
+     b. **Forward to analyst**: Send question to the relevant analyst via `SendMessage` for targeted investigation
+     c. **AskUserQuestion**: If the question cannot be resolved by tools or analysts, ask the user (header: "DA Open Question")
+   - **DEFERRED_QUESTION**: Record in briefing as "Open Items for Committee" — does NOT block
+3. **Compile briefing package** containing:
    - DA-verified findings (with verdict status)
    - DA aggregate verdict and any NEEDS TRIBUNAL items
    - Cross-analyst contradictions identified by DA
-   - Open questions from DA evaluation
-3. Write briefing to `.omc/state/plan-{short-id}/da-verified-briefing.md`
+   - Resolved BLOCKING_QUESTIONs with answers
+   - DEFERRED_QUESTIONs as open items
+4. Write briefing to `.omc/state/plan-{short-id}/da-verified-briefing.md`
 
 ### Phase 4 Exit Gate
 
@@ -281,8 +288,9 @@ MUST NOT proceed until:
 
 - [ ] DA verdict is SUFFICIENT (or NEEDS TRIBUNAL items recorded as open questions)
 - [ ] Challenge-response loop completed (max 2 rounds)
+- [ ] **All DA BLOCKING_QUESTIONs resolved** (answered via tools, analysts, or user)
 - [ ] Orchestrator-compiled briefing written to `da-verified-briefing.md`
-- [ ] Briefing contains: DA-verified findings, aggregate verdict, open questions
+- [ ] Briefing contains: DA-verified findings, aggregate verdict, resolved BLOCKING_QUESTIONs, DEFERRED_QUESTIONs
 
 ---
 
@@ -304,6 +312,7 @@ Compile for committee members (~10-15K tokens max):
 - DA-verified findings and aggregate verdict (from Phase 4 `da-verified-briefing.md`)
 - Cross-analyst contradictions and open questions (from DA evaluation)
 - NEEDS TRIBUNAL items (if any) for committee resolution
+- DEFERRED_QUESTIONs from DA as "Open Items" — committee MUST state a position (adopt, defer, or dismiss with rationale) for each
 - Ontology scope reference from Phase 1.6 (for independent verification)
 
 ### Step 5.3: Shutdown Completed Analysts
@@ -383,7 +392,7 @@ MUST NOT proceed until:
 - [ ] Consensus level determined for every plan element
 - [ ] All Strong/Working items have clear positions documented
 - [ ] All dissenting views documented with rationale
-- [ ] Open items (if any) clearly listed
+- [ ] DEFERRED_QUESTIONs from DA listed as open items with committee positions
 - [ ] Feedback loop either achieved consensus or user chose to proceed
 
 ---
@@ -431,7 +440,7 @@ After writing the file, output to chat: Goal, File path, Consensus level (% of e
 ## Gate Summary
 
 ```
-Prerequisite → Setup Agent [Phase 0 + Phase 1] → Phase 1 Exit Gate → Phase 2 → Phase 3 [4-item] → Phase 4 [4-item, DA evaluation + challenge-response loop + orchestrator synthesis] → Phase 5 [consensus] → Phase 6 → Phase 7
+Prerequisite → Setup Agent [Phase 0 + Phase 1] → Phase 1 Exit Gate → Phase 2 → Phase 3 [4-item] → Phase 4 [5-item, DA evaluation + challenge-response loop + BLOCKING_QUESTION triage + orchestrator synthesis] → Phase 5 [consensus] → Phase 6 → Phase 7
                                                                                                       ↓ (ONTOLOGY_AVAILABLE=false)
                                                                                                       └─ Analysts get {ONTOLOGY_SCOPE}="N/A", proceed normally
 ```

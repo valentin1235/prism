@@ -276,6 +276,18 @@ Orchestrator tracks round count. Maximum 2 challenge-response rounds before esca
 
 **How to read DA verdict**: DA's SendMessage contains a "### Tribunal Trigger Assessment" section with exactly one checked item (`[x]`). Parse the checked line to determine: `SUFFICIENT`, `NOT SUFFICIENT`, or `NEEDS TRIBUNAL`. If no checked item found, ask DA to clarify via SendMessage.
 
+### Step 2.4.1: Triage DA Unanswered Questions
+
+After DA verdict is SUFFICIENT, orchestrator MUST parse DA's "Unanswered Questions" section for BLOCKING_QUESTION and DEFERRED_QUESTION classifications:
+
+- **BLOCKING_QUESTION**: Orchestrator MUST resolve BEFORE proceeding to Phase 2 Exit Gate. Resolution methods (in priority order):
+  a. **Tool-based verification**: Use available tools (Bash, Grep, Read, MCP tools, WebSearch) to answer the question directly
+  b. **Forward to analyst**: Send question to the relevant analyst via `SendMessage` for targeted investigation
+  c. **AskUserQuestion**: If the question cannot be resolved by tools or analysts, ask the user (header: "DA Open Question")
+- **DEFERRED_QUESTION**: Record in report as "Open Items" — does NOT block
+
+Write resolved answers to `.omc/state/incident-{short-id}/analyst-findings.md` under a `## DA Resolved Questions` section header (append — do NOT overwrite existing analyst content).
+
 ### Phase 2 Exit Gate
 
 MUST NOT proceed until ALL verified:
@@ -284,6 +296,7 @@ MUST NOT proceed until ALL verified:
 - [ ] No unexplained timeline gaps
 - [ ] ≥1 root cause hypothesis with strong evidence + code references
 - [ ] DA Aggregate Verdict is SUFFICIENT (zero BLOCKING, all MAJOR resolved or acknowledged)
+- [ ] **All DA BLOCKING_QUESTIONs resolved** (answered via tools, analysts, or user)
 - [ ] All cross-perspective discrepancies resolved
 - [ ] Impact quantified with actual data
 
@@ -375,7 +388,7 @@ Tribunal → Phase 2.5.
 ## Gate Summary
 
 ```
-Prerequisite → Step 0.5.5 [session ID] → Setup Agent [Phase 0 + 0.5 + 0.6] → Setup Exit Gate → Phase 1 [create tasks + spawn analysts] → Phase 2 [analysts complete → compile findings → spawn DA (Step 1.4) → DA runs → 6-item gate] → Phase 2.5? → Phase 3 → Phase 4
+Prerequisite → Step 0.5.5 [session ID] → Setup Agent [Phase 0 + 0.5 + 0.6] → Setup Exit Gate → Phase 1 [create tasks + spawn analysts] → Phase 2 [analysts complete → compile findings → spawn DA (Step 1.4) → DA runs → 7-item gate] → Phase 2.5? → Phase 3 → Phase 4
 ```
 
 Every gate specifies exact missing items. Fix before proceeding.
