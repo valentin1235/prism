@@ -48,7 +48,14 @@ Fill all sections. Write "N/A" if truly irrelevant — do NOT leave sections emp
 |-------------|---------------|----------------|--------------|
 
 ### Unanswered Questions
-- [Questions that MUST be answered before conclusions can be drawn]
+
+**Resolved BLOCKING_QUESTIONs:**
+| # | Question | Resolution Method | Answer |
+|---|----------|------------------|--------|
+
+**DEFERRED_QUESTIONs (Open Items):**
+| # | Question | Reason Deferred |
+|---|----------|----------------|
 
 ### Aggregate Verdict
 - BLOCKING: {count}

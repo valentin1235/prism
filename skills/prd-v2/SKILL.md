@@ -227,12 +227,23 @@ Orchestrator-mediated loop, max 2 rounds:
    - BLOCKING persists after 2 rounds → **NEEDS TRIBUNAL** → record as open question for Phase 5
    - MAJOR unresolved after 2 rounds → record as acknowledged limitation
 
-### 3.5 DA Exit Gate
+### 3.5 Triage DA Unanswered Questions
+
+After DA verdict is SUFFICIENT, orchestrator MUST parse DA's "Unanswered Questions" section for BLOCKING_QUESTION and DEFERRED_QUESTION classifications:
+
+- **BLOCKING_QUESTION**: Orchestrator MUST resolve BEFORE proceeding to DA Exit Gate. Resolution methods (in priority order):
+  a. **Tool-based verification**: Use available tools (Bash, Grep, Read, MCP tools, WebSearch) to answer the question directly
+  b. **Forward to analyst**: Send question to the relevant analyst via `SendMessage` for targeted investigation
+  c. **AskUserQuestion**: If the question cannot be resolved by tools or analysts, ask the user (header: "DA Open Question")
+- **DEFERRED_QUESTION**: Record in report as "Open Items" — does NOT block
+
+### 3.6 DA Exit Gate
 
 MUST NOT proceed until:
 
 - [ ] DA verdict is SUFFICIENT (or NEEDS TRIBUNAL items recorded as open questions)
 - [ ] Challenge-response loop completed (max 2 rounds)
+- [ ] **All DA BLOCKING_QUESTIONs resolved** (answered via tools, analysts, or user)
 - [ ] DA evaluation report received with: fallacy check results, aggregate verdict, ontology scope critique, tribunal trigger assessment
 
 ### Phase 3 Exit Gate
@@ -241,7 +252,7 @@ MUST NOT proceed until ALL verified:
 
 - [ ] All analyst tasks in `completed` status
 - [ ] Every analyst cited evidence sources (ontology-docs, mcp-query, web, or file references)
-- [ ] DA evaluation complete (Step 3.5 exit gate passed)
+- [ ] DA evaluation complete (Step 3.6 exit gate passed)
 
 If ANY analyst incomplete → check via `TaskList`, send status query. Error: "Cannot synthesize: {analyst} not completed."
 
@@ -252,7 +263,7 @@ Lead receives messages automatically from teammates.
 - Analyst completion report received → record content
 - All analysts complete → verify DA task unblocked → spawn DA (Phase 3.3)
 - DA challenge-response loop mediated by lead (Phase 3.4) → forward challenges to analysts, collect responses
-- DA evaluation complete (Phase 3.5 exit gate) → proceed to Phase 5
+- DA evaluation complete (Phase 3.6 exit gate) → proceed to Phase 5
 
 ### Clarity Enforcement
 
@@ -348,6 +359,7 @@ MUST verify before outputting report:
 - [ ] All analyst tasks in `completed` status
 - [ ] DA task in `completed` status with SUFFICIENT verdict (or NEEDS TRIBUNAL items recorded)
 - [ ] DA challenge-response loop completed (max 2 rounds)
+- [ ] All DA BLOCKING_QUESTIONs resolved (answered via tools, analysts, or user)
 - [ ] Every TOP 10 item has `Decision needed` checklist
 - [ ] Every issue has ontology-docs citation evidence
 - [ ] PRD contradictions section exists (state "None found" if 0)

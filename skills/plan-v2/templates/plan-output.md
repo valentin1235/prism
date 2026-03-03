@@ -62,7 +62,14 @@ Fill all sections. Write "N/A" if truly irrelevant — do NOT leave sections emp
 |-------------|---------------|----------------|--------------|
 
 ### Unanswered Questions
-{Questions identified by DA that remain open for committee resolution}
+
+**Resolved BLOCKING_QUESTIONs:**
+| # | Question | Resolution Method | Answer |
+|---|----------|------------------|--------|
+
+**DEFERRED_QUESTIONs:**
+| # | Question | Committee Position | Rationale |
+|---|----------|--------------------|-----------|
 
 ### Aggregate Verdict
 - **BLOCKING**: {count} — {list or "None"}
