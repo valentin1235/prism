@@ -114,6 +114,8 @@ Otherwise, for each selected server:
 2. Generate a brief capability summary describing what analysts can query
 3. Add to `SELECTED_MCP_SERVERS[]` with: server name, full tool list, description, capability summary
 
+→ **NEXT ACTION: Proceed to Step 3 — ask about external sources.**
+
 ### Step 3: Screen 2 — External Source Addition
 
 ```
@@ -148,7 +150,9 @@ AskUserQuestion(
 7. Return to Screen 2 (repeat loop)
 
 #### None — proceed
-Exit loop, proceed to Step 4.
+Exit loop.
+
+→ **NEXT ACTION: Proceed to Step 4 — confirm pool configuration.**
 
 ### Step 4: Screen 3 — Pool Configuration Confirmation
 
@@ -189,6 +193,8 @@ AskUserQuestion(
 | Cancel + `{AVAILABILITY_MODE}`=`required` | Warn: "Ontology pool is required. Add at least one source." Return to Step 3 (Screen 2) to add external sources. Maximum 2 cancel-retry cycles — after 2nd cancel without adding any source, error: "Cannot proceed without at least one ontology source in required mode." **STOP.** |
 | Cancel + `{AVAILABILITY_MODE}`=`optional` | Warn: "Proceeding without ontology pool." Pool Catalog is empty. Proceed |
 
+→ **NEXT ACTION: Proceed to Step 5 — build the final catalog.**
+
 ### Step 5: Build Final Pool Catalog
 
 Combine all sources into a unified catalog:
@@ -213,6 +219,8 @@ If catalog is empty after all steps:
 Write the Pool Catalog to `{STATE_DIR}/ontology-catalog.md`.
 
 If Pool Catalog is empty and `{AVAILABILITY_MODE}`=`optional` → analysts get `{ONTOLOGY_SCOPE}` = "N/A — no ontology sources available". Skip to Exit Gate.
+
+→ **NEXT ACTION: Proceed to Phase B — generate scoped reference blocks for analysts and DA.**
 
 ---
 
@@ -311,20 +319,9 @@ After writing both files, the orchestrator MAY discard the in-memory scope block
 
 ## Exit Gate
 
-**Empty pool skip:** If Pool Catalog is empty and `{AVAILABILITY_MODE}`=`optional` (execution skipped to Exit Gate from Phase A Step 5), the three file-write items below are N/A — no files to write.
+**Empty pool skip:** If Pool Catalog is empty and `{AVAILABILITY_MODE}`=`optional`, file-write items below are N/A.
 
-- [ ] ontology-docs MCP availability checked via `list_allowed_directories` (or `ONTOLOGY_AVAILABLE=false`)
-- [ ] `ALLOWED_ROOTS[]` captured and included in `{ONTOLOGY_SCOPE}` doc source block (if available)
-- [ ] MCP data sources discovered via `ToolSearch` and presented to user via Screen 1 (or none available)
-- [ ] Selected MCP servers recorded with full tool lists and capability summaries
-- [ ] External sources collected via Screen 2 (or explicitly skipped)
-- [ ] Pool configuration confirmed via Screen 3
-- [ ] Pool Catalog generated with Source, Type, and Status for every entry
-- [ ] Web source summaries cached for analyst prompt use
-- [ ] File source summaries cached for analyst prompt use
-- [ ] MCP data source access instructions generated with tool loading steps (`ToolSearch` → direct call)
-- [ ] Full-pool `{ONTOLOGY_SCOPE}` block generated for all analysts with correct access instructions per source type
-- [ ] DA full-scope block generated with verification mission (including ontology-docs and MCP data source utilization check)
-- [ ] Pool Catalog written to `{STATE_DIR}/ontology-catalog.md`
-- [ ] Analyst scope block written to `{STATE_DIR}/ontology-scope-analyst.md`
-- [ ] DA scope block written to `{STATE_DIR}/ontology-scope-da.md`
+- [ ] Phase A complete: ontology-docs checked, MCP data sources selected (or skipped), external sources collected (or skipped), pool confirmed
+- [ ] `{STATE_DIR}/ontology-catalog.md` written with Pool Catalog
+- [ ] `{STATE_DIR}/ontology-scope-analyst.md` written with analyst scope block
+- [ ] `{STATE_DIR}/ontology-scope-da.md` written with DA scope block
