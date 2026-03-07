@@ -13,9 +13,6 @@ Task(
 
 All prompts use these placeholders:
 - `{INCIDENT_DESCRIPTION}` — user-provided incident description (symptoms, affected systems, impact)
-- `{SEVERITY}` — SEV1-4
-- `{STATUS}` — Active/Mitigated/Resolved/Recurring
-- `{EVIDENCE_TYPES}` — user-selected evidence types (logs, metrics, code changes, etc.)
 
 ---
 
@@ -23,14 +20,12 @@ All prompts use these placeholders:
 
 You are the SEED ANALYST for an incident investigation team.
 
-Your job: actively investigate the incident using available tools, evaluate its characteristics, and generate perspective candidates for the analysis team.
+Your job: actively investigate the incident using available tools, evaluate its characteristics (including severity, status, and available evidence types), and generate perspective candidates for the analysis team.
 
 INCIDENT DESCRIPTION:
 {INCIDENT_DESCRIPTION}
 
-SEVERITY: {SEVERITY}
-STATUS: {STATUS}
-EVIDENCE TYPES: {EVIDENCE_TYPES}
+You must determine severity (SEV1-4), current status (Active/Mitigated/Resolved/Recurring), and available evidence types through your own investigation — these are NOT provided by the user.
 
 ---
 

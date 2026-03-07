@@ -76,59 +76,7 @@ Orchestrator handles intake directly — NOT delegated.
 
 If the user provided an incident description via `$ARGUMENTS`, use it directly. Otherwise, ask via `AskUserQuestion` (header: "Incident"): "Please describe the incident: What symptoms? Which systems affected? Business impact?"
 
-### Step 0.2: Severity
-
-Call `AskUserQuestion` for severity ONLY:
-
-```
-AskUserQuestion(
-  header: "Severity",
-  question: "What is the severity level of this incident?",
-  options: [
-    "SEV1 — Full outage",
-    "SEV2 — Partial degradation",
-    "SEV3 — Limited impact",
-    "SEV4 — Minor"
-  ]
-)
-```
-
-### Step 0.3: Status
-
-Call `AskUserQuestion` for status ONLY:
-
-```
-AskUserQuestion(
-  header: "Status",
-  question: "What is the current status of this issue?",
-  options: [
-    "Active — Ongoing",
-    "Mitigated — Temp fix applied",
-    "Resolved — Postmortem phase",
-    "Recurring — Pattern observed"
-  ]
-)
-```
-
-### Step 0.4: Evidence Types
-
-Call `AskUserQuestion` for evidence types:
-
-```
-AskUserQuestion(
-  header: "Evidence",
-  question: "What evidence is available? (select all that apply)",
-  multiSelect: true,
-  options: [
-    "Logs & errors",
-    "Metrics/dashboards",
-    "Code changes",
-    "All of the above"
-  ]
-)
-```
-
-### Step 0.5: Generate Session ID and State Directory
+### Step 0.2: Generate Session ID and State Directory
 
 Generate `{short-id}`: `Bash(uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-8)`. Generate ONCE and reuse throughout all phases.
 
@@ -138,11 +86,10 @@ Create state directory: `Bash(mkdir -p .omc/state/incident-{short-id})`
 
 MUST NOT proceed until ALL documented:
 
-- [ ] Incident description collected (symptoms, affected systems, impact)
-- [ ] Severity determined
-- [ ] Status determined
-- [ ] Evidence types identified
+- [ ] Incident description collected
 - [ ] `{short-id}` generated and state directory created
+
+Severity, status, and evidence types are NOT collected here — the seed-analyst will determine these automatically during active investigation in Phase 0.5.
 
 → **NEXT ACTION: Proceed to Phase 0.5 Step 0.5.1 — Create team.**
 
@@ -180,16 +127,14 @@ Task(
 
 Placeholder replacements in seed-analyst prompt:
 - `{INCIDENT_DESCRIPTION}` → Phase 0 incident description
-- `{SEVERITY}` → Phase 0 severity
-- `{STATUS}` → Phase 0 status
-- `{EVIDENCE_TYPES}` → Phase 0 evidence types
 
 ### Step 0.5.3: Receive Seed Analyst Results
 
 Wait for seed-analyst to send results via `SendMessage`. The message contains:
 - **Research Summary**: evidence discovered, files examined, MCP queries, recent changes
+- **Assessed Context**: severity (SEV1-4), status (Active/Mitigated/Resolved/Recurring), evidence types found
 - **Dimension Evaluation**: domain, failure type, evidence, complexity, recurrence
-- **Perspectives**: 3-5 perspective candidates with ID, Name, Scope, Key Questions, Model, Agent Type, Rationale
+- **Perspectives**: perspective candidates with ID, Name, Scope, Key Questions, Model, Agent Type, Rationale
 
 ### Step 0.5.4: Shutdown Seed Analyst
 
