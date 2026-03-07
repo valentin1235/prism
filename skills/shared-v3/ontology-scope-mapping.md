@@ -103,6 +103,8 @@ If user selects "Skip", gives empty answer, or selects no servers → proceed to
 
 For each selected server, record: server name, tool list, description, capability summary.
 
+**Safety note:** When compiling tool lists, filter out obvious write/mutation tools (names containing `create`, `update`, `delete`, `patch`, `post`) from the analyst-facing list. For query-execution tools (`run_query`, `run_select_query`), keep them but note: "SELECT queries only."
+
 → **NEXT ACTION: Proceed to Step 3 — ask about external sources.**
 
 ### Step 3: Screen 2 — External Source Addition
