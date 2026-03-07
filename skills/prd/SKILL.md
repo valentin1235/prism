@@ -191,7 +191,7 @@ Per issue:
 
 After all analysts complete (DA task blockedBy resolved), spawn DA.
 
-Read `prompts/devil-advocate.md` (relative to this SKILL.md) + `shared/da-evaluation-protocol.md`.
+Read `prompts/devil-advocate.md` (relative to this SKILL.md) + `../shared-v1/da-evaluation-protocol.md`.
 
 ```
 Task(

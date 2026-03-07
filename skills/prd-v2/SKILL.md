@@ -21,7 +21,7 @@ Analyst rules are defined inline. DA prompt is in `prompts/devil-advocate.md`. R
 
 ## Prerequisite
 
-→ Read and execute `../shared/prerequisite-gate.md`. Set `{PROCEED_TO}` = "Phase 0".
+→ Read and execute `../shared-v2/prerequisite-gate.md`. Set `{PROCEED_TO}` = "Phase 0".
 
 ## Artifact Persistence
 
@@ -62,7 +62,7 @@ Create state directory: `Bash(mkdir -p .omc/state/prd-{short-id})`
 Task(
   subagent_type="oh-my-claudecode:deep-executor",
   model="opus",
-  prompt="Read and execute skills/shared/setup-agent.md with:
+  prompt="Read and execute skills/shared-v2/setup-agent.md with:
     {SKILL_NAME} = 'prd'
     {STATE_DIR} = '.omc/state/prd-{short-id}'
     {SHORT_ID} = '{short-id}'
@@ -160,7 +160,7 @@ All analysts use `analyst` (opus) — PRD policy conflict analysis requires deep
 
 ### 3.2 Analyst Prompt Structure
 
-→ Apply worker preamble from `../shared/worker-preamble.md` with:
+→ Apply worker preamble from `../shared-v2/worker-preamble.md` with:
 - `{TEAM_NAME}` = `"prd-policy-review-{short-id}"`
 - `{WORKER_NAME}` = `"{perspective-slug}-analyst"`
 - `{WORK_ACTION}` = `"Use ontology-docs MCP tools to explore and read the ontology pool documents (see ONTOLOGY SCOPE below), then cross-reference PRD sections against docs to find policy conflicts/ambiguities"`
@@ -195,7 +195,7 @@ Per issue:
 
 After all analysts complete (DA task blockedBy resolved), spawn DA.
 
-Read `prompts/devil-advocate.md` (relative to this SKILL.md) + `shared/da-evaluation-protocol.md`.
+Read `prompts/devil-advocate.md` (relative to this SKILL.md) + `../shared-v2/da-evaluation-protocol.md`.
 
 ```
 Task(
@@ -267,7 +267,7 @@ Lead receives messages automatically from teammates.
 
 ### Clarity Enforcement
 
-→ Apply `../shared/clarity-enforcement.md` with `{EVIDENCE_FORMAT}` = `"filename:section"`.
+→ Apply `../shared-v2/clarity-enforcement.md` with `{EVIDENCE_FORMAT}` = `"filename:section"`.
 
 MUST: Periodically check `TaskList`. If any task stays `in_progress` for 5+ minutes without messages, send status check via `SendMessage`.
 
@@ -350,7 +350,7 @@ Include in report:
 
 ## Phase 6: Team Teardown
 
-→ Execute `../shared/team-teardown.md`. Then report file path to user.
+→ Execute `../shared-v2/team-teardown.md`. Then report file path to user.
 
 ## Verification Checklist
 

@@ -252,5 +252,5 @@ This module uses no placeholders. It is self-contained and referenced directly b
 
 Reference from DA prompts (path relative to prompt file location):
 ```
-→ Apply evaluation protocol from `../../shared/da-evaluation-protocol.md`
+→ Apply evaluation protocol from `../../shared-v3/da-evaluation-protocol.md`
 ```

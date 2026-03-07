@@ -27,7 +27,7 @@ Prompt templates and output template are in subdirectories relative to this file
 
 ## Prerequisite
 
-→ Read and execute `../shared/prerequisite-gate.md`. Set `{PROCEED_TO}` = "Phase 0".
+→ Read and execute `../shared-v2/prerequisite-gate.md`. Set `{PROCEED_TO}` = "Phase 0".
 
 ## Artifact Persistence
 
@@ -145,7 +145,7 @@ Task(
 )
 ```
 
-→ Apply worker preamble from `../shared/worker-preamble.md` with:
+→ Apply worker preamble from `../shared-v2/worker-preamble.md` with:
 - `{TEAM_NAME}` = `"plan-committee-{short-id}"`
 - `{WORKER_NAME}` = `"seed-analyst"`
 - `{WORK_ACTION}` = `"Analyze the planning input, evaluate dimensions, and generate perspective recommendations. If input references codebase, investigate using Grep/Read/Bash. Report findings via SendMessage."`
@@ -219,7 +219,7 @@ Write locked roster to `.omc/state/plan-{short-id}/perspectives.md`:
 
 ## Phase 0.7: Ontology Scope Mapping
 
-→ Read and execute `../shared/ontology-scope-mapping.md` with:
+→ Read and execute `../shared-v2/ontology-scope-mapping.md` with:
 - `{AVAILABILITY_MODE}` = `optional`
 - `{CALLER_CONTEXT}` = `"analysis"`
 - `{STATE_DIR}` = `.omc/state/plan-{short-id}`
@@ -325,7 +325,7 @@ Placeholder replacements:
 
 ### Step 3.3: Analyst Prompt Structure
 
-→ Apply worker preamble from `../shared/worker-preamble.md` with:
+→ Apply worker preamble from `../shared-v2/worker-preamble.md` with:
 - `{TEAM_NAME}` = `"plan-committee-{short-id}"`
 - `{WORKER_NAME}` = `"{perspective-id}-analyst"`
 - `{WORK_ACTION}` = `"Analyze the planning context from your assigned perspective. Answer ALL key questions with evidence and reasoning. If ontology docs are available (see ONTOLOGY SCOPE), explore them through your perspective's lens."`
@@ -340,7 +340,7 @@ Monitor via `TaskList`. Forward relevant cross-perspective findings between anal
 
 ### Step 3.5: Clarity Enforcement
 
-→ Apply `../shared/clarity-enforcement.md` with `{EVIDENCE_FORMAT}` = `"concrete evidence or reasoning"`.
+→ Apply `../shared-v2/clarity-enforcement.md` with `{EVIDENCE_FORMAT}` = `"concrete evidence or reasoning"`.
 
 ### Phase 3 Exit Gate
 
@@ -361,7 +361,7 @@ Write compiled analyst findings to `.omc/state/plan-{short-id}/analyst-findings.
 
 ### Step 4.1: Read DA Prompt
 
-Read `prompts/devil-advocate.md` (relative to this SKILL.md) + `shared/da-evaluation-protocol.md`.
+Read `prompts/devil-advocate.md` (relative to this SKILL.md) + `../shared-v2/da-evaluation-protocol.md`.
 
 ### Step 4.2: Spawn Devil's Advocate
 
@@ -568,7 +568,7 @@ After writing the file, output to chat: Goal, File path, Consensus level (% of e
 
 ## Phase 7: Cleanup
 
-→ Execute `../shared/team-teardown.md`.
+→ Execute `../shared-v2/team-teardown.md`.
 
 ---
 

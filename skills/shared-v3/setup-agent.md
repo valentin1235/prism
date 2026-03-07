@@ -74,7 +74,7 @@ Rationale: {1-2 sentences: why THIS input demands this perspective}
 
 ### Perspective Quality Gate
 
-→ Apply `../shared/perspective-quality-gate.md` with skill-appropriate `{DOMAIN}` and `{EVIDENCE_SOURCE}`.
+→ Apply `../shared-v3/perspective-quality-gate.md` with skill-appropriate `{DOMAIN}` and `{EVIDENCE_SOURCE}`.
 
 Write seed analysis results to `{STATE_DIR}/seed-analysis.md` (internal — not read by orchestrator).
 
@@ -107,7 +107,7 @@ Write locked roster to `{STATE_DIR}/perspectives.md`.
 
 ### Execution
 
-→ Read and execute `../shared/ontology-scope-mapping.md` with:
+→ Read and execute `../shared-v3/ontology-scope-mapping.md` with:
 - `{AVAILABILITY_MODE}` = value from parameter
 - `{CALLER_CONTEXT}` = value from parameter
 - `{STATE_DIR}` = value from parameter

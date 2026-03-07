@@ -1,6 +1,6 @@
 # Delegated Phases — Original Steps Reference
 
-These phases are delegated to the setup agent (`../shared/setup-agent.md`). This file preserves the original step definitions for reference.
+These phases are delegated to the setup agent (`../shared-v2/setup-agent.md`). This file preserves the original step definitions for reference.
 
 ---
 
@@ -56,11 +56,11 @@ PRD sections: {FR-N, NFR-N, etc.}
 
 #### Perspective Quality Gate
 
-→ Apply `../shared/perspective-quality-gate.md` with `{DOMAIN}` = "prd", `{EVIDENCE_SOURCE}` = "PRD content and ontology docs".
+→ Apply `../shared-v2/perspective-quality-gate.md` with `{DOMAIN}` = "prd", `{EVIDENCE_SOURCE}` = "PRD content and ontology docs".
 
 ### 1.3 Ontology Scope Mapping
 
-→ Read and execute `../shared/ontology-scope-mapping.md` with:
+→ Read and execute `../shared-v2/ontology-scope-mapping.md` with:
 - `{AVAILABILITY_MODE}` = `required`
 - `{CALLER_CONTEXT}` = `"PRD analysis"`
 - `{STATE_DIR}` = `.omc/state/prd-{short-id}`

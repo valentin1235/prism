@@ -39,7 +39,7 @@ Rationale: {1-2 sentences: why THIS plan demands this perspective}
 
 ### Perspective Quality Gate
 
-→ Apply `../shared/perspective-quality-gate.md` with `{DOMAIN}` = "plan", `{EVIDENCE_SOURCE}` = "Available input content".
+→ Apply `../shared-v2/perspective-quality-gate.md` with `{DOMAIN}` = "plan", `{EVIDENCE_SOURCE}` = "Available input content".
 
 ---
 

@@ -25,7 +25,7 @@ Prompt templates and output template are in subdirectories relative to this file
 
 ## Prerequisite
 
-→ Read and execute `../shared/prerequisite-gate.md`. Set `{PROCEED_TO}` = "Phase 0".
+→ Read and execute `../shared-v1/prerequisite-gate.md`. Set `{PROCEED_TO}` = "Phase 0".
 
 ## Artifact Persistence
 
@@ -178,7 +178,7 @@ Rationale: {1-2 sentences: why THIS plan demands this perspective}
 
 #### Perspective Quality Gate
 
-→ Apply `../shared/perspective-quality-gate.md` with `{DOMAIN}` = "plan", `{EVIDENCE_SOURCE}` = "Available input content".
+→ Apply `../shared-v1/perspective-quality-gate.md` with `{DOMAIN}` = "plan", `{EVIDENCE_SOURCE}` = "Available input content".
 
 ### Step 1.3: Present to User
 
@@ -278,7 +278,7 @@ Placeholder replacements:
 
 ### Step 3.3: Analyst Prompt Structure
 
-→ Apply worker preamble from `../shared/worker-preamble.md` with:
+→ Apply worker preamble from `../shared-v1/worker-preamble.md` with:
 - `{TEAM_NAME}` = `"plan-committee-{short-id}"`
 - `{WORKER_NAME}` = `"{perspective-id}-analyst"`
 - `{WORK_ACTION}` = `"Analyze the planning context from your assigned perspective. Answer ALL key questions with evidence and reasoning."`
@@ -293,7 +293,7 @@ Monitor via `TaskList`. Forward relevant cross-perspective findings between anal
 
 ### Step 3.5: Clarity Enforcement
 
-→ Apply `../shared/clarity-enforcement.md` with `{EVIDENCE_FORMAT}` = `"concrete evidence or reasoning"`.
+→ Apply `../shared-v1/clarity-enforcement.md` with `{EVIDENCE_FORMAT}` = `"concrete evidence or reasoning"`.
 
 ### Phase 3 Exit Gate
 
@@ -314,7 +314,7 @@ Write compiled analyst findings to `.omc/state/plan-{short-id}/analyst-findings.
 
 ### Step 4.1: Read DA Prompt
 
-Read `prompts/devil-advocate.md` (relative to this SKILL.md) + `shared/da-evaluation-protocol.md`.
+Read `prompts/devil-advocate.md` (relative to this SKILL.md) + `../shared-v1/da-evaluation-protocol.md`.
 
 ### Step 4.2: Spawn Devil's Advocate
 
@@ -485,7 +485,7 @@ Output to chat: Goal, File path, Consensus level, Perspectives used, Iteration c
 
 ## Phase 7: Cleanup
 
-→ Execute `../shared/team-teardown.md`.
+→ Execute `../shared-v1/team-teardown.md`.
 
 ---
 

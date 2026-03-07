@@ -1,7 +1,7 @@
 ---
-name: incident-v2
-description: Multi-perspective agent team incident postmortem with ontology-scoped analysis
-version: 1.0.0
+name: incident-v3
+description: Multi-perspective agent team incident postmortem with ontology-scoped analysis, Socratic DA sidecar verification, and mathematical ambiguity scoring. Use this skill for incident analysis, postmortem reports, outage investigation, or root cause analysis that requires verified multi-perspective findings with hallucination detection.
+version: 3.0.0
 user-invocable: true
 allowed-tools: Task, SendMessage, TeamCreate, TeamDelete, TaskCreate, TaskUpdate, TaskList, TaskGet, Read, Glob, Grep, Bash, Write, WebFetch, WebSearch, ToolSearch, ListMcpResourcesTool, mcp__ontology-docs__list_allowed_directories, mcp__ontology-docs__search_files, mcp__ontology-docs__read_file, mcp__ontology-docs__read_text_file, mcp__ontology-docs__read_multiple_files, mcp__ontology-docs__list_directory, mcp__ontology-docs__directory_tree
 ---
@@ -14,9 +14,9 @@ allowed-tools: Task, SendMessage, TeamCreate, TeamDelete, TaskCreate, TaskUpdate
 - [Phase 0.6: Perspective Approval](#phase-06-perspective-approval)
 - [Phase 0.7: Ontology Scope Mapping](#phase-07-ontology-scope-mapping)
 - [Phase 0.8: Context & State Files](#phase-08-context--state-files)
-- [Phase 1: Analyst Task Creation & Spawn](#phase-1-analyst-task-creation--spawn)
-- [Phase 2: Analysis Execution](#phase-2-analysis-execution)
-- [Phase 2.5: Conditional Tribunal](#phase-25-conditional-tribunal)
+- [Phase 1: Analyst Spawn](#phase-1-analyst-spawn)
+- [Phase 2: Socratic Verification Loop](#phase-2-socratic-verification-loop)
+- [Phase 2.5: Tribunal Decision](#phase-25-tribunal-decision)
 - [Phase 3: Synthesis & Report](#phase-3-synthesis--report)
 - [Phase 4: Cleanup](#phase-4-cleanup)
 
@@ -30,16 +30,17 @@ MUST persist phase outputs to `.omc/state/incident-{short-id}/` (created in Phas
 |------|---------|---------|
 | `perspectives.md` | Orchestrator (Phase 0.6) | All agents |
 | `context.md` | Orchestrator (Phase 0.8) | All agents |
-| `analyst-findings.md` | Phase 2 exit | DA |
-| `da-evaluation.md` | Phase 2.4 exit (DA) | Phase 3 synthesis |
-| `prior-iterations.md` | Each re-entry (append) | DA (cumulative history) |
-| `ontology-catalog.md` | Orchestrator (Phase 0.7) | All agents |
-| `ontology-scope-analyst.md` | Orchestrator (Phase 0.7) | All analysts |
-| `ontology-scope-da.md` | Orchestrator (Phase 0.7) | DA |
+| `da-qa-{analyst-id}-round-{N}.md` | Orchestrator (Phase 2) | DA, Scorer |
+| `ambiguity-{analyst-id}.json` | Scorer (Phase 2) | Orchestrator |
+| `verified-findings-{analyst-id}.md` | Orchestrator (Phase 2) | Phase 3 synthesis |
+| `analyst-findings.md` | Orchestrator (Phase 2 exit) | Phase 3 synthesis |
+| `prior-iterations.md` | Each re-entry (append) | All agents (cumulative) |
+| `ontology-catalog.md` | Orchestrator (Phase 0.7) | Analysts |
+| `ontology-scope-analyst.md` | Orchestrator (Phase 0.7) | Analysts |
 
 ## Prerequisite: Agent Team Mode (HARD GATE)
 
-→ Read and execute `../shared-v2/prerequisite-gate.md`. Set `{PROCEED_TO}` = "Phase 0".
+→ Read and execute `../shared-v3/prerequisite-gate.md`. Set `{PROCEED_TO}` = "Phase 0".
 
 ## Archetype Index
 
@@ -63,10 +64,17 @@ MUST persist phase outputs to `.omc/state/incident-{short-id}/` (created in Phas
 | `network` | Network & Connectivity | Sonnet | `architect-medium` | Partitions, DNS, LB issues |
 | `concurrency` | Concurrency & Race | Opus | `architect` | Race conditions, deadlocks |
 | `dependency` | External Dependency | Sonnet | `architect-medium` | Third-party failures |
-| `ux` | User Experience | Sonnet | `architect-medium` | User-facing degradation, error UX, journey disruption |
+| `ux` | User Experience | Sonnet | `architect-medium` | User-facing degradation, error UX |
 | `custom` | Custom | Auto | Auto | Novel failure modes |
 
-Team size: 3 min (DA + 2) — 6 max (DA + 5). Devil's Advocate is ALWAYS present.
+### Verification Agents (per analyst)
+
+| Role | Model | Agent Type | Purpose |
+|------|-------|------------|---------|
+| Socratic DA | Opus | `critic` | Sidecar interviewer — reduces ambiguity via Q&A |
+| Ambiguity Scorer | Sonnet | `analyst` | Scores clarity of verified findings |
+
+Team size: 2 min analysts — 5 max analysts. Each analyst gets a sidecar DA + scorer.
 
 ---
 
@@ -90,7 +98,7 @@ If the user provided an incident description via `$ARGUMENTS`, use it directly. 
 
 | Condition | Track | Action |
 |-----------|-------|--------|
-| SEV1 OR Active | **FAST_TRACK** | Lock 4 core archetypes (Timeline + Root Cause + Systems + Impact) + DA. Skip Phase 0.5 seed-analyst and Phase 0.6 perspective approval. |
+| SEV1 OR Active | **FAST_TRACK** | Lock 4 core archetypes (Timeline + Root Cause + Systems + Impact). Skip Phase 0.5 seed-analyst and Phase 0.6 perspective approval. |
 | Otherwise | **PERSPECTIVE_TRACK** | Continue with seed-analyst for dynamic perspective generation. |
 
 ### Step 0.4: Generate Session ID and State Directory
@@ -138,7 +146,7 @@ Task(
 )
 ```
 
-→ Apply worker preamble from `../shared-v2/worker-preamble.md` with:
+→ Apply worker preamble from `../shared-v3/worker-preamble.md` with:
 - `{TEAM_NAME}` = `"incident-analysis-{short-id}"`
 - `{WORKER_NAME}` = `"seed-analyst"`
 - `{WORK_ACTION}` = `"Actively investigate the incident using available tools (Grep, Read, Bash, MCP). Evaluate incident dimensions, map to archetype candidates, and generate perspective recommendations. Report findings via SendMessage."`
@@ -217,12 +225,14 @@ Write locked roster to `.omc/state/incident-{short-id}/perspectives.md`:
 
 ## Phase 0.7: Ontology Scope Mapping
 
-→ Read and execute `../shared-v2/ontology-scope-mapping.md` with:
+→ Read and execute `../shared-v3/ontology-scope-mapping.md` with:
 - `{AVAILABILITY_MODE}` = `optional`
 - `{CALLER_CONTEXT}` = `"incident analysis"`
 - `{STATE_DIR}` = `.omc/state/incident-{short-id}`
 
 If `ONTOLOGY_AVAILABLE=false` → all analysts get `{ONTOLOGY_SCOPE}` = "N/A — ontology scope not available. Analyze using available evidence only."
+
+**Note:** DA agents do NOT receive ontology scope. They work only with analyst-provided findings.
 
 ---
 
@@ -248,30 +258,26 @@ MUST NOT proceed until:
 
 ---
 
-## Phase 1: Analyst Task Creation & Spawn
+## Phase 1: Analyst Spawn
 
 Team already exists from Phase 0.5.
 
-### Step 1.1: Create Tasks
+### Step 1.1: Create Analyst Tasks
 
-Create tasks: one per perspective + DA.
-
-- **Per-perspective analyst tasks**: one per selected archetype
-- **DA task**: with `addBlockedBy` depending on ALL analyst task IDs (DA cannot start until all analysts complete)
+Create one task per perspective. NO central DA task — DAs are spawned as sidecars in Phase 2.
 
 ### Step 1.2: Pre-assign Owners
 
-MUST pre-assign owners via `TaskUpdate(owner="{worker-name}")` BEFORE spawning.
+MUST pre-assign owners via `TaskUpdate(owner="{analyst-name}")` BEFORE spawning.
 
 ### Step 1.3: Spawn Analysts in Parallel
 
-Spawn all **analyst** agents in parallel. DA is spawned separately after analysts complete (Step 1.4).
+Spawn all analyst agents in parallel.
 
 MUST read prompt files before spawning. Files are relative to this SKILL.md's directory.
 
 | Agent | Prompt File | Section |
 |-------|-------------|---------|
-| Devil's Advocate (ALWAYS) | `prompts/devil-advocate.md` + `../shared-v2/da-evaluation-protocol.md` | full file + inline protocol |
 | Timeline | `prompts/core-archetypes.md` | § Timeline Lens |
 | Root Cause | `prompts/core-archetypes.md` | § Root Cause Lens |
 | Systems & Architecture | `prompts/core-archetypes.md` | § Systems Lens |
@@ -298,7 +304,7 @@ Task(
 )
 ```
 
-→ Apply worker preamble from `../shared-v2/worker-preamble.md` to each analyst prompt with:
+→ Apply worker preamble from `../shared-v3/worker-preamble.md` to each analyst prompt with:
 - `{TEAM_NAME}` = `"incident-analysis-{short-id}"`
 - `{WORKER_NAME}` = `"{archetype-id}-analyst"`
 - `{WORK_ACTION}` = `"Investigate the incident from your assigned perspective. Answer ALL key questions with evidence and code references. If ontology docs are available (see REFERENCE DOCUMENTS), explore them for relevant policies and documentation."`
@@ -306,135 +312,173 @@ Task(
 MUST replace `{INCIDENT_CONTEXT}` in every prompt with actual Phase 0 details (from `context.md`).
 MUST replace `{ONTOLOGY_SCOPE}`: Orchestrator `Read`s `.omc/state/incident-{short-id}/ontology-scope-analyst.md` and injects file contents. If file not found, inject "N/A — ontology scope not available. Analyze using available evidence only."
 
-### Step 1.4: Spawn Devil's Advocate
+### Phase 1 Exit Gate
 
-After all analysts complete (DA task `blockedBy` resolved), spawn DA.
+MUST NOT proceed until:
 
-The lead MUST compile all analyst findings into `{ALL_ANALYST_FINDINGS}` before spawning DA. Collect findings from analyst `SendMessage` reports received during Phase 2.
+- [ ] All analyst tasks created and owners pre-assigned
+- [ ] All analysts spawned in parallel
+
+---
+
+## Phase 2: Socratic Verification Loop
+
+This phase runs a per-analyst verification pipeline: Analyst → Socratic DA → Ambiguity Scorer. The orchestrator manages the loop.
+
+### Step 2.1: Collect Analyst Findings
+
+As each analyst completes (monitor via `TaskList`), collect their findings from `SendMessage`.
+
+**Immediately persist** each analyst's findings to:
+`.omc/state/incident-{short-id}/raw-findings-{analyst-id}.md`
+
+Apply clarity enforcement (`../shared-v3/clarity-enforcement.md` with `{EVIDENCE_FORMAT}` = `"file:function:line"`) before proceeding. Max 2 rework cycles per analyst.
+
+### Step 2.2: Spawn Sidecar DA (per analyst)
+
+For each analyst that passes clarity enforcement, spawn a Socratic DA sidecar.
+
+Read `prompts/devil-advocate.md` (relative to this SKILL.md).
 
 ```
 Task(
   subagent_type="oh-my-claudecode:critic",
-  name="devils-advocate",
+  name="da-{analyst-id}",
   team_name="incident-analysis-{short-id}",
   model="opus",
   run_in_background=true,
-  prompt="{DA prompt with {INCIDENT_CONTEXT}, {ACTIVE_PERSPECTIVES}, {ALL_ANALYST_FINDINGS}, {PRIOR_ITERATION_CONTEXT}, and {ONTOLOGY_SCOPE} replaced}"
+  prompt="{DA prompt with placeholders replaced}"
 )
 ```
 
-`{ONTOLOGY_SCOPE}` for DA: Orchestrator `Read`s `.omc/state/incident-{short-id}/ontology-scope-da.md` and injects file contents. If file not found, inject "N/A" fallback.
+→ Apply worker preamble with:
+- `{WORKER_NAME}` = `"da-{analyst-id}"`
+- `{WORK_ACTION}` = `"Ask Socratic questions to reduce ambiguity in the analyst's findings. Do NOT reference ontology documents. Work only with what the analyst provides."`
 
----
+Placeholder replacements:
+- `{ANALYST_NAME}` → the paired analyst's name
+- `{ANALYST_FINDINGS}` → the analyst's findings
+- `{PRIOR_QA}` → empty string for Round 1
+- `{ROUND_NUMBER}` → "1"
+- `{INCIDENT_CONTEXT}` → Phase 0 details
 
-## Phase 2: Analysis Execution
+**Spawn DAs in parallel** as analysts complete — do not wait for all analysts.
 
-### Step 2.1: Monitor & Coordinate
+### Step 2.3: Socratic Q&A Loop
 
-Monitor via `TaskList`. Forward findings between analysts. Unblock stuck analysts.
-
-### Step 2.2: Clarity Enforcement
-
-→ Apply `../shared-v2/clarity-enforcement.md` with `{EVIDENCE_FORMAT}` = `"file:function:line"`.
-
-**Rework procedure** when analyst output matches a rejection pattern (MUST occur before analyst marks task `completed` and before DA spawning in Step 1.4):
-1. Send feedback via `SendMessage(recipient: "{analyst-name}", content: "{rejection message from clarity enforcement table}")`.
-2. Analyst addresses feedback and re-sends findings (task remains `in_progress` throughout).
-3. Max 2 rework cycles per analyst. After 2nd rejection, accept with caveat and note for DA.
-
-### Step 2.3: Cross-Perspective Validation
-
-| Signal | Action |
-|--------|--------|
-| Convergence | Note for synthesis — strengthens confidence |
-| Divergence | Route to DA + analysts for resolution |
-| Blind spot | Targeted follow-up or spawn specialist |
-
-### Step 2.4: DA Challenge-Response Loop
-
-The DA evaluates analyst findings using the evaluation protocol (`../shared-v2/da-evaluation-protocol.md`). The orchestrator mediates a multi-round loop:
+The orchestrator mediates the conversation between DA and analyst:
 
 **Round 1:**
-1. DA receives analyst findings and produces Fallacy Check Results (per-claim verdicts with severity)
-2. Orchestrator extracts FAIL items (BLOCKING and MAJOR)
-3. Orchestrator forwards each FAIL item to the responsible analyst via `SendMessage`, including the fallacy name and explanation
-4. Analysts respond with corrected reasoning, additional evidence, or acknowledged limitations
+1. DA receives analyst findings, produces 2-4 questions targeting ambiguity
+2. Orchestrator receives DA questions via `SendMessage`
+3. Orchestrator forwards questions to the paired analyst via `SendMessage`
+4. Analyst responds with clarifications
+5. **Persist Q&A**: Write to `.omc/state/incident-{short-id}/da-qa-{analyst-id}-round-1.md`
 
-**Round N (if needed):**
-5. Orchestrator forwards analyst responses to DA for re-evaluation
-6. DA marks each item: RESOLVED / PARTIALLY RESOLVED / UNRESOLVED
-7. If UNRESOLVED items remain → repeat from step 3
+**Round N:**
+6. Orchestrator compiles all prior Q&A into `{PRIOR_QA}`
+7. Sends updated prompt to DA (or spawns new DA instance with accumulated context)
+8. DA either asks more questions or declares COMPLETE
+9. **Persist Q&A**: Write to `.omc/state/incident-{short-id}/da-qa-{analyst-id}-round-{N}.md`
 
-**Termination:**
+**DA declares COMPLETE** → proceed to Step 2.4 for this analyst.
 
-| DA Aggregate Verdict | Condition | Action |
-|---------------------|-----------|--------|
-| SUFFICIENT | Zero BLOCKING + all MAJOR resolved or acknowledged | → Proceed to Phase 2 Exit Gate |
-| NOT SUFFICIENT | BLOCKING items remain | → Continue loop (next round) |
-| NEEDS TRIBUNAL | BLOCKING persists after 2 rounds | → Proceed to Phase 2.5 |
+**Max rounds: 3** per analyst (prevent infinite loops). After 3 rounds, proceed to scoring regardless.
 
-Orchestrator tracks round count. Maximum 2 challenge-response rounds before escalation.
+### Step 2.4: Ambiguity Scoring
 
-**How to read DA verdict**: DA's SendMessage contains a "### Tribunal Trigger Assessment" section with exactly one checked item (`[x]`). Parse the checked line to determine: `SUFFICIENT`, `NOT SUFFICIENT`, or `NEEDS TRIBUNAL`. If no checked item found, ask DA to clarify via SendMessage.
+For each analyst whose DA has completed, spawn an Ambiguity Scorer.
 
-### Step 2.4.1: Triage DA Unanswered Questions
+Read `prompts/ambiguity-scorer.md` (relative to this SKILL.md).
 
-After DA verdict is SUFFICIENT, orchestrator MUST parse DA's "Unanswered Questions" section for BLOCKING_QUESTION and DEFERRED_QUESTION classifications:
+```
+Task(
+  subagent_type="oh-my-claudecode:analyst",
+  name="scorer-{analyst-id}",
+  team_name="incident-analysis-{short-id}",
+  model="sonnet",
+  run_in_background=true,
+  prompt="{scorer prompt with placeholders replaced}"
+)
+```
 
-- **BLOCKING_QUESTION**: Orchestrator MUST resolve BEFORE proceeding to Phase 2 Exit Gate. Resolution methods (in priority order):
-  a. **Tool-based verification**: Use available tools (Bash, Grep, Read, MCP tools, WebSearch) to answer the question directly
-  b. **Forward to analyst**: Send question to the relevant analyst via `SendMessage` for targeted investigation
-  c. **AskUserQuestion**: If the question cannot be resolved by tools or analysts, ask the user (header: "DA Open Question")
-- **DEFERRED_QUESTION**: Record in report as "Open Items" — does NOT block
+Placeholder replacements:
+- `{ANALYST_NAME}` → analyst name
+- `{ANALYST_FINDINGS}` → analyst's findings (post-Q&A updated version)
+- `{DA_QA_HISTORY}` → compiled Q&A from all rounds (read from persisted files)
+- `{INCIDENT_CONTEXT}` → Phase 0 details
 
-Write resolved answers to `.omc/state/incident-{short-id}/analyst-findings.md` under a `## DA Resolved Questions` section header (append — do NOT overwrite existing analyst content).
+**Persist score**: Write scorer's JSON response to `.omc/state/incident-{short-id}/ambiguity-{analyst-id}.json`
+
+### Step 2.5: Threshold Check
+
+Parse the scorer's JSON output:
+
+| Condition | Action |
+|-----------|--------|
+| `ambiguity ≤ 0.2` | **PASS** — mark analyst as verified. Write final findings to `.omc/state/incident-{short-id}/verified-findings-{analyst-id}.md` |
+| `ambiguity > 0.2` AND loop count < 3 | **RETRY** — send `improvement_hint` from scorer to DA. Return to Step 2.3 with accumulated Q&A. Increment loop count. |
+| `ambiguity > 0.2` AND loop count ≥ 3 | **FORCE PASS** — mark as verified with caveat. Note in findings: "Ambiguity score {X} exceeds threshold after 3 rounds. Lowest dimension: {dimension}." |
+
+### Step 2.6: Compile Verified Findings
+
+After ALL analysts are verified (PASS or FORCE PASS):
+
+1. Compile all verified findings into `.omc/state/incident-{short-id}/analyst-findings.md`
+2. Include ambiguity scores summary table
+3. Flag any FORCE PASS analysts for user attention
 
 ### Phase 2 Exit Gate
 
 MUST NOT proceed until ALL verified:
 
-- [ ] All perspective key questions answered
-- [ ] No unexplained timeline gaps
-- [ ] ≥1 root cause hypothesis with strong evidence + code references
-- [ ] DA Aggregate Verdict is SUFFICIENT (zero BLOCKING, all MAJOR resolved or acknowledged)
-- [ ] **All DA BLOCKING_QUESTIONs resolved** (answered via tools, analysts, or user)
-- [ ] All cross-perspective discrepancies resolved
-- [ ] Impact quantified with actual data
-
-If DA Aggregate Verdict is NEEDS TRIBUNAL → skip Exit Gate, proceed directly to Phase 2.5.
-If ANY other item fails → create follow-up tasks, continue Phase 2. Error: "Cannot synthesize: {item} not satisfied."
+- [ ] All analysts have completed findings
+- [ ] All DA Q&A rounds persisted to files
+- [ ] All ambiguity scores computed and persisted
+- [ ] All analysts verified (PASS or FORCE PASS)
+- [ ] Compiled findings written to `analyst-findings.md`
 
 ---
 
-## Phase 2.5: Conditional Tribunal
+## Phase 2.5: Tribunal Decision
 
-### Trigger (ANY one)
+Tribunal is now a user decision, not an automatic trigger.
 
-1. DA marks "NEEDS TRIBUNAL"
-2. ≥2 unresolved cross-perspective contradictions
-3. User requests tribunal
+### Step 2.5.1: Present Summary
 
-If NONE → announce "DA: analysis sufficient. Proceeding to report." → skip to Phase 3.
+Show the user a summary of verified findings:
+- Per-analyst ambiguity scores
+- Any FORCE PASS analysts (highlighted)
+- Key findings overview
 
-### Execution
+### Step 2.5.2: Ask User
 
-1. Compile findings package (~10-15K tokens) using this structure:
-   - **Incident Summary**: 2-3 sentence recap from Phase 0
-   - **Key Findings by Perspective**: For each analyst — perspective name, top 3 findings with evidence
-   - **Root Cause Hypothesis**: Primary hypothesis with supporting evidence and code references
-   - **Recommendations**: Numbered list of all proposed recommendations
-   - **DA Fallacy Check Results**: Per-claim verdict table (FAIL items only — BLOCKING + MAJOR)
-   - **Unresolved Contradictions**: Cross-perspective conflicts that triggered tribunal
-   - **Tribunal Trigger**: Specific condition from Trigger check that activated tribunal
-2. Shut down completed analysts (keep DA): for each analyst, call `SendMessage(type: "shutdown_request", recipient: "{analyst-name}", content: "Analysis complete, proceeding to tribunal.")` and await `shutdown_response(approve=true)` before proceeding. DA remains active for tribunal review.
+```
+AskUserQuestion(
+  header: "Tribunal",
+  question: "All analyst findings have been verified through Socratic Q&A. Would you like to send them to a Tribunal for additional review?",
+  options: [
+    "Skip — proceed to report",
+    "Request Tribunal"
+  ]
+)
+```
+
+### Step 2.5.3: If Tribunal Requested
+
+1. Compile findings package (~10-15K tokens):
+   - **Incident Summary**: 2-3 sentence recap
+   - **Key Findings by Perspective**: top 3 findings per analyst with ambiguity scores
+   - **Recommendations**: all proposed recommendations
+   - **FORCE PASS items**: analysts that didn't meet the threshold
+2. Shut down completed analysts and DAs
 3. Read `prompts/tribunal.md` for critic prompts
-3.5. Replace placeholders in tribunal prompts:
-   - `{FINDINGS_PACKAGE}` → compiled findings from step 1
-   - `{TRIGGER_REASON}` → specific tribunal trigger condition from Trigger check
+4. Replace placeholders:
+   - `{FINDINGS_PACKAGE}` → compiled findings
+   - `{TRIGGER_REASON}` → "User requested tribunal review"
    - `{INCIDENT_CONTEXT}` → Phase 0 details
-4. Spawn UX Critic (Sonnet) + Engineering Critic (Opus) in parallel
-5. Collect independent reviews
-6. Consensus round:
+5. Spawn UX Critic (Sonnet) + Engineering Critic (Opus) in parallel
+6. Collect reviews, run consensus round:
 
 | Level | Condition | Label |
 |-------|-----------|-------|
@@ -442,9 +486,13 @@ If NONE → announce "DA: analysis sufficient. Proceeding to report." → skip t
 | Caveat | 1 APPROVE, 1 CONDITIONAL | `[Approved w/caveat]` |
 | Split | 1+ REJECT | `[No consensus]` → user decision |
 
-Split → share rationale, 1 final round only. Still split → present to user via `AskUserQuestion` with options: "{UX Critic position}" / "{Eng Critic position}" / "Defer". If user selects "Defer", apply per-recommendation tiebreaker: adopt the position of the critic whose rationale aligns with the DA's findings for that specific recommendation.
+Split → share rationale, 1 final round only. Still split → present to user via `AskUserQuestion`.
 
 7. Compile verdict, shut down critics, proceed to Phase 3.
+
+### If Skip
+
+Proceed directly to Phase 3.
 
 ---
 
@@ -452,7 +500,7 @@ Split → share rationale, 1 final round only. Still split → present to user v
 
 ### Step 3.1
 
-Integrate all analyst findings.
+Integrate all verified analyst findings. Read from `.omc/state/incident-{short-id}/analyst-findings.md`.
 
 ### Step 3.2
 
@@ -462,34 +510,41 @@ Read `templates/report.md` and fill all sections with synthesized findings.
 
 `AskUserQuestion`:
 - "Is the analysis complete?"
-- Options: "Complete" / "Need deeper investigation" / "Request Tribunal" / "Add recommendations" / "Share with team"
+- Options: "Complete" / "Need deeper investigation" / "Add recommendations" / "Share with team"
 
 **Deeper investigation re-entry (max 2 loops):**
 
 Before re-entry, increment `investigation_loops` counter in `.omc/state/incident-{short-id}/context.md`. If counter ≥ 2, inform user: "Maximum investigation depth reached. Proceeding with current findings." and auto-select "Complete".
 
-1. Write current findings to `.omc/state/incident-{short-id}/analyst-findings.md` and DA evaluation to `da-evaluation.md`
+1. Write current findings to `.omc/state/incident-{short-id}/analyst-findings.md`
 2. Append iteration summary to `prior-iterations.md`
 3. Identify gaps via `AskUserQuestion` (header: "Investigation Gaps"):
-   - "Add new perspective" → spawn new analyst only (existing findings preserved in `analyst-findings.md`)
+   - "Add new perspective" → spawn new analyst only (existing findings preserved)
    - "Re-examine with focus" → user specifies focus area → targeted follow-up tasks
-4. New analyst runs → DA re-evaluates with cumulative findings (`analyst-findings.md` appended + `prior-iterations.md` for context via `{PRIOR_ITERATION_CONTEXT}`)
+4. New analyst runs → full Socratic DA + Scorer verification
 5. Return to Phase 3 synthesis with expanded findings
-
-Tribunal → Phase 2.5.
 
 ---
 
 ## Phase 4: Cleanup
 
-→ Execute `../shared-v2/team-teardown.md`.
+→ Execute `../shared-v3/team-teardown.md`.
 
 ---
 
 ## Gate Summary
 
 ```
-Prerequisite → Phase 0 [intake, severity, track, session ID] → Phase 0.5 [TeamCreate + seed-analyst] → Phase 0.6 [perspective approval] → Phase 0.7 [ontology] → Phase 0.8 [context + state files] → Phase 1 [create tasks + spawn analysts] → Phase 2 [7-item gate] → Phase 2.5? → Phase 3 → Phase 4
+Prerequisite → Phase 0 [intake, severity, track, session ID]
+→ Phase 0.5 [TeamCreate + seed-analyst]
+→ Phase 0.6 [perspective approval]
+→ Phase 0.7 [ontology]
+→ Phase 0.8 [context + state files]
+→ Phase 1 [spawn analysts]
+→ Phase 2 [Socratic DA + Ambiguity Scorer loop per analyst]
+→ Phase 2.5 [AskUser: tribunal?]
+→ Phase 3 [report]
+→ Phase 4 [cleanup]
 ```
 
 FAST_TRACK shortcut: Phase 0 → Phase 0.5 [TeamCreate only, skip seed-analyst] → Phase 0.6 [skip, 4-core locked] → Phase 0.7 → Phase 0.8 → Phase 1.
