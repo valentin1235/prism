@@ -62,9 +62,9 @@ Persist phase outputs to `.omc/state/incident-{short-id}/` (created in Phase 0, 
 | Role | Model | Agent Type | Purpose |
 |------|-------|------------|---------|
 | Socratic DA | Opus | `critic` | Sidecar interviewer — reduces ambiguity via Q&A |
-| Ambiguity Scorer | Sonnet | `analyst` | Scores clarity of verified findings |
+| Ambiguity Scorer | Sonnet | `analyst` | Single shared scorer — scores all analysts sequentially |
 
-Team size: 2 min analysts — 5 max analysts. Each analyst gets a sidecar DA + scorer.
+Team size: 2 min analysts, no hard max (typically 3-5; complex incidents may need more). Each analyst gets a sidecar DA. A single shared scorer handles all ambiguity scoring sequentially.
 
 ---
 

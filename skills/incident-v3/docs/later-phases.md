@@ -68,16 +68,17 @@ The orchestrator mediates the conversation between DA and analyst:
 
 **Max rounds: 3** per analyst (prevent infinite loops). After 3 rounds, proceed to scoring regardless.
 
-### Step 2.4: Ambiguity Scoring
+### Step 2.4: Ambiguity Scoring (Single Shared Scorer)
 
-For each analyst whose DA has completed, spawn an Ambiguity Scorer.
+Spawn ONE shared scorer agent for the entire team. As each analyst's DA completes, feed that analyst's findings to the scorer sequentially.
 
 Read `prompts/ambiguity-scorer.md` (relative to the main SKILL.md).
 
+**Spawn once (after the first DA completes):**
 ```
 Task(
   subagent_type="oh-my-claudecode:analyst",
-  name="scorer-{analyst-id}",
+  name="shared-scorer",
   team_name="incident-analysis-{short-id}",
   model="sonnet",
   run_in_background=true,
@@ -85,13 +86,13 @@ Task(
 )
 ```
 
-Placeholder replacements:
+**For each analyst**, send scoring request to the shared scorer via `SendMessage`:
 - `{ANALYST_NAME}` → analyst name
 - `{ANALYST_FINDINGS}` → analyst's findings (post-Q&A updated version)
 - `{DA_QA_HISTORY}` → compiled Q&A from all rounds (read from persisted files)
 - `{INCIDENT_CONTEXT}` → Phase 0 details
 
-**Persist score**: Write scorer's JSON response to `.omc/state/incident-{short-id}/ambiguity-{analyst-id}.json`
+**Persist each score**: Write scorer's JSON response to `.omc/state/incident-{short-id}/ambiguity-{analyst-id}.json`
 
 ### Step 2.5: Threshold Check
 
