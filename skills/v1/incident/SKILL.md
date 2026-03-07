@@ -258,7 +258,7 @@ MUST read prompt files before spawning. Files are relative to this SKILL.md's di
 
 | Agent | Prompt File | Section |
 |-------|-------------|---------|
-| Devil's Advocate (ALWAYS) | `prompts/devil-advocate.md` + `shared/da-evaluation-protocol.md` | full file + inline protocol |
+| Devil's Advocate (ALWAYS) | `prompts/devil-advocate.md` + `../shared/da-evaluation-protocol.md` | full file + inline protocol |
 | Timeline | `prompts/core-archetypes.md` | § Timeline Lens |
 | Root Cause | `prompts/core-archetypes.md` | § Root Cause Lens |
 | Systems & Architecture | `prompts/core-archetypes.md` | § Systems Lens |
@@ -310,7 +310,7 @@ MUST reject and return these patterns:
 
 ### Step 2.4: DA Challenge-Response Loop
 
-The DA evaluates analyst findings using the evaluation protocol (`shared/da-evaluation-protocol.md`). The orchestrator mediates a multi-round loop:
+The DA evaluates analyst findings using the evaluation protocol (`../shared/da-evaluation-protocol.md`). The orchestrator mediates a multi-round loop:
 
 **Round 1:**
 1. DA receives analyst findings and produces Fallacy Check Results (per-claim verdicts with severity)

@@ -62,7 +62,7 @@ Create state directory: `Bash(mkdir -p .omc/state/prd-{short-id})`
 Task(
   subagent_type="oh-my-claudecode:deep-executor",
   model="opus",
-  prompt="Read and execute skills/shared/setup-agent.md with:
+  prompt="Read and execute skills/v2/shared/setup-agent.md with:
     {SKILL_NAME} = 'prd'
     {STATE_DIR} = '.omc/state/prd-{short-id}'
     {SHORT_ID} = '{short-id}'
@@ -195,7 +195,7 @@ Per issue:
 
 After all analysts complete (DA task blockedBy resolved), spawn DA.
 
-Read `prompts/devil-advocate.md` (relative to this SKILL.md) + `shared/da-evaluation-protocol.md`.
+Read `prompts/devil-advocate.md` (relative to this SKILL.md) + `../shared/da-evaluation-protocol.md`.
 
 ```
 Task(

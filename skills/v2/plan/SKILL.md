@@ -361,7 +361,7 @@ Write compiled analyst findings to `.omc/state/plan-{short-id}/analyst-findings.
 
 ### Step 4.1: Read DA Prompt
 
-Read `prompts/devil-advocate.md` (relative to this SKILL.md) + `shared/da-evaluation-protocol.md`.
+Read `prompts/devil-advocate.md` (relative to this SKILL.md) + `../shared/da-evaluation-protocol.md`.
 
 ### Step 4.2: Spawn Devil's Advocate
 
