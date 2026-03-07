@@ -117,13 +117,14 @@ Map incident characteristics to archetype candidates:
 
 ## PHASE 4: Generate Perspectives
 
-Generate 3-5 perspectives (DA is always added separately by the orchestrator).
+Generate perspectives based on incident complexity (DA is always added separately by the orchestrator).
 
 Selection rules:
 - MUST include ≥1 Core Archetype (timeline, root-cause, systems, impact)
 - MUST NOT select perspectives without supporting evidence from Phase 1
-- Fewer targeted > broad coverage
-- Max 5 perspectives (team size: DA + 5 = 6 max)
+- Fewer targeted > broad coverage — prefer quality over quantity
+- Typical: 3-5 perspectives for most incidents. Complex multi-domain incidents (e.g., security + data + infra) may warrant more.
+- Each perspective spawns a sidecar DA agent, so more perspectives = more resource cost. Recommend only what the evidence justifies.
 
 Per perspective:
 ```
