@@ -1,9 +1,9 @@
 ---
 name: incident-v3
-description: Multi-perspective agent team incident postmortem with ontology-scoped analysis, Socratic DA sidecar verification, and mathematical ambiguity scoring. Use this skill for incident analysis, postmortem reports, outage investigation, or root cause analysis that requires verified multi-perspective findings with hallucination detection.
-version: 3.1.0
+description: Multi-perspective agent team incident postmortem with ontology-scoped analysis and MCP-based Socratic verification with mathematical ambiguity scoring. Use this skill for incident analysis, postmortem reports, outage investigation, or root cause analysis that requires verified multi-perspective findings with hallucination detection.
+version: 4.0.0
 user-invocable: true
-allowed-tools: Task, SendMessage, TeamCreate, TeamDelete, TaskCreate, TaskUpdate, TaskList, TaskGet, TaskOutput, Read, Glob, Grep, Bash, Write, WebFetch, WebSearch, ToolSearch, ListMcpResourcesTool, mcp__ontology-docs__list_allowed_directories, mcp__ontology-docs__search_files, mcp__ontology-docs__read_file, mcp__ontology-docs__read_text_file, mcp__ontology-docs__read_multiple_files, mcp__ontology-docs__list_directory, mcp__ontology-docs__directory_tree
+allowed-tools: Task, SendMessage, TeamCreate, TeamDelete, TaskCreate, TaskUpdate, TaskList, TaskGet, TaskOutput, Read, Glob, Grep, Bash, Write, WebFetch, WebSearch, ToolSearch, ListMcpResourcesTool, mcp__ontology-docs__list_allowed_directories, mcp__ontology-docs__search_files, mcp__ontology-docs__read_file, mcp__ontology-docs__read_text_file, mcp__ontology-docs__read_multiple_files, mcp__ontology-docs__list_directory, mcp__ontology-docs__directory_tree, mcp__prism__prism_interview, mcp__prism__prism_score
 ---
 
 # Incident Postmortem v3
@@ -14,15 +14,14 @@ Later phases (Phase 2+) are in `docs/later-phases.md`. Read that file ONLY when 
 
 ## Artifact Persistence
 
-Persist phase outputs to `.omc/state/incident-{short-id}/` (created in Phase 0, Step 0.4). On deeper investigation re-entry, agents MUST `Read` artifact files — do NOT rely solely on prompt context.
+Persist phase outputs to `~/.prism/state/incident-{short-id}/` (created in Phase 0, Step 0.4). On deeper investigation re-entry, agents MUST `Read` artifact files — do NOT rely solely on prompt context.
 
 | File | Written | Read By |
 |------|---------|---------|
 | `perspectives.md` | Orchestrator (Phase 0.6) | All agents |
 | `context.md` | Orchestrator (Phase 0.8) | All agents |
-| `da-qa-{analyst-id}-round-{N}.md` | Orchestrator (Phase 2) | DA, Scorer |
-| `ambiguity-{analyst-id}.json` | Scorer (Phase 2) | Orchestrator |
-| `verified-findings-{analyst-id}.md` | Orchestrator (Phase 2) | Phase 3 synthesis |
+| `~/.prism/state/incident-{short-id}/perspectives/{perspective-id}/findings.json` | Analyst (Phase 2) | MCP prism_interview |
+| `verified-findings-{perspective-id}.md` | Orchestrator (Phase 2) | Phase 3 synthesis |
 | `analyst-findings.md` | Orchestrator (Phase 2 exit) | Phase 3 synthesis |
 | `prior-iterations.md` | Each re-entry (append) | All agents (cumulative) |
 | `ontology-catalog.md` | Orchestrator (Phase 0.7) | Analysts |
@@ -57,14 +56,14 @@ Persist phase outputs to `.omc/state/incident-{short-id}/` (created in Phase 0, 
 | `ux` | User Experience | Sonnet | `architect-medium` | User-facing degradation, error UX |
 | `custom` | Custom | Auto | Auto | Novel failure modes |
 
-### Verification Agents (per analyst)
+### Verification (MCP-based)
 
-| Role | Model | Agent Type | Purpose |
-|------|-------|------------|---------|
-| Socratic DA | Opus | `critic` | Sidecar interviewer — reduces ambiguity via Q&A |
-| Ambiguity Scorer | Sonnet | `analyst` | Single shared scorer — scores all analysts sequentially |
+| Tool | Purpose |
+|------|---------|
+| `prism_interview` | Socratic interviewer — reads analyst findings, asks probing questions to reduce ambiguity |
+| `prism_score` | Ambiguity scorer — evaluates clarity on 3 axes (Goal 40%, Constraints 30%, Criteria 30%) |
 
-Team size: 2 min analysts, no hard max (typically 3-5; complex incidents may need more). Each analyst gets a sidecar DA. A single shared scorer handles all ambiguity scoring sequentially.
+Team size: 2 min analysts, no hard max (typically 3-5; complex incidents may need more). Verification runs via MCP tools, not sidecar agents.
 
 ---
 
@@ -80,7 +79,7 @@ If the user provided an incident description via `$ARGUMENTS`, use it directly. 
 
 Generate `{short-id}`: `Bash(uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-8)`. Generate ONCE and reuse throughout all phases.
 
-Create state directory: `Bash(mkdir -p .omc/state/incident-{short-id})`
+Create state directory: `Bash(mkdir -p ~/.prism/state/incident-{short-id})`
 
 ### Phase 0 Exit Gate
 
@@ -175,7 +174,7 @@ Repeat until user selects "Proceed". Warn if <2 dynamic perspectives.
 
 ### Step 0.6.3: Write Perspectives
 
-Write locked roster to `.omc/state/incident-{short-id}/perspectives.md`:
+Write locked roster to `~/.prism/state/incident-{short-id}/perspectives.md`:
 
 ```markdown
 # Perspectives — Locked Roster
@@ -208,11 +207,9 @@ Write locked roster to `.omc/state/incident-{short-id}/perspectives.md`:
 > Read and execute `../shared-v3/ontology-scope-mapping.md` with:
 - `{AVAILABILITY_MODE}` = `optional`
 - `{CALLER_CONTEXT}` = `"incident analysis"`
-- `{STATE_DIR}` = `.omc/state/incident-{short-id}`
+- `{STATE_DIR}` = `~/.prism/state/incident-{short-id}`
 
 If `ONTOLOGY_AVAILABLE=false` → all analysts get `{ONTOLOGY_SCOPE}` = "N/A — ontology scope not available. Analyze using available evidence only."
-
-**Note:** DA agents do NOT receive ontology scope. They work only with analyst-provided findings.
 
 → **NEXT ACTION: Proceed to Phase 0.8 — Write context file.**
 
@@ -222,7 +219,7 @@ If `ONTOLOGY_AVAILABLE=false` → all analysts get `{ONTOLOGY_SCOPE}` = "N/A —
 
 ### Step 0.8.1: Write Context File
 
-Write `.omc/state/incident-{short-id}/context.md` with:
+Write `~/.prism/state/incident-{short-id}/context.md` with:
 - Incident summary (symptoms, timeline, blast radius, mitigation, evidence)
 - Severity and status
 - Evidence types
@@ -241,30 +238,11 @@ MUST NOT proceed until:
 
 ---
 
-## Phase 1: Spawn Analyst-DA Pairs + Shared Scorer
+## Phase 1: Spawn Analysts
 
-Team already exists from Phase 0.5. Spawn all agents simultaneously for maximum parallelism.
+Team already exists from Phase 0.5. Spawn all analyst agents in parallel. Each analyst runs self-verification via MCP tools (prism_interview + prism_score) before reporting.
 
-### Step 1.1: Spawn Shared Scorer
-
-Spawn ONE shared scorer first. Read `prompts/ambiguity-scorer.md`.
-
-```
-Task(
-  subagent_type="oh-my-claudecode:analyst",
-  name="shared-scorer",
-  team_name="incident-analysis-{short-id}",
-  model="sonnet",
-  run_in_background=true,
-  prompt="{scorer prompt}"
-)
-```
-
-The scorer receives scoring requests from DAs via `SendMessage` and returns score JSON directly to the requesting DA.
-
-### Step 1.2: Spawn Analyst-DA Pairs
-
-For each perspective, spawn an analyst AND its paired DA simultaneously.
+### Step 1.1: Spawn Analysts
 
 MUST read prompt files before spawning. Files are relative to this SKILL.md's directory.
 
@@ -284,7 +262,8 @@ MUST read prompt files before spawning. Files are relative to this SKILL.md's di
 | Dependency | `prompts/extended-archetypes.md` | § Dependency |
 | Custom | `prompts/extended-archetypes.md` | § Custom Lens |
 
-**Analyst spawn pattern:**
+**Spawn pattern:**
+
 ```
 Task(
   subagent_type="oh-my-claudecode:{agent_type}",
@@ -292,35 +271,15 @@ Task(
   team_name="incident-analysis-{short-id}",
   model="{model}",
   run_in_background=true,
-  prompt="{analyst prompt with {INCIDENT_CONTEXT}, {ONTOLOGY_SCOPE}, {DA_NAME} replaced}"
+  prompt="{analyst prompt with {INCIDENT_CONTEXT}, {ONTOLOGY_SCOPE}, {INCIDENT_SHORT_ID} replaced}"
 )
 ```
 
-> Apply worker preamble with `{WORK_ACTION}` = `"Investigate the incident from your assigned perspective. Send findings to your paired DA. Then respond to DA questions until the DA stops asking."`
+> Apply worker preamble with `{WORK_ACTION}` = `"Investigate the incident from your assigned perspective. Answer ALL key questions with evidence and code references. Run self-verification via MCP tools (prism_interview + prism_score). Report verified findings via SendMessage to team-lead."`
 
 MUST replace `{INCIDENT_CONTEXT}` from `context.md`.
 MUST replace `{ONTOLOGY_SCOPE}` from `ontology-scope-analyst.md` (or "N/A" if not found).
-MUST replace `{DA_NAME}` with the paired DA's name: `"da-{archetype-id}"`.
-
-**DA spawn pattern (one per analyst):**
-
-Read `prompts/devil-advocate.md`.
-
-```
-Task(
-  subagent_type="oh-my-claudecode:critic",
-  name="da-{archetype-id}",
-  team_name="incident-analysis-{short-id}",
-  model="opus",
-  run_in_background=true,
-  prompt="{DA prompt with {ANALYST_NAME}, {INCIDENT_CONTEXT} replaced}"
-)
-```
-
-> Apply worker preamble with `{WORK_ACTION}` = `"Wait for analyst findings, run Socratic Q&A loop, request scoring from shared-scorer, and report verified results to team-lead."`
-
-MUST replace `{ANALYST_NAME}` with `"{archetype-id}-analyst"`.
-MUST replace `{INCIDENT_CONTEXT}` from `context.md`.
+MUST replace `{INCIDENT_SHORT_ID}` with the incident's `{short-id}`. Analysts construct their own session path: `incident-{short-id}/perspectives/{perspective-id}`.
 
 ### Phase 1 Exit Gate
 
@@ -329,7 +288,7 @@ MUST NOT proceed until:
 - [ ] All analyst tasks created and owners pre-assigned
 - [ ] All analysts spawned in parallel
 
-→ **NEXT ACTION: Read `docs/later-phases.md` and proceed to Phase 2 — Socratic Verification Loop.**
+→ **NEXT ACTION: Read `docs/later-phases.md` and proceed to Phase 2 — MCP Socratic Verification.**
 
 ---
 
@@ -342,7 +301,7 @@ Prerequisite → Phase 0 [intake, severity, status, evidence, session ID]
 → Phase 0.7 [ontology]
 → Phase 0.8 [context + state files]
 → Phase 1 [spawn analysts]
-→ Phase 2 [Socratic DA + Ambiguity Scorer loop per analyst] ← docs/later-phases.md
+→ Phase 2 [collect verified findings — analysts self-verify via prism_interview + prism_score] ← docs/later-phases.md
 → Phase 2.5 [AskUser: tribunal?] ← docs/later-phases.md
 → Phase 3 [report] ← docs/later-phases.md
 → Phase 4 [cleanup] ← docs/later-phases.md

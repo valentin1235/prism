@@ -4,57 +4,55 @@ Read this file when entering Phase 2. Do NOT preload.
 
 ---
 
-## Phase 2: Decentralized Verification (Autonomous Agent Loop)
+## Phase 2: Collect Verified Findings
 
-Each analyst-DA pair runs an independent Q&A loop. The DA drives the loop: receives findings, questions the analyst, requests scoring, and retries if needed. The orchestrator does NOT relay messages — it only collects final results.
+Each analyst runs self-verification via MCP tools (prism_interview + prism_score) autonomously. The orchestrator only collects verified results.
 
 ### Architecture
 
 ```
-analyst-1 ──findings──→ da-1 ──score request──→ shared-scorer
-analyst-2 ──findings──→ da-2 ──score request──→ shared-scorer
-analyst-N ──findings──→ da-N ──score request──→ shared-scorer
-
-Each pair runs independently. Scorer processes requests FIFO.
-DA reports verified findings to orchestrator (team-lead) when done.
+analyst-1: investigate → write findings.json → prism_interview loop → prism_score → SendMessage(verified)
+analyst-2: investigate → write findings.json → prism_interview loop → prism_score → SendMessage(verified)
+...
+orchestrator: wait for all analysts → collect verified findings → compile
 ```
 
-### Agent Communication Protocol
+### Step 2.1: Wait for Analysts
 
-| From | To | Message | When |
-|------|-----|---------|------|
-| Analyst | DA | Raw findings | After investigation complete |
-| DA | Analyst | Socratic questions (2-4) | Each Q&A round |
-| Analyst | DA | Clarification responses | After receiving questions |
-| DA | Shared-Scorer | Score request (findings + QA history) | When DA thinks ambiguity is resolved |
-| Shared-Scorer | DA | Score JSON (PASS/FAIL + improvement_hint) | After scoring |
-| DA | Analyst | Follow-up questions | If scorer returns FAIL |
-| DA | Orchestrator | Verified findings + final score | On PASS or FORCE PASS |
+Monitor analyst completion via `TaskList`. Each analyst will:
+1. Write findings to `~/.prism/state/incident-{short-id}/perspectives/{perspective-id}/findings.json`
+2. Run self-verification (prism_interview Q&A + prism_score threshold check)
+3. Send verified findings to team-lead via `SendMessage`
 
-### Step 2.1: Wait for DA Reports
+The `SendMessage` from each analyst includes:
+- context_id, perspective_id, rounds completed, weighted_total score, verdict (PASS/FORCE PASS)
+- Verified findings (refined through Q&A)
+- Key Q&A clarifications
 
-The orchestrator waits for all DAs to report via `SendMessage`. Each DA reports:
-- **Verified findings** (post-Q&A)
-- **Ambiguity score** (from scorer)
-- **Q&A summary** (rounds completed, key clarifications)
-- **Verdict**: PASS or FORCE PASS
+### Step 2.2: Drain Background Tasks
 
-As each DA reports, persist results:
-- Write verified findings to `.omc/state/incident-{short-id}/verified-findings-{analyst-id}.md`
-- Write score to `.omc/state/incident-{short-id}/ambiguity-{analyst-id}.json`
+After each analyst completes (Claude Code bug workaround [#27431]):
+- `TaskList` → find completed tasks → `TaskOutput` for each
 
-### Step 2.2: Compile Verified Findings
+### Step 2.3: Persist Verified Results
 
-After ALL DAs have reported:
+For each analyst:
+- Write verified findings to `~/.prism/state/incident-{short-id}/verified-findings-{perspective-id}.md`
+- MCP session artifacts are at `~/.prism/state/incident-{short-id}/perspectives/{perspective-id}/` (interview.json + findings.json)
 
-1. Compile all verified findings into `.omc/state/incident-{short-id}/analyst-findings.md`
-2. Include ambiguity scores summary table
+### Step 2.4: Compile Verified Findings
+
+After ALL analysts are verified:
+
+1. Compile all verified findings into `~/.prism/state/incident-{short-id}/analyst-findings.md`
+2. Include ambiguity scores summary table (per perspective: perspective_id, goal, constraints, criteria, weighted_total, verdict)
 3. Flag any FORCE PASS analysts for user attention
 
 ### Phase 2 Exit Gate
 
-- [ ] All DAs have reported verified findings
-- [ ] All scores persisted
+- [ ] All analysts have completed and sent verified findings
+- [ ] All background task outputs drained via `TaskOutput`
+- [ ] All verified findings persisted
 - [ ] Compiled findings written to `analyst-findings.md`
 
 → **NEXT ACTION: Proceed to Phase 2.5 — Tribunal Decision.**
@@ -92,7 +90,7 @@ AskUserQuestion(
    - **Key Findings by Perspective**: top 3 findings per analyst with ambiguity scores
    - **Recommendations**: all proposed recommendations
    - **FORCE PASS items**: analysts that didn't meet the threshold
-2. Shut down completed analysts and DAs
+2. Shut down completed analysts
 3. Read `prompts/tribunal.md` for critic prompts
 4. Replace placeholders:
    - `{FINDINGS_PACKAGE}` → compiled findings
@@ -123,7 +121,7 @@ Proceed directly to Phase 3.
 
 ### Step 3.1
 
-Integrate all verified analyst findings. Read from `.omc/state/incident-{short-id}/analyst-findings.md`.
+Integrate all verified analyst findings. Read from `~/.prism/state/incident-{short-id}/analyst-findings.md`.
 
 ### Step 3.2
 
@@ -137,14 +135,14 @@ Read `templates/report.md` and fill all sections with synthesized findings.
 
 **Deeper investigation re-entry (max 2 loops):**
 
-Before re-entry, increment `investigation_loops` counter in `.omc/state/incident-{short-id}/context.md`. If counter ≥ 2, inform user: "Maximum investigation depth reached. Proceeding with current findings." and auto-select "Complete".
+Before re-entry, increment `investigation_loops` counter in `~/.prism/state/incident-{short-id}/context.md`. If counter ≥ 2, inform user: "Maximum investigation depth reached. Proceeding with current findings." and auto-select "Complete".
 
-1. Write current findings to `.omc/state/incident-{short-id}/analyst-findings.md`
+1. Write current findings to `~/.prism/state/incident-{short-id}/analyst-findings.md`
 2. Append iteration summary to `prior-iterations.md`
 3. Identify gaps via `AskUserQuestion` (header: "Investigation Gaps"):
    - "Add new perspective" → spawn new analyst only (existing findings preserved)
    - "Re-examine with focus" → user specifies focus area → targeted follow-up tasks
-4. New analyst runs → full Socratic DA + Scorer verification
+4. New analyst runs → full MCP Socratic verification (prism_interview + prism_score)
 5. Return to Phase 3 synthesis with expanded findings
 
 → **NEXT ACTION: Proceed to Phase 4 — Cleanup.**

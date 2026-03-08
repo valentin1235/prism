@@ -15,9 +15,16 @@
 All prompts use these placeholders — replace at spawn time:
 - `{INCIDENT_CONTEXT}` — Phase 0 details
 - `{ONTOLOGY_SCOPE}` — full-pool scoped reference from Phase 0.7
-- `{DA_NAME}` — paired DA agent name (e.g., "da-security")
+**Communication protocol:** After investigation, run self-verification via MCP tools (see `prompts/verification-protocol.md` injected below), then send verified findings to team-lead via SendMessage.
 
-**Communication protocol:** After investigation, send findings directly to `{DA_NAME}` (NOT to team-lead). Then respond to DA's Socratic questions until DA stops asking. The DA drives the verification loop.
+**Self-verification:** After investigation:
+1. Write findings to `~/.prism/state/incident-{INCIDENT_SHORT_ID}/perspectives/{perspective-id}/findings.json`
+2. Call `prism_interview(context_id="incident-{INCIDENT_SHORT_ID}", perspective_id="{perspective-id}", topic="...")` → get question
+3. Answer the question (re-investigate with tools if needed)
+4. Call `prism_interview(context_id="incident-{INCIDENT_SHORT_ID}", perspective_id="{perspective-id}", response="...")` → next question
+5. Call `prism_score(context_id="incident-{INCIDENT_SHORT_ID}", perspective_id="{perspective-id}")` → check score
+6. If `weighted_total > 0.8` or `INTERVIEW_COMPLETE` → PASS. If round ≥ 30 → FORCE PASS. Otherwise loop from 3.
+7. Send verified findings + score to team-lead via SendMessage
 
 ---
 
@@ -63,7 +70,7 @@ OUTPUT:
 ## Recommendations
 ### Immediate (contain) / Short-term (remediate) / Long-term (prevent)
 
-Read TaskGet, mark in_progress → completed. Send findings to `{DA_NAME}` via SendMessage. Then respond to DA questions until DA stops asking.
+Read TaskGet, mark in_progress. Run self-verification protocol (write findings.json → prism_interview → prism_score loop). Send verified findings to team-lead via SendMessage. Mark completed.
 
 ---
 
@@ -108,7 +115,7 @@ OUTPUT:
 - Irrecoverable: [what, why]
 - Recoverable: [what, from where, how]
 
-Read TaskGet, mark in_progress → completed. Send findings to `{DA_NAME}` via SendMessage. Then respond to DA questions until DA stops asking.
+Read TaskGet, mark in_progress. Run self-verification protocol (write findings.json → prism_interview → prism_score loop). Send verified findings to team-lead via SendMessage. Mark completed.
 
 ---
 
@@ -148,7 +155,7 @@ OUTPUT:
 ## Recommendations
 ### Immediate / Short-term / Long-term
 
-Read TaskGet, mark in_progress → completed. Send findings to `{DA_NAME}` via SendMessage. Then respond to DA questions until DA stops asking.
+Read TaskGet, mark in_progress. Run self-verification protocol (write findings.json → prism_interview → prism_score loop). Send verified findings to team-lead via SendMessage. Mark completed.
 
 ---
 
@@ -196,7 +203,7 @@ OUTPUT:
 ### Short-term (error boundaries, fallback UI)
 ### Long-term (offline mode, graceful degradation architecture)
 
-Read TaskGet, mark in_progress → completed. Send findings to `{DA_NAME}` via SendMessage. Then respond to DA questions until DA stops asking.
+Read TaskGet, mark in_progress. Run self-verification protocol (write findings.json → prism_interview → prism_score loop). Send verified findings to team-lead via SendMessage. Mark completed.
 
 ---
 
@@ -219,7 +226,7 @@ TASKS:
 OUTPUT:
 {output sections from below}
 
-Read TaskGet, mark in_progress → completed. Send findings to `{DA_NAME}` via SendMessage. Then respond to DA questions until DA stops asking.
+Read TaskGet, mark in_progress. Run self-verification protocol (write findings.json → prism_interview → prism_score loop). Send verified findings to team-lead via SendMessage. Mark completed.
 ```
 
 ---
@@ -291,4 +298,4 @@ For novel failure modes. Compose using Tier 2 Template with:
 4. Defined output sections
 5. TaskGet/SendMessage boilerplate
 
-DA will specifically challenge whether the custom perspective is necessary.
+MCP verification (prism_interview) will specifically challenge whether the custom perspective findings are well-supported.
