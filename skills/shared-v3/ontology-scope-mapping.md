@@ -53,24 +53,16 @@
 - Each file is read and summarized at pool build time
 - Files that fail to read are marked as `unavailable` in the catalog
 
-### Step 1: Check ontology-docs MCP Availability
+### Step 1: Check ontology-docs MCP and Resolve Directories
 
-Call `mcp__ontology-docs__list_allowed_directories` to check if the ontology-docs MCP server is reachable.
+1. Run `Bash("grep -A 20 '\"ontology-docs\"' ~/.claude.json")` to extract the MCP config
+2. Parse the `args` array — paths after `@modelcontextprotocol/server-filesystem` are the registered directories. Record as `ONTOLOGY_DIRS[]`
+3. If config not found or no paths → check `{AVAILABILITY_MODE}`:
+   - `optional`: `ONTOLOGY_AVAILABLE=false`. Warn and proceed to Step 2.
+   - `required`: Error and **STOP.**
+4. If paths found → `ONTOLOGY_AVAILABLE=true`. Proceed to Step 2.
 
-| Result | {AVAILABILITY_MODE}=optional | {AVAILABILITY_MODE}=required |
-|--------|------------------------------|------------------------------|
-| Success (returns 1+ paths) | `ONTOLOGY_AVAILABLE=true`. Proceed to Step 1b. | Proceed to Step 1b. |
-| Success (returns 0 paths) | `ONTOLOGY_AVAILABLE=false`. Warn: "ontology-docs MCP is configured but has no allowed directories. Pool will contain MCP data sources and external sources only." Proceed to Step 2. | Error: "ontology-docs MCP is configured but has no allowed directories. Check MCP server configuration." **STOP.** |
-| Error / MCP not configured | `ONTOLOGY_AVAILABLE=false`. Warn: "ontology-docs MCP not configured. Pool will contain MCP data sources and external sources only." Proceed to Step 2. | Error: "ontology-docs MCP not configured. See plugin README for setup." **STOP.** |
-
-### Step 1b: Resolve Document Directories
-
-`list_allowed_directories` may return broad paths (e.g., user home directory) due to the MCP roots protocol overriding server-configured paths. Analysts must never search on these broad paths — it causes `search_files` to scan irrelevant content (node_modules, .git, caches) and timeout.
-
-**Resolution:**
-1. Check each returned path — if it looks like a specific documentation directory (leaf directory, contains `.md` files or doc structure), use it directly as `ONTOLOGY_DIRS[]`
-2. If ANY returned path is a broad root (home directory, project root, workspace root), call `list_directory(path)` 1-depth to discover subdirectories, then present the full list to the user via `AskUserQuestion` (multiSelect: true, header: "Documentation Directories") and let them select which directories contain documentation
-3. Record selected paths as `ONTOLOGY_DIRS[]`. These are the only paths analysts may search.
+Do NOT use `list_allowed_directories` — the MCP roots protocol overrides server-configured paths, returning broad paths (e.g., home directory) instead of the actual registered directories. The config file is the source of truth.
 
 ### Step 2: Screen 1 — MCP Data Source Selection
 
