@@ -20,37 +20,31 @@ Parse the current `directories` array.
 
 ## Step 2: Loop — Collect Paths
 
-Repeat until user says "Done":
+Repeat until user selects "Done":
 
-1. Ask for a directory path:
-   ```
-   AskUserQuestion(
-     header: "Add Documentation Directory",
-     question: "Enter the absolute path to a documentation directory:"
-   )
-   ```
+```
+AskUserQuestion(
+  header: "Add Documentation Directory",
+  question: "<current_list_or_empty>\nEnter the absolute path to a documentation directory:",
+  options: [
+    {label: "Enter path", description: "Type an absolute directory path"},
+    {label: "Done", description: "Save and finish"}
+  ]
+)
+```
 
-2. Validate the path exists:
-   ```bash
-   test -d '<path>' && echo OK || echo NOT_FOUND
-   ```
-   If not found, warn and ask again.
+- `<current_list_or_empty>`: If directories already exist, show `"Current directories:\n- /path/a\n- /path/b\n\n"`. If empty, omit.
 
-3. If the path is already in the list, warn "Already registered" and skip.
+**If user selects "Enter path"** (the response will contain the path string):
+1. Extract the path from the user's input
+2. Validate: `test -d '<path>' && echo OK || echo NOT_FOUND`
+3. If not found → warn "Directory not found: <path>" and loop back to the same question
+4. If already in list → warn "Already registered: <path>" and loop back
+5. If valid and new → add to list, loop back to the same question (the updated current list will show in the next prompt)
 
-4. Add to list, then ask:
-   ```
-   AskUserQuestion(
-     header: "Add More?",
-     question: "Added: <path>\n\nCurrent list:\n<all paths>\n\nAdd another?",
-     options: [
-       {label: "Add another", description: "Add one more directory"},
-       {label: "Done", description: "Save and finish"}
-     ]
-   )
-   ```
+**If user selects "Done"** → exit loop, proceed to Step 3.
 
-5. If "Add another" → go to step 1. If "Done" → exit loop.
+**Important:** Do NOT add a separate confirmation question after adding a path. After validation, immediately loop back to the same AskUserQuestion with the updated list. This keeps the flow snappy — one question per iteration.
 
 ## Step 3: Save
 

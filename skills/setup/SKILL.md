@@ -87,29 +87,26 @@ AskUserQuestion(
 )
 ```
 
-If "Add directories", loop:
-1. Ask for a directory path:
-   ```
-   AskUserQuestion(
-     header: "Documentation Directory",
-     question: "Enter the absolute path to a documentation directory:"
-   )
-   ```
-2. Validate path exists: `Bash("test -d '<path>' && echo OK || echo NOT_FOUND")`
-3. If not found, warn and ask again
-4. Add to list, then ask:
-   ```
-   AskUserQuestion(
-     header: "Add More?",
-     question: "Added: <path>. Current list: <all paths>. Add another directory?",
-     options: [
-       {label: "Add another", description: "Add one more directory"},
-       {label: "Done", description: "Finish and save"}
-     ]
-   )
-   ```
-5. If "Add another" → go to step 1. If "Done" → exit loop.
-6. Write all valid paths to `~/.prism/ontology-docs.json`:
+If "Add directories", loop with a single question per iteration:
+
+```
+AskUserQuestion(
+  header: "Add Documentation Directory",
+  question: "<current_list_or_empty>\nEnter the absolute path to a documentation directory:",
+  options: [
+    {label: "Enter path", description: "Type an absolute directory path"},
+    {label: "Done", description: "Save and finish"}
+  ]
+)
+```
+
+- `<current_list_or_empty>`: If directories already added, show `"Current directories:\n- /path/a\n- /path/b\n\n"`. If empty, omit.
+- **"Enter path"**: Extract path from input → validate with `test -d` → if not found, warn and loop back → if already in list, warn and loop back → if valid and new, add to list, immediately loop back with updated list.
+- **"Done"**: Exit loop.
+
+Do NOT add a separate confirmation after each path. One question per iteration.
+
+Write all valid paths to `~/.prism/ontology-docs.json`:
    ```json
    {
      "directories": [
