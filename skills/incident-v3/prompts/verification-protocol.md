@@ -34,7 +34,9 @@ mcp__prism__prism_interview(
 → returns { context_id, perspective_id, round, question }
 ```
 
-### 3. Answer + Score Loop
+### 3. Answer + Integrated Score Loop
+
+The interview tool has integrated scoring — each answer submission automatically scores and returns `continue: true/false`.
 
 For each question from the interviewer:
 
@@ -46,21 +48,13 @@ mcp__prism__prism_interview(
   perspective_id="{perspective-id}",
   response="{your answer}"
 )
-→ returns { context_id, perspective_id, round, question }
+→ returns { context_id, perspective_id, round, continue, score, question?, reason? }
 ```
-3. **Score current state:**
-```
-mcp__prism__prism_score(
-  context_id="incident-{INCIDENT_SHORT_ID}",
-  perspective_id="{perspective-id}"
-)
-→ returns goal, constraints, criteria, weighted_total, pass, summary
-```
-4. **Check threshold:**
-   - `weighted_total > 0.8` → **PASS** — proceed to step 4
-   - `question = "INTERVIEW_COMPLETE"` → **PASS** — proceed to step 4
-   - `weighted_total ≤ 0.8` AND round < 20 → answer next question, repeat loop
-   - round ≥ 20 → **FORCE PASS** — proceed to step 4 with caveat
+3. **Check response:**
+   - `continue: false` + `reason: "pass"` → **PASS** — proceed to step 4
+   - `continue: false` + `reason: "interview_complete"` → **PASS** — proceed to step 4
+   - `continue: false` + `reason: "max_rounds"` → **FORCE PASS** — proceed to step 4 with caveat
+   - `continue: true` → answer the returned `question`, repeat loop
 
 ### 4. Report Verified Findings
 

@@ -21,10 +21,9 @@ All prompts use these placeholders — replace at spawn time:
 1. Write findings to `~/.prism/state/incident-{INCIDENT_SHORT_ID}/perspectives/{perspective-id}/findings.json`
 2. Call `prism_interview(context_id="incident-{INCIDENT_SHORT_ID}", perspective_id="{perspective-id}", topic="...")` → get question
 3. Answer the question (re-investigate with tools if needed)
-4. Call `prism_interview(context_id="incident-{INCIDENT_SHORT_ID}", perspective_id="{perspective-id}", response="...")` → next question
-5. Call `prism_score(context_id="incident-{INCIDENT_SHORT_ID}", perspective_id="{perspective-id}")` → check score
-6. If `weighted_total > 0.8` or `INTERVIEW_COMPLETE` → PASS. If round ≥ 20 → FORCE PASS. Otherwise loop from 3.
-7. Send verified findings + score to team-lead via SendMessage
+4. Call `prism_interview(context_id="incident-{INCIDENT_SHORT_ID}", perspective_id="{perspective-id}", response="...")` → returns `{continue, score, question?, reason?}`
+5. If `continue: false` → PASS (or FORCE PASS if reason is "max_rounds"). If `continue: true` → answer returned question, loop from 3.
+6. Send verified findings + score to team-lead via SendMessage
 
 ---
 
@@ -70,7 +69,7 @@ OUTPUT:
 ## Recommendations
 ### Immediate (contain) / Short-term (remediate) / Long-term (prevent)
 
-Read TaskGet, mark in_progress. Run self-verification protocol (write findings.json → prism_interview → prism_score loop). Send verified findings to team-lead via SendMessage. Mark completed.
+Read TaskGet, mark in_progress. Run self-verification protocol (write findings.json → prism_interview loop). Send verified findings to team-lead via SendMessage. Mark completed.
 
 ---
 
@@ -115,7 +114,7 @@ OUTPUT:
 - Irrecoverable: [what, why]
 - Recoverable: [what, from where, how]
 
-Read TaskGet, mark in_progress. Run self-verification protocol (write findings.json → prism_interview → prism_score loop). Send verified findings to team-lead via SendMessage. Mark completed.
+Read TaskGet, mark in_progress. Run self-verification protocol (write findings.json → prism_interview loop). Send verified findings to team-lead via SendMessage. Mark completed.
 
 ---
 
@@ -155,7 +154,7 @@ OUTPUT:
 ## Recommendations
 ### Immediate / Short-term / Long-term
 
-Read TaskGet, mark in_progress. Run self-verification protocol (write findings.json → prism_interview → prism_score loop). Send verified findings to team-lead via SendMessage. Mark completed.
+Read TaskGet, mark in_progress. Run self-verification protocol (write findings.json → prism_interview loop). Send verified findings to team-lead via SendMessage. Mark completed.
 
 ---
 
@@ -203,7 +202,7 @@ OUTPUT:
 ### Short-term (error boundaries, fallback UI)
 ### Long-term (offline mode, graceful degradation architecture)
 
-Read TaskGet, mark in_progress. Run self-verification protocol (write findings.json → prism_interview → prism_score loop). Send verified findings to team-lead via SendMessage. Mark completed.
+Read TaskGet, mark in_progress. Run self-verification protocol (write findings.json → prism_interview loop). Send verified findings to team-lead via SendMessage. Mark completed.
 
 ---
 
@@ -226,7 +225,7 @@ TASKS:
 OUTPUT:
 {output sections from below}
 
-Read TaskGet, mark in_progress. Run self-verification protocol (write findings.json → prism_interview → prism_score loop). Send verified findings to team-lead via SendMessage. Mark completed.
+Read TaskGet, mark in_progress. Run self-verification protocol (write findings.json → prism_interview loop). Send verified findings to team-lead via SendMessage. Mark completed.
 ```
 
 ---

@@ -3,8 +3,7 @@ name: incident-v3
 description: Multi-perspective agent team incident postmortem with ontology-scoped analysis and MCP-based Socratic verification with mathematical ambiguity scoring. Use this skill for incident analysis, postmortem reports, outage investigation, or root cause analysis that requires verified multi-perspective findings with hallucination detection.
 version: 4.0.0
 user-invocable: true
-allowed-tools: Task, SendMessage, TeamCreate, TeamDelete, TaskCreate, TaskUpdate, TaskList, TaskGet, TaskOutput, Read, Glob, Grep, Bash, Write, WebFetch, WebSearch, ToolSearch, ListMcpResourcesTool, mcp__ontology-docs__list_allowed_directories, mcp__ontology-docs__search_files, mcp__ontology-docs__read_file, mcp__ontology-docs__read_text_file, mcp__ontology-docs__read_multiple_files, mcp__ontology-docs__list_directory, mcp__ontology-docs__directory_tree, mcp__prism__prism_interview, mcp__prism__prism_score
----
+allowed-tools: Task, SendMessage, TeamCreate, TeamDelete, TaskCreate, TaskUpdate, TaskList, TaskGet, TaskOutput, Read, Glob, Grep, Bash, Write, WebFetch, WebSearch, ToolSearch, ListMcpResourcesTool, mcp__ontology-docs__list_allowed_directories, mcp__ontology-docs__search_files, mcp__ontology-docs__read_file, mcp__ontology-docs__read_text_file, mcp__ontology-docs__read_multiple_files, mcp__ontology-docs__list_directory, mcp__ontology-docs__directory_tree, mcp__prism__prism_interview---
 
 # Incident Postmortem v3
 
@@ -60,8 +59,7 @@ Persist phase outputs to `~/.prism/state/incident-{short-id}/` (created in Phase
 
 | Tool | Purpose |
 |------|---------|
-| `prism_interview` | Socratic interviewer — reads analyst findings, asks probing questions to reduce ambiguity |
-| `prism_score` | Ambiguity scorer — evaluates clarity on 3 axes (Goal 40%, Constraints 30%, Criteria 30%) |
+| `prism_interview` | Socratic interviewer with integrated scoring — reads analyst findings, asks probing questions, auto-scores after each answer. Returns `{continue: true/false, score, question?, reason?}` |
 
 Team size: 2 min analysts, no hard max (typically 3-5; complex incidents may need more). Verification runs via MCP tools, not sidecar agents.
 
@@ -240,7 +238,7 @@ MUST NOT proceed until:
 
 ## Phase 1: Spawn Analysts
 
-Team already exists from Phase 0.5. Spawn all analyst agents in parallel. Each analyst runs self-verification via MCP tools (prism_interview + prism_score) before reporting.
+Team already exists from Phase 0.5. Spawn all analyst agents in parallel. Each analyst runs self-verification via MCP tools (prism_interview) before reporting.
 
 ### Step 1.1: Spawn Analysts
 
@@ -275,7 +273,7 @@ Task(
 )
 ```
 
-> Apply worker preamble with `{WORK_ACTION}` = `"Investigate the incident from your assigned perspective. Answer ALL key questions with evidence and code references. Run self-verification via MCP tools (prism_interview + prism_score). Report verified findings via SendMessage to team-lead."`
+> Apply worker preamble with `{WORK_ACTION}` = `"Investigate the incident from your assigned perspective. Answer ALL key questions with evidence and code references. Run self-verification via MCP tools (prism_interview). Report verified findings via SendMessage to team-lead."`
 
 MUST replace `{INCIDENT_CONTEXT}` from `context.md`.
 MUST replace `{ONTOLOGY_SCOPE}` from `ontology-scope-analyst.md` (or "N/A" if not found).
@@ -301,7 +299,7 @@ Prerequisite → Phase 0 [intake, session ID]
 → Phase 0.7 [ontology]
 → Phase 0.8 [context + state files]
 → Phase 1 [spawn analysts]
-→ Phase 2 [collect verified findings — analysts self-verify via prism_interview + prism_score] ← docs/later-phases.md
+→ Phase 2 [collect verified findings — analysts self-verify via prism_interview] ← docs/later-phases.md
 → Phase 3 [report] ← docs/later-phases.md
 → Phase 4 [cleanup] ← docs/later-phases.md
 ```

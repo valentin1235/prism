@@ -119,7 +119,7 @@ Selection rules:
 - MUST NOT select perspectives without supporting evidence from Phase 1
 - Fewer targeted > broad coverage — prefer quality over quantity
 - Typical: 3-5 perspectives for most incidents. Complex multi-domain incidents (e.g., security + data + infra) may warrant more.
-- Each perspective runs through MCP verification (prism_interview + prism_score), so more perspectives = more verification rounds. Recommend only what the evidence justifies.
+- Each perspective runs through MCP verification (prism_interview), so more perspectives = more verification rounds. Recommend only what the evidence justifies.
 
 Per perspective:
 ```

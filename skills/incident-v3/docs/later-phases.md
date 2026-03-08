@@ -6,13 +6,13 @@ Read this file when entering Phase 2. Do NOT preload.
 
 ## Phase 2: Collect Verified Findings
 
-Each analyst runs self-verification via MCP tools (prism_interview + prism_score) autonomously. The orchestrator only collects verified results.
+Each analyst runs self-verification via MCP tools (prism_interview) autonomously. The orchestrator only collects verified results.
 
 ### Architecture
 
 ```
-analyst-1: investigate → write findings.json → prism_interview loop → prism_score → SendMessage(verified)
-analyst-2: investigate → write findings.json → prism_interview loop → prism_score → SendMessage(verified)
+analyst-1: investigate → write findings.json → prism_interview loop (integrated scoring) → SendMessage(verified)
+analyst-2: investigate → write findings.json → prism_interview loop (integrated scoring) → SendMessage(verified)
 ...
 orchestrator: wait for all analysts → collect verified findings → compile
 ```
@@ -21,7 +21,7 @@ orchestrator: wait for all analysts → collect verified findings → compile
 
 Monitor analyst completion via `TaskList`. Each analyst will:
 1. Write findings to `~/.prism/state/incident-{short-id}/perspectives/{perspective-id}/findings.json`
-2. Run self-verification (prism_interview Q&A + prism_score threshold check)
+2. Run self-verification (prism_interview loop with integrated scoring)
 3. Send verified findings to team-lead via `SendMessage`
 
 The `SendMessage` from each analyst includes:
@@ -84,7 +84,7 @@ Before re-entry, increment `investigation_loops` counter in `~/.prism/state/inci
 3. Identify gaps via `AskUserQuestion` (header: "Investigation Gaps"):
    - "Add new perspective" → spawn new analyst only (existing findings preserved)
    - "Re-examine with focus" → user specifies focus area → targeted follow-up tasks
-4. New analyst runs → full MCP Socratic verification (prism_interview + prism_score)
+4. New analyst runs → full MCP Socratic verification (prism_interview)
 5. Return to Phase 3 synthesis with expanded findings
 
 → **NEXT ACTION: Proceed to Phase 4 — Cleanup.**
