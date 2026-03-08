@@ -32,9 +32,9 @@
 ### Pool Source Rules
 
 #### Document Source
-- The `ontology-docs` global MCP server is registered as a **single pool entry** when available
-- No pre-selection of individual directories — analysts explore the MCP directly at reasoning time using `search_files`, `read_file`, `list_directory`, etc.
-- The lead captures `ALLOWED_ROOTS[]` from `list_allowed_directories` and passes them to analysts as exploration starting points
+- The `ontology-docs` MCP server exposes registered directories
+- The lead calls `list_allowed_directories` → `list_directory` (1-depth) on each root → collects `ONTOLOGY_DIRS[]`
+- Each directory is a separate pool entry; analysts search only within these paths
 
 #### MCP Data Source
 - Any registered MCP server (excluding `ontology-docs` and internal plugin tools) can be added as a queryable data source
@@ -59,11 +59,13 @@ Call `mcp__ontology-docs__list_allowed_directories` to check if the ontology-doc
 
 | Result | {AVAILABILITY_MODE}=optional | {AVAILABILITY_MODE}=required |
 |--------|------------------------------|------------------------------|
-| Success (returns 1+ paths) | `ONTOLOGY_AVAILABLE=true`. Record returned paths as `ALLOWED_ROOTS[]`. Proceed to Step 2. | Record returned paths as `ALLOWED_ROOTS[]`. Proceed to Step 2. |
+| Success (returns 1+ paths) | `ONTOLOGY_AVAILABLE=true`. Proceed to Step 1b. | Proceed to Step 1b. |
 | Success (returns 0 paths) | `ONTOLOGY_AVAILABLE=false`. Warn: "ontology-docs MCP is configured but has no allowed directories. Pool will contain MCP data sources and external sources only." Proceed to Step 2. | Error: "ontology-docs MCP is configured but has no allowed directories. Check MCP server configuration." **STOP.** |
 | Error / MCP not configured | `ONTOLOGY_AVAILABLE=false`. Warn: "ontology-docs MCP not configured. Pool will contain MCP data sources and external sources only." Proceed to Step 2. | Error: "ontology-docs MCP not configured. See plugin README for setup." **STOP.** |
 
-**That's it.** No directory enumeration, classification, or characterization. Analysts will explore ontology-docs directly at reasoning time using the MCP tools available to them.
+### Step 1b: Resolve Document Directories
+
+For each path in `ALLOWED_ROOTS[]`, call `mcp__ontology-docs__list_directory(path)` to get its 1-depth contents. Collect all `[DIR]` entries as `ONTOLOGY_DIRS[]` (full paths). These are the only paths analysts may search.
 
 ### Step 2: Screen 1 — MCP Data Source Selection
 
@@ -153,8 +155,8 @@ Output the assembled catalog as text:
 Ontology Pool Configuration:
 | # | Source | Type | Path/URL | Domain | Summary | Status |
 |---|--------|------|----------|--------|---------|--------|
-| 1 | mcp    | doc  | ontology-docs MCP | (analyst-explored) | Analysts explore directly | available |
-| 2 | mcp    | query| mysql    | ...    | ...     | available |
+| 1..N | mcp | doc  | {ONTOLOGY_DIRS[i]} | {domain} | Documentation directory | available |
+| N+1  | mcp | query| mysql    | ...    | ...     | available |
 | 3 | web    | url  | ...      | ...    | ...     | available |
 | 4 | file   | file | ...      | ...    | ...     | available |
 Total N sources (MCP Docs: {0 or 1}, MCP Data: n, Web: n, File: n)
@@ -195,11 +197,11 @@ Combine all sources into a unified catalog:
 
 | # | Source | Type | Path/URL | Domain | Summary | Key Topics | Status |
 |---|--------|------|----------|--------|---------|------------|--------|
-| 1 | mcp | doc | ontology-docs | (analyst-explored) | Full MCP access | search_files, read_file, list_directory | available |
-| 2 | mcp | query | {server_name} | {domain} | {description} | {key tools} | available |
-| 3 | web | url | {url} | {domain} | {1-2 line summary} | {3-5 keywords} | available |
-| 4 | file | file | {path} | {domain} | {1-2 line summary} | {3-5 keywords} | available |
-| 5 | web | url | {url} | — | — | — | unavailable: {reason} |
+| 1..N | mcp | doc | {ONTOLOGY_DIRS[i]} | {inferred domain} | Documentation directory | search_files, read_file | available |
+| N+1 | mcp | query | {server_name} | {domain} | {description} | {key tools} | available |
+| ... | web | url | {url} | {domain} | {1-2 line summary} | {3-5 keywords} | available |
+| ... | file | file | {path} | {domain} | {1-2 line summary} | {3-5 keywords} | available |
+| ... | web | url | {url} | — | — | — | unavailable: {reason} |
 ```
 
 If catalog is empty after all steps:
@@ -228,12 +230,13 @@ Generate `{ONTOLOGY_SCOPE}` block containing all available pool entries:
 For **document sources** (ontology-docs MCP):
 ```
 - doc: ontology-docs MCP (available)
-  Allowed roots: {ALLOWED_ROOTS[] joined by ", "}
-  Access: Use mcp__ontology-docs__ tools to explore documentation at reasoning time.
-  Discovery: Call list_directory on the allowed roots above to browse structure,
-             search_files to find relevant documents by keyword,
-             read_file or read_text_file to read content.
-  Note: No pre-selected directories — explore the full MCP scope through your perspective's lens.
+  Directories:
+  {ONTOLOGY_DIRS[] — one per line, e.g.:
+    - /Users/heechul/podo-backend/podo-docs
+    - /Users/heechul/podo-app/podo-docs
+    - /Users/heechul/grape/podo-docs}
+  Access: Use mcp__ontology-docs__ tools (search_files, read_file, list_directory).
+          Always pass a directory from the list above as the path argument.
 ```
 
 For **MCP data sources** (mcp query):
