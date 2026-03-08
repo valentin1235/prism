@@ -17,6 +17,8 @@ Persist phase outputs to `~/.prism/state/incident-{short-id}/` (created in Phase
 
 | File | Written | Read By |
 |------|---------|---------|
+| `seed-analysis.json` | Seed Analyst (Phase 0.5) | Perspective Generator (Phase 0.55), Orchestrator |
+| `perspective-candidates.json` | Perspective Generator (Phase 0.55) | Orchestrator (Phase 0.6) |
 | `perspectives.md` | Orchestrator (Phase 0.6) | All agents |
 | `context.md` | Orchestrator (Phase 0.8) | All agents |
 | `~/.prism/state/incident-{short-id}/perspectives/{perspective-id}/findings.json` | Analyst (Phase 2) | MCP prism_interview |
@@ -120,20 +122,22 @@ Task(
 > Apply worker preamble from `../shared-v3/worker-preamble.md` with:
 - `{TEAM_NAME}` = `"incident-analysis-{short-id}"`
 - `{WORKER_NAME}` = `"seed-analyst"`
-- `{WORK_ACTION}` = `"Actively investigate the incident using available tools (Grep, Read, Bash, MCP). Evaluate incident dimensions, map to archetype candidates, and generate perspective recommendations. Report findings via SendMessage."`
+- `{WORK_ACTION}` = `"Actively investigate the incident using available tools (Grep, Read, Bash, MCP). Evaluate incident dimensions and severity. Write findings to seed-analysis.json. Report via SendMessage."`
 
 Placeholder replacements in seed-analyst prompt:
 - `{INCIDENT_DESCRIPTION}` → Phase 0 incident description
+- `{INCIDENT_SHORT_ID}` → Phase 0 short-id
 
 ### Step 0.5.3: Receive Seed Analyst Results
 
-Wait for seed-analyst to send results via `SendMessage`. The message contains:
-- **Research Summary**: evidence discovered, files examined, investigation tool queries, recent changes
-- **Assessed Context**: severity (SEV1-4), status (Active/Mitigated/Resolved/Recurring), evidence types found
-- **Dimension Evaluation**: domain, failure type, evidence, complexity, recurrence
-- **Perspectives**: perspective candidates with ID, Name, Scope, Key Questions, Model, Agent Type, Rationale
+Wait for seed-analyst to send results via `SendMessage`. The message contains a JSON object with:
+- `severity`, `status`, `evidence_types`
+- `dimensions`: domain, failure_type, evidence_available, complexity, recurrence
+- `research`: findings (with source and tool_used), files_examined, mcp_queries, recent_changes
 
-Note: Any MCP tools the seed analyst queried during investigation are for research only. They do NOT pre-select data sources for the ontology pool — that selection happens in Phase 0.7 where the user chooses which data sources analysts should use.
+The seed analyst also writes this JSON to `~/.prism/state/incident-{short-id}/seed-analysis.json`.
+
+Note: The seed analyst focuses on research and dimension evaluation only — perspective generation is handled separately in Phase 0.55.
 
 ### Step 0.5.4: Shutdown Seed Analyst
 
@@ -152,11 +156,70 @@ After receiving results: `SendMessage(type: "shutdown_request", recipient: "seed
 MUST NOT proceed until:
 
 - [ ] Team created
-- [ ] Seed-analyst results received
+- [ ] Seed-analyst results received (JSON with severity, status, dimensions, research)
+- [ ] `seed-analysis.json` written to state directory
 - [ ] Seed-analyst shut down
 - [ ] All background task outputs drained via `TaskOutput`
 
-→ **NEXT ACTION: Proceed to Phase 0.6 Step 0.6.1 — Present perspectives to user.**
+→ **NEXT ACTION: Proceed to Phase 0.55 — Perspective Generation.**
+
+---
+
+## Phase 0.55: Perspective Generation
+
+### Step 0.55.1: Spawn Perspective Generator
+
+Read `prompts/perspective-generator.md` (relative to this SKILL.md).
+
+Create task via `TaskCreate`, pre-assign owner via `TaskUpdate(owner="perspective-generator")`, then spawn:
+
+```
+Task(
+  subagent_type="oh-my-claudecode:architect",
+  name="perspective-generator",
+  team_name="incident-analysis-{short-id}",
+  model="opus",
+  run_in_background=true,
+  prompt="{worker preamble + perspective-generator prompt with placeholders replaced}"
+)
+```
+
+> Apply worker preamble from `../shared-v3/worker-preamble.md` with:
+- `{TEAM_NAME}` = `"incident-analysis-{short-id}"`
+- `{WORKER_NAME}` = `"perspective-generator"`
+- `{WORK_ACTION}` = `"Read seed-analysis.json, apply archetype mapping rules and mandatory rules, generate perspective candidates. Write perspective-candidates.json. Report via SendMessage."`
+
+Placeholder replacements:
+- `{INCIDENT_SHORT_ID}` → Phase 0 short-id
+- `{INCIDENT_DESCRIPTION}` → Phase 0 incident description
+
+### Step 0.55.2: Receive Perspective Generator Results
+
+Wait for perspective-generator to send results via `SendMessage`. The message contains a JSON object with:
+- `perspectives`: array of perspective candidates (id, name, scope, key_questions, model, agent_type, rationale)
+- `rules_applied`: which mandatory rules were checked and enforced
+- `selection_summary`: reasoning for the selection
+
+The perspective generator also writes this JSON to `~/.prism/state/incident-{short-id}/perspective-candidates.json`.
+
+### Step 0.55.3: Shutdown Perspective Generator
+
+After receiving results: `SendMessage(type: "shutdown_request", recipient: "perspective-generator", content: "Perspective generation complete.")`.
+
+### Step 0.55.4: Drain Background Task Output
+
+Same as Step 0.5.5 — drain all completed background task outputs via `TaskList` → `TaskOutput`.
+
+### Phase 0.55 Exit Gate
+
+MUST NOT proceed until:
+
+- [ ] Perspective generator results received
+- [ ] `perspective-candidates.json` written to state directory
+- [ ] Perspective generator shut down
+- [ ] All background task outputs drained
+
+→ **NEXT ACTION: Proceed to Phase 0.6 — Perspective Approval.**
 
 ---
 
@@ -164,9 +227,11 @@ MUST NOT proceed until:
 
 ### Step 0.6.1: Present Perspectives
 
+Read `~/.prism/state/incident-{short-id}/perspective-candidates.json` and present to user.
+
 `AskUserQuestion` (header: "Perspectives", question: "I recommend these {N} perspectives for analysis. How to proceed?", options: "Proceed" / "Add perspective" / "Remove perspective" / "Modify perspective")
 
-Include seed-analyst's research summary for user context.
+Include seed-analyst's research summary (from `seed-analysis.json`) for user context. Show `rules_applied` so user knows which mandatory rules were enforced.
 
 ### Step 0.6.2: Iterate Until Approved
 
@@ -296,8 +361,9 @@ MUST NOT proceed until:
 
 ```
 Prerequisite → Phase 0 [intake, session ID]
-→ Phase 0.5 [TeamCreate + seed-analyst (severity, status, evidence) + drain background tasks]
-→ Phase 0.6 [perspective approval]
+→ Phase 0.5 [TeamCreate + seed-analyst (research, dimensions → seed-analysis.json) + drain]
+→ Phase 0.55 [perspective-generator (seed-analysis.json → perspective-candidates.json) + drain]
+→ Phase 0.6 [perspective approval (user reviews perspective-candidates.json)]
 → Phase 0.7 [ontology]
 → Phase 0.8 [context + state files]
 → Phase 1 [spawn analysts]

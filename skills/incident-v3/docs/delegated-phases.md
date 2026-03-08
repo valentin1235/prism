@@ -4,7 +4,7 @@ This file provides reference tables for seed analysis dimension evaluation and a
 - **Orchestrator**: Phase 0 intake (SKILL.md § Phase 0)
 - **Seed-analyst**: Active research and perspective generation (`prompts/seed-analyst.md`)
 
-> **Note**: Phase 0 and seed analysis are NOT delegated to setup-agent for incident-v2. The orchestrator handles intake directly, and seed-analyst runs as a team member. See `prompts/seed-analyst.md` for the seed-analyst prompt.
+> **Note**: Phase 0 and seed analysis are NOT delegated to setup-agent for incident-v3. The orchestrator handles intake directly, and seed-analyst runs as a team member. See `prompts/seed-analyst.md` for the seed-analyst prompt.
 
 ---
 

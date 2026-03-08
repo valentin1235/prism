@@ -26,7 +26,7 @@ Write your findings to `~/.prism/state/incident-{INCIDENT_SHORT_ID}/perspectives
 ### 2. Start Interview
 
 ```
-mcp__prism__prism_interview(
+mcp__prism-mcp__prism_interview(
   context_id="incident-{INCIDENT_SHORT_ID}",
   perspective_id="{perspective-id}",
   topic="{perspective-id} findings verification — {incident summary}"
@@ -43,7 +43,7 @@ For each question from the interviewer:
 1. **Answer the question** — re-investigate using tools (Grep, Read, Bash) if needed to provide evidence-backed answers
 2. **Submit answer:**
 ```
-mcp__prism__prism_interview(
+mcp__prism-mcp__prism_interview(
   context_id="incident-{INCIDENT_SHORT_ID}",
   perspective_id="{perspective-id}",
   response="{your answer}"

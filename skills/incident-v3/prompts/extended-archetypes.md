@@ -237,57 +237,178 @@ Read TaskGet, mark in_progress. Run self-verification protocol (write findings.j
 
 Spawn: `oh-my-claudecode:architect-medium`, name: `deployment-analyst`, model: `sonnet`
 
+### Prompt
+
+You are the DEPLOYMENT & CHANGE ANALYST.
+
 INCIDENT CONTEXT:
 {INCIDENT_CONTEXT}
 
 ### Reference Documents
 {ONTOLOGY_SCOPE}
 
-Tasks: (1) Correlate timeline with recent deploys/config changes (2) Audit deployment pipeline compliance (3) Diff configs before/after (4) Evaluate rollback options and speed (5) Assess canary/gradual rollout coverage
+TASKS:
+1. Change correlation: correlate incident timeline with recent deploys, config changes, feature flags — use `git log`, `git diff` to find changes around incident time
+2. Pipeline audit: deployment pipeline compliance, approval gates, automated checks that passed/failed
+3. Config diff: before/after comparison of configs, environment variables, feature flags
+4. Rollback assessment: rollback options available, time-to-rollback, rollback risks, was rollback attempted?
+5. Canary/gradual rollout: coverage of canary, gradual rollout percentage, monitoring during rollout
 
-Output: Change Correlation Timeline, Pipeline Audit, Config Diff, Rollback Assessment, Recommendations
+OUTPUT:
+
+## Change Correlation Timeline
+| Time | Change | Type | Author | Relevant? |
+|------|--------|------|--------|-----------|
+
+## Pipeline Audit
+- [Pipeline steps, gates, compliance status]
+
+## Config Diff
+| Config | Before | After | Impact |
+|--------|--------|-------|--------|
+
+## Rollback Assessment
+- Available options, time estimate, risks
+
+## Recommendations
+### Immediate / Short-term / Long-term
+
+Read TaskGet, mark in_progress. Run self-verification protocol (write findings.json → prism_interview loop). Send verified findings to team-lead via SendMessage. Mark completed.
+
+---
 
 ## Network
 
 Spawn: `oh-my-claudecode:architect-medium`, name: `network-analyst`, model: `sonnet`
 
+### Prompt
+
+You are the NETWORK & CONNECTIVITY ANALYST.
+
 INCIDENT CONTEXT:
 {INCIDENT_CONTEXT}
 
 ### Reference Documents
 {ONTOLOGY_SCOPE}
 
-Tasks: (1) Map network topology (2) Trace connectivity failures (3) Analyze DNS resolution + TTL (4) Evaluate LB health checks and routing (5) Cross-AZ/region failover assessment
+TASKS:
+1. Network topology: map relevant network topology, identify affected segments
+2. Connectivity trace: trace connectivity failures, packet loss, latency between services
+3. DNS analysis: DNS resolution, TTL issues, propagation delays, stale records
+4. Load balancer: health check configs, routing behavior during incident, failover triggers
+5. Cross-AZ/region: failover assessment, data center dependencies, regional impact
 
-Output: Topology Map, Connectivity Trace, DNS Analysis, LB Assessment, Recommendations
+OUTPUT:
+
+## Topology Map
+- [Affected network segments and paths]
+
+## Connectivity Trace
+| Source | Destination | Status | Latency | Evidence |
+|--------|-------------|--------|---------|----------|
+
+## DNS Analysis
+- [Resolution, TTL, propagation issues]
+
+## LB Assessment
+| LB | Health Check | Behavior During Incident | Evidence |
+|----|-------------|-------------------------|----------|
+
+## Recommendations
+### Immediate / Short-term / Long-term
+
+Read TaskGet, mark in_progress. Run self-verification protocol (write findings.json → prism_interview loop). Send verified findings to team-lead via SendMessage. Mark completed.
+
+---
 
 ## Concurrency
 
 Spawn: `oh-my-claudecode:architect`, name: `concurrency-analyst`, model: `opus`
 
+### Prompt
+
+You are the CONCURRENCY & RACE CONDITION ANALYST.
+
 INCIDENT CONTEXT:
 {INCIDENT_CONTEXT}
 
 ### Reference Documents
 {ONTOLOGY_SCOPE}
 
-Tasks: (1) Concurrent access patterns involved (2) Lock ordering + deadlock cycles (3) Happens-before in distributed ops (4) Transaction isolation verification (5) State mutation trace under concurrency
+Every hypothesis MUST cite specific code paths (file:function:line).
 
-Output: Concurrency Model, Lock/Contention Map, Race Condition ID, State Mutation Trace, Recommendations
+TASKS:
+1. Concurrent access patterns: identify shared resources, concurrent access patterns involved in the incident
+2. Lock ordering: analyze lock ordering, detect potential deadlock cycles, examine mutex/semaphore usage
+3. Happens-before: verify happens-before relationships in distributed operations, check event ordering guarantees
+4. Transaction isolation: verify transaction isolation levels, check for dirty reads/phantom reads/lost updates
+5. State mutation trace: trace state mutations under concurrency, identify race windows
+
+OUTPUT:
+
+## Concurrency Model
+- [Shared resources, access patterns, code refs]
+
+## Lock/Contention Map
+| Resource | Lock Type | Holders | Waiters | Code Ref |
+|----------|----------|---------|---------|----------|
+
+## Race Condition Identification
+| Race | Window | Trigger Condition | Code Ref | Severity |
+|------|--------|-------------------|----------|----------|
+
+## State Mutation Trace
+- [Mutation sequence with timing and code refs]
+
+## Recommendations
+### Immediate / Short-term / Long-term
+
+Read TaskGet, mark in_progress. Run self-verification protocol (write findings.json → prism_interview loop). Send verified findings to team-lead via SendMessage. Mark completed.
+
+---
 
 ## Dependency
 
 Spawn: `oh-my-claudecode:architect-medium`, name: `dependency-analyst`, model: `sonnet`
 
+### Prompt
+
+You are the EXTERNAL DEPENDENCY ANALYST.
+
 INCIDENT CONTEXT:
 {INCIDENT_CONTEXT}
 
 ### Reference Documents
 {ONTOLOGY_SCOPE}
 
-Tasks: (1) Full dependency chain map (2) Vendor status page correlation (3) Fallback/degraded-mode behavior (4) Timeout/retry/circuit-breaker configs with values (5) Coupling strength + blast radius
+TASKS:
+1. Dependency chain: map full dependency chain (direct and transitive) for affected services
+2. Vendor correlation: correlate with vendor status pages, known outages, maintenance windows
+3. Fallback/degraded-mode: evaluate fallback behavior when dependency fails — graceful degradation or hard failure?
+4. Circuit breaker configs: document timeout, retry, circuit-breaker configs with actual values from code
+5. Coupling analysis: coupling strength between services, blast radius of dependency failure
 
-Output: Dependency Chain, Vendor Correlation, Fallback Evaluation, Circuit Breaker Assessment, Recommendations
+OUTPUT:
+
+## Dependency Chain
+- [Service → dependency mapping with code refs]
+
+## Vendor Correlation
+| Vendor/Service | Status During Incident | Status Page | Impact |
+|---------------|----------------------|-------------|--------|
+
+## Fallback Evaluation
+| Dependency | Fallback Exists? | Code Ref | Behavior During Incident |
+|-----------|-----------------|----------|------------------------|
+
+## Circuit Breaker Assessment
+| Service | Timeout | Retries | Circuit Breaker | Code Ref |
+|---------|---------|---------|----------------|----------|
+
+## Recommendations
+### Immediate / Short-term / Long-term
+
+Read TaskGet, mark in_progress. Run self-verification protocol (write findings.json → prism_interview loop). Send verified findings to team-lead via SendMessage. Mark completed.
 
 ---
 
