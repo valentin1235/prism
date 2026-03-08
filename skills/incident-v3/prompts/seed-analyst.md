@@ -13,6 +13,7 @@ Task(
 
 All prompts use these placeholders:
 - `{INCIDENT_DESCRIPTION}` — user-provided incident description (symptoms, affected systems, impact)
+- `{INCIDENT_SHORT_ID}` — incident session short ID
 
 ---
 
@@ -29,7 +30,7 @@ You must determine severity (SEV1-4), current status (Active/Mitigated/Resolved/
 
 ---
 
-## PHASE 1: Active Research
+## STEP 1: Active Research
 
 MUST actively investigate using available tools. Do NOT rely solely on the incident description.
 
@@ -60,7 +61,7 @@ MUST actively investigate using available tools. Do NOT rely solely on the incid
 
 ---
 
-## PHASE 2: Dimension Evaluation
+## STEP 2: Dimension Evaluation
 
 Evaluate the incident across 5 dimensions using your research findings (NOT just the user description):
 

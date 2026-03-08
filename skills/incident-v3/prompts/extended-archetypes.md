@@ -15,6 +15,7 @@
 All prompts use these placeholders — replace at spawn time:
 - `{INCIDENT_CONTEXT}` — Phase 0 details
 - `{ONTOLOGY_SCOPE}` — full-pool scoped reference from Phase 0.7
+- `{INCIDENT_SHORT_ID}` — incident session short ID
 
 **Data source constraint:** You MUST only use data sources listed in the "Reference Documents" section (injected from `{ONTOLOGY_SCOPE}`). Do NOT use `ToolSearch` to discover or call MCP servers that are not in your Reference Documents. If a data source is not listed there, it was not selected for this analysis and must not be used.
 
