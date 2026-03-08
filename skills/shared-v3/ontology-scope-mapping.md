@@ -32,7 +32,7 @@
 ### Pool Source Rules
 
 #### Document Source
-- The `prism-mcp` server exposes documentation directories via `prism_docs_*` tools (configured in `~/.prism/docs.json`)
+- The `prism-mcp` server exposes documentation directories via `prism_docs_*` tools (configured in `~/.prism/ontology-docs.json`)
 - The lead calls `prism_docs_roots` to get `ONTOLOGY_DIRS[]`
 - Each directory is a separate pool entry; analysts search only within these paths using `prism_docs_list`, `prism_docs_read`, `prism_docs_search`
 
@@ -60,7 +60,7 @@ Call `mcp__prism-mcp__prism_docs_roots` to get configured documentation director
 | Result | {AVAILABILITY_MODE}=optional | {AVAILABILITY_MODE}=required |
 |--------|------------------------------|------------------------------|
 | Returns 1+ paths | `ONTOLOGY_AVAILABLE=true`. Record as `ONTOLOGY_DIRS[]`. Proceed to Step 2. | Record as `ONTOLOGY_DIRS[]`. Proceed to Step 2. |
-| Returns 0 paths or "No directories configured" | `ONTOLOGY_AVAILABLE=false`. Warn and proceed to Step 2. | Error: "No documentation directories configured in ~/.prism/docs.json." **STOP.** |
+| Returns 0 paths or "No directories configured" | `ONTOLOGY_AVAILABLE=false`. Warn and proceed to Step 2. | Error: "No documentation directories configured in ~/.prism/ontology-docs.json." **STOP.** |
 | Error / tool not found | `ONTOLOGY_AVAILABLE=false`. Warn and proceed to Step 2. | Error and **STOP.** |
 
 ### Step 2: Screen 1 — MCP Data Source Selection
