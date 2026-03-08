@@ -128,10 +128,12 @@ Placeholder replacements in seed-analyst prompt:
 ### Step 0.5.3: Receive Seed Analyst Results
 
 Wait for seed-analyst to send results via `SendMessage`. The message contains:
-- **Research Summary**: evidence discovered, files examined, MCP queries, recent changes
+- **Research Summary**: evidence discovered, files examined, investigation tool queries, recent changes
 - **Assessed Context**: severity (SEV1-4), status (Active/Mitigated/Resolved/Recurring), evidence types found
 - **Dimension Evaluation**: domain, failure type, evidence, complexity, recurrence
 - **Perspectives**: perspective candidates with ID, Name, Scope, Key Questions, Model, Agent Type, Rationale
+
+Note: Any MCP tools the seed analyst queried during investigation are for research only. They do NOT pre-select data sources for the ontology pool — that selection happens in Phase 0.7 where the user chooses which data sources analysts should use.
 
 ### Step 0.5.4: Shutdown Seed Analyst
 

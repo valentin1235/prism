@@ -55,7 +55,7 @@
 
 ### Step 1: Check Document Source Availability
 
-Call `mcp__prism-mcp__prism_docs_roots` to get configured documentation directories.
+First load the deferred tool: `ToolSearch(query="select:mcp__prism-mcp__prism_docs_roots")`. Then call `mcp__prism-mcp__prism_docs_roots` to get configured documentation directories.
 
 | Result | {AVAILABILITY_MODE}=optional | {AVAILABILITY_MODE}=required |
 |--------|------------------------------|------------------------------|
@@ -82,7 +82,7 @@ If no MCP data sources found → set `SELECTED_MCP_SERVERS[]` to empty, skip to 
 
 #### Selection
 
-Present discovered servers via `AskUserQuestion`:
+Present discovered servers via `AskUserQuestion` — the user decides which data sources analysts can access:
 
 ```
 AskUserQuestion(

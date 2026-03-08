@@ -157,7 +157,8 @@ If a perspective fails any check → replace or drop it.
 ### Files Examined
 - [file:line — what was found]
 
-### MCP Queries (if any)
+### Investigation Tool Queries (if any)
+These are one-time investigation queries — they do NOT determine which data sources analysts will use.
 - [tool: query → result summary]
 
 ### Recent Changes
