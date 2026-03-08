@@ -93,28 +93,15 @@ claude plugin marketplace add Yeachan-Heo/oh-my-claudecode
 claude plugin install oh-my-claudecode@omc
 ```
 
-### Step 4: Configure ontology-docs MCP (optional)
+### Step 4: Run setup (optional)
 
-All skills can reference your internal documentation through the `ontology-docs` MCP server. This is optional but recommended for accurate policy/codebase analysis.
+Prism includes a setup skill that automatically downloads the `prism-mcp` binary and registers it as a user-scope MCP server:
 
-Use the `claude mcp add` CLI command to register the server with **user scope**. Replace `/path/to/your/docs` with the absolute path to your documentation directory.
-
-```bash
-claude mcp add --transport stdio --scope user ontology-docs \
-  -- npx -y @modelcontextprotocol/server-filesystem /path/to/your/docs
+```
+/prism:setup
 ```
 
-> **The server name must be exactly `ontology-docs`.** Prism skills internally reference `mcp__ontology-docs__*` tools by this name. Using a different name will cause the skills to fail.
-
-> `--scope user` is recommended so the MCP server is available across all projects. With `local` or `project` scope, the server will only be accessible within that specific project.
-
-Verify it was added:
-
-```bash
-claude mcp list
-```
-
-> For more details on MCP configuration, see the [official Claude Code MCP docs](https://code.claude.com/docs/en/mcp).
+This configures the MCP tools (`prism_interview`, `prism_docs_*`) used by the analyze skill's Socratic verification and ontology-scoped analysis.
 
 ### Step 5: Verify installation
 
