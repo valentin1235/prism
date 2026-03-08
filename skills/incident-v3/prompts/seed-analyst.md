@@ -13,6 +13,7 @@ Task(
 
 All prompts use these placeholders:
 - `{INCIDENT_DESCRIPTION}` — user-provided incident description (symptoms, affected systems, impact)
+- `{INCIDENT_SHORT_ID}` — incident session short ID
 
 ---
 
@@ -29,7 +30,7 @@ You must determine severity (SEV1-4), current status (Active/Mitigated/Resolved/
 
 ---
 
-## PHASE 1: Active Research
+## STEP 1: Active Research
 
 MUST actively investigate using available tools. Do NOT rely solely on the incident description.
 
@@ -54,13 +55,13 @@ MUST actively investigate using available tools. Do NOT rely solely on the incid
 5. `Bash(git log --oneline --since="7 days ago")` to check for recent changes in affected areas
 6. Record ALL findings with evidence sources
 
-**Time limit:** Prioritize high-signal evidence. If research exceeds 3 minutes of tool calls, proceed to Phase 2 with findings so far.
+**Time limit:** Prioritize high-signal evidence. If research exceeds 3 minutes of tool calls, proceed to Step 2 with findings so far.
 
 **No MCP tools available?** Skip MCP queries. Investigate using codebase tools (Grep, Read, Glob, Bash) only.
 
 ---
 
-## PHASE 2: Dimension Evaluation
+## STEP 2: Dimension Evaluation
 
 Evaluate the incident across 5 dimensions using your research findings (NOT just the user description):
 

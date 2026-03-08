@@ -93,6 +93,18 @@ After initial selection, walk through each rule and verify compliance. If any ru
 
 For each selected perspective, generate specific scope and questions grounded in the seed analyst's findings.
 
+### Perspective Quality Gate
+
+Each perspective MUST pass ALL checks before inclusion:
+1. **Orthogonal** — does NOT overlap analysis scope with other selected perspectives
+2. **Evidence-backed** — seed analyst research found evidence this perspective can analyze
+3. **Incident-specific** — selected because THIS incident demands it, not generically useful
+4. **Actionable** — will produce concrete recommendations, not just observations
+
+If a perspective fails any check → replace or drop it.
+
+Prefer fewer targeted perspectives over broad coverage — each perspective runs through MCP verification (prism_interview), so more perspectives = more verification rounds. Recommend only what the evidence justifies.
+
 ---
 
 ## OUTPUT FORMAT
