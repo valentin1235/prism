@@ -9,6 +9,9 @@
 All prompts use these placeholders — replace at spawn time:
 - `{INCIDENT_CONTEXT}` — Phase 0 details
 - `{ONTOLOGY_SCOPE}` — full-pool scoped reference from Phase 0.7
+
+**Data source constraint:** You MUST only use data sources listed in the "Reference Documents" section (injected from `{ONTOLOGY_SCOPE}`). Do NOT use `ToolSearch` to discover or call MCP servers that are not in your Reference Documents. If a data source is not listed there, it was not selected for this analysis and must not be used.
+
 **Communication protocol:** After investigation, run self-verification via MCP tools (see `prompts/verification-protocol.md` injected below), then send verified findings to team-lead via SendMessage.
 
 **Self-verification:** After investigation:
