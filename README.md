@@ -144,135 +144,34 @@ After completing all installation steps, your `~/.claude/settings.json` should c
 
 ## Usage
 
-### Incident Postmortem
+| Skill | Command | Workflow | Output |
+|-------|---------|---------|--------|
+| **incident** | `/prism:incident` | Intake → Seed Analysis → 3-6 Perspective Agents → Devil's Advocate → optional Tribunal → Report | Postmortem report |
+| **prd** | `/prism:prd path/to/prd.md` | Read PRD → 3-6 Policy Analysts (via ontology-docs MCP) → Devil's Advocate → Report | `prd-policy-review-report.md` |
+| **plan** | `/prism:plan path/to/prd.md` | Input Analysis → 3-6 Analysts → Devil's Advocate → Committee Debate (UX + Eng + Planner) → Consensus Loop → Plan | `plan.md` |
+| **analyze** | `/prism:analyze` | Intake → Seed Analysis → Perspective Generation → Parallel Analysts → Socratic Verification (per analyst) → Synthesis | Analysis report |
+
+All skills share the same core pattern: **spawn multi-perspective agents → cross-validate → synthesize**. See [How It Works](#how-it-works) for detailed flow diagrams.
+
+### analyze: Socratic Verification & Ambiguity Scoring
+
+The analyze skill adds MCP-based Socratic verification on top of the shared pattern. Each analyst self-verifies through a `prism_interview` loop before reporting:
 
 ```
-/prism:incident
+Analyst → write findings.json → prism_interview(start) → question
+       → answer (with evidence) → auto-score → next question
+       → ... repeat until PASS or max rounds
 ```
 
-The skill will guide you through:
-
-1. **Problem Intake** — Describe the incident, severity, and evidence
-2. **Perspective Generation** — AI recommends 3-5 analysis perspectives based on your incident
-3. **Team Formation** — Spawns specialized agents (Timeline, Root Cause, Systems, Impact, etc.)
-4. **Analysis Execution** — Agents analyze in parallel, cross-validate findings
-5. **Tribunal** (conditional) — UX + Engineering critics review recommendations if needed
-6. **Report** — Structured postmortem report with findings and recommendations
-
-**Available perspectives:**
-
-| Core | Extended |
-|------|----------|
-| Timeline | Security & Threat |
-| Root Cause | Data Integrity |
-| Systems & Architecture | Performance & Capacity |
-| Impact | Deployment & Change |
-| | Network & Connectivity |
-| | Concurrency & Race |
-| | External Dependency |
-| | User Experience |
-
----
-
-### PRD Policy Analysis
-
-```
-/prism:prd path/to/your/prd.md
-```
-
-The skill will:
-
-1. **Read & Analyze PRD** — Parse functional requirements, detect policy domains
-2. **Generate Perspectives** — Create 3-6 orthogonal policy analysis perspectives
-3. **Spawn Analysts** — Each analyst examines PRD against reference docs for their domain
-4. **Devil's Advocate** — Merges duplicates, calibrates severity, finds gaps, ranks TOP 10 PM decisions
-5. **Report** — Final policy analysis report written to the PRD's directory
-
-**Output:** `prd-policy-review-report.md` in the same directory as the PRD file.
-
----
-
-### Plan (Committee Debate)
-
-```
-/prism:plan path/to/prd.md
-/prism:plan "Design a new payment system"
-/prism:plan https://example.com/requirements
-/prism:plan --hell path/to/prd.md    # Hell Mode: unanimous or infinite loop
-```
-
-The skill will:
-
-1. **Input Analysis** — Detect input type (file/URL/text/conversation), extract context, identify gaps via user interview
-2. **Perspective Generation** — Dynamically generate 3-6 orthogonal analysis perspectives based on input
-3. **Team Formation** — Create agent team, artifact directory, and pre-assign all tasks
-4. **Parallel Analysis** — Spawn analysts in parallel, each examining from their assigned perspective
-5. **Devil's Advocate** — Merge findings, challenge assumptions, identify blind spots, stress-test feasibility
-6. **Committee Debate** — UX Critic + Engineering Critic + Planner debate via Lead-mediated protocol
-7. **Plan Output** — Write `plan.md` with execution phases, risk mitigation, and success metrics
-
-**Input types:**
-
-| Input Type | Detection | Action |
-|-----------|-----------|--------|
-| File path | `.md`, `.txt`, etc. | Read the file |
-| URL | `http://` or `https://` | WebFetch |
-| Text prompt | Plain text | Parse as requirements |
-| No argument | During conversation | Summarize context |
-| `--hell` | Hell Mode flag | Unanimous consensus required |
-
-**Output:** `plan.md` in the same directory as the input file (or CWD).
-
-### Analyze (Socratic Verification)
-
-```
-/prism:analyze
-/prism:analyze "Why is the payment queue backing up?"
-/prism:analyze path/to/error-logs.md
-```
-
-The skill will:
-
-1. **Problem Intake** — Collect description (from argument or interactive prompt)
-2. **Seed Analysis** — Opus agent actively investigates using Grep, Read, Bash, and MCP tools; evaluates severity, domain, complexity, and recurrence dimensions
-3. **Perspective Generation** — Opus agent reads seed findings and selects 2-5 optimal analysis lenses from 14 archetypes, enforcing mandatory rules (core archetype required, evidence-backed only, complexity scaling)
-4. **Perspective Approval** — User reviews, adds, removes, or modifies perspectives before proceeding
-5. **Ontology Scope Mapping** (optional) — Maps perspectives to reference docs via ontology-docs MCP
-6. **Parallel Analysis** — Spawns analyst agents in parallel, each investigating from their assigned perspective
-7. **Socratic Verification** — Each analyst self-verifies via MCP `prism_interview` loop before reporting
-8. **Synthesis & Report** — Integrates verified findings into a structured report with ambiguity scores
-
-**Socratic Interview Loop:**
-
-Each analyst, after completing their investigation, enters a Socratic verification loop powered by the `prism_interview` MCP tool:
-
-1. Analyst writes findings to `findings.json`
-2. `prism_interview` reads findings and asks probing questions
-3. Analyst answers with evidence — re-investigates using tools if needed
-4. Each answer is auto-scored on **Evidence Clarity**, **Causal Chain Clarity**, and **Recommendation Clarity**
-5. Loop continues until score threshold is met or max rounds reached
-
-```
-Analyst → write findings.json
-       → prism_interview(start) → question
-       → answer (with evidence) → score + next question
-       → answer (with evidence) → score + PASS/continue
-       → ... until PASS or max rounds
-```
-
-**Ambiguity Score Structure:**
+**Ambiguity Score:**
 
 | Dimension | Weight | Measures |
 |-----------|--------|----------|
-| Evidence Clarity | 0.4 | Are findings backed by concrete evidence (file, line, log)? |
-| Causal Chain Clarity | 0.35 | Is the cause-effect chain logically sound and complete? |
-| Recommendation Clarity | 0.25 | Are recommendations specific and actionable? |
+| Evidence Clarity | 0.4 | Findings backed by concrete evidence (file, line, log)? |
+| Causal Chain Clarity | 0.35 | Cause-effect chain logically sound and complete? |
+| Recommendation Clarity | 0.25 | Recommendations specific and actionable? |
 
-Weighted total determines verdict:
-- **PASS** — Score meets threshold; findings are verified
-- **FORCE PASS** — Max rounds reached; flagged for user attention with unresolved ambiguities noted
-
-**Output:** Analysis report written to CWD, including per-analyst ambiguity scores and key Socratic Q&A clarifications.
+Verdict: **PASS** (score meets threshold) or **FORCE PASS** (max rounds reached, flagged for user attention).
 
 ---
 
@@ -460,27 +359,24 @@ graph TD
 
 </details>
 
-**Normal Mode**: Working consensus (2/3) or better proceeds to output. Max 2 feedback loops, then forced output.
+### plan: Consensus Modes
 
-**Hell Mode** (`--hell`): Requires 3/3 unanimous on ALL elements. No iteration limit — cycles until unanimous or user stops. Each iteration shuts down the old committee (prevents position entrenchment) and spawns fresh agents with cumulative context.
-
-| Consensus Level | Condition | Normal Mode | Hell Mode |
+| Consensus Level | Condition | Normal Mode | Hell Mode (`--hell`) |
 |-------|-----------|-------------|-----------|
 | **Strong** | 3/3 agree | Output | Output |
 | **Working** | 2/3 agree | Output | Feedback Loop |
 | **No Consensus** | <60% | Feedback Loop | Feedback Loop |
 
-All intermediate artifacts (`analyst-findings.md`, `da-synthesis.md`, `committee-debate.md`, `prior-iterations.md`) are persisted to `.omc/state/plan-{short-id}/` to survive context compression.
+Normal Mode: max 2 feedback loops, then forced output. Hell Mode: unlimited loops until unanimous.
 
-#### Agent Mapping
+### Agent Mapping
 
 | Role | Agent Type | Model |
 |------|-----------|-------|
 | Analyst (complex) | `oh-my-claudecode:analyst` | opus |
 | Analyst (standard) | `oh-my-claudecode:architect-medium` | sonnet |
 | Devil's Advocate | `oh-my-claudecode:critic` | opus |
-| UX Critic | `oh-my-claudecode:architect-medium` | sonnet |
-| Engineering Critic | `oh-my-claudecode:architect` | opus |
+| UX / Engineering Critic | `oh-my-claudecode:architect` / `architect-medium` | opus / sonnet |
 | Planner | `oh-my-claudecode:planner` | opus |
 
 ## Troubleshooting
