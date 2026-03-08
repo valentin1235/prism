@@ -1,12 +1,22 @@
-# Self-Verification Protocol (MCP)
+# Analyst Protocol
+
+## Data Source Constraint
+
+You MUST only use data sources listed in the "Reference Documents" section above. Do NOT use `ToolSearch` to discover or call MCP servers not in your Reference Documents. If a data source is not listed there, it was not selected for this analysis and MUST NOT be used.
+
+## Task Lifecycle
+
+Read task via `TaskGet` → mark `in_progress` → investigate → self-verify (below) → `SendMessage` to team-lead → mark `completed` via `TaskUpdate`.
+
+## Self-Verification (MCP)
 
 After completing your investigation, run self-verification using MCP tools before reporting to team-lead.
 
 Your session path is: `analyze-{SHORT_ID}/perspectives/{perspective-id}`
 
-## Steps
+### Steps
 
-### 1. Write Findings
+#### 1. Write Findings
 
 Write your findings to `~/.prism/state/analyze-{SHORT_ID}/perspectives/{perspective-id}/findings.json`:
 
@@ -23,7 +33,7 @@ Write your findings to `~/.prism/state/analyze-{SHORT_ID}/perspectives/{perspect
 }
 ```
 
-### 2. Start Interview
+#### 2. Start Interview
 
 ```
 mcp__prism-mcp__prism_interview(
@@ -34,7 +44,7 @@ mcp__prism-mcp__prism_interview(
 → returns { context_id, perspective_id, round, question }
 ```
 
-### 3. Answer + Integrated Score Loop
+#### 3. Answer + Integrated Score Loop
 
 The interview tool has integrated scoring — each answer submission automatically scores and returns `continue: true/false`.
 
@@ -56,7 +66,7 @@ mcp__prism-mcp__prism_interview(
    - `continue: false` + `reason: "max_rounds"` → **FORCE PASS** — proceed to step 4 with caveat
    - `continue: true` → answer the returned `question`, repeat loop
 
-### 4. Report Verified Findings
+#### 4. Report Verified Findings
 
 Send verified findings to `team-lead` via `SendMessage`:
 

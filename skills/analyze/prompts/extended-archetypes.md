@@ -18,17 +18,7 @@ All prompts use these placeholders — replace at spawn time:
 - `{ONTOLOGY_SCOPE}` — full-pool scoped reference from Phase 0.7
 - `{SHORT_ID}` — session short ID
 
-**Data source constraint:** You MUST only use data sources listed in the "Reference Documents" section (injected from `{ONTOLOGY_SCOPE}`). Do NOT use `ToolSearch` to discover or call MCP servers that are not in your Reference Documents. If a data source is not listed there, it was not selected for this analysis and must not be used.
-
-**Communication protocol:** After investigation, run self-verification via MCP tools (see `prompts/verification-protocol.md` injected below), then send verified findings to team-lead via SendMessage.
-
-**Self-verification:** After investigation:
-1. Write findings to `~/.prism/state/analyze-{SHORT_ID}/perspectives/{perspective-id}/findings.json`
-2. Call `prism_interview(context_id="analyze-{SHORT_ID}", perspective_id="{perspective-id}", topic="...")` → get question
-3. Answer the question (re-investigate with tools if needed)
-4. Call `prism_interview(context_id="analyze-{SHORT_ID}", perspective_id="{perspective-id}", response="...")` → returns `{continue, score, question?, reason?}`
-5. If `continue: false` → PASS (or FORCE PASS if reason is "max_rounds"). If `continue: true` → answer returned question, loop from 3.
-6. Send verified findings + score to team-lead via SendMessage
+**Analyst protocol:** All analysts MUST follow `prompts/verification-protocol.md` (data source constraint, self-verification, task lifecycle) — injected into this prompt by the orchestrator at spawn time.
 
 ---
 
@@ -74,8 +64,6 @@ OUTPUT:
 ## Recommendations
 ### Immediate (contain) / Short-term (remediate) / Long-term (prevent)
 
-Read TaskGet, mark in_progress. Run self-verification protocol (write findings.json → prism_interview loop). Send verified findings to team-lead via SendMessage. Mark completed.
-
 ---
 
 ## Data Integrity Lens
@@ -119,8 +107,6 @@ OUTPUT:
 - Irrecoverable: [what, why]
 - Recoverable: [what, from where, how]
 
-Read TaskGet, mark in_progress. Run self-verification protocol (write findings.json → prism_interview loop). Send verified findings to team-lead via SendMessage. Mark completed.
-
 ---
 
 ## Performance Lens
@@ -158,8 +144,6 @@ OUTPUT:
 
 ## Recommendations
 ### Immediate / Short-term / Long-term
-
-Read TaskGet, mark in_progress. Run self-verification protocol (write findings.json → prism_interview loop). Send verified findings to team-lead via SendMessage. Mark completed.
 
 ---
 
@@ -207,8 +191,6 @@ OUTPUT:
 ### Short-term (error boundaries, fallback UI)
 ### Long-term (offline mode, graceful degradation architecture)
 
-Read TaskGet, mark in_progress. Run self-verification protocol (write findings.json → prism_interview loop). Send verified findings to team-lead via SendMessage. Mark completed.
-
 ---
 
 ## Tier 2 Template
@@ -229,8 +211,6 @@ TASKS:
 
 OUTPUT:
 {output sections from below}
-
-Read TaskGet, mark in_progress. Run self-verification protocol (write findings.json → prism_interview loop). Send verified findings to team-lead via SendMessage. Mark completed.
 ```
 
 ---
@@ -275,8 +255,6 @@ OUTPUT:
 ## Recommendations
 ### Immediate / Short-term / Long-term
 
-Read TaskGet, mark in_progress. Run self-verification protocol (write findings.json → prism_interview loop). Send verified findings to team-lead via SendMessage. Mark completed.
-
 ---
 
 ## Network
@@ -318,8 +296,6 @@ OUTPUT:
 
 ## Recommendations
 ### Immediate / Short-term / Long-term
-
-Read TaskGet, mark in_progress. Run self-verification protocol (write findings.json → prism_interview loop). Send verified findings to team-lead via SendMessage. Mark completed.
 
 ---
 
@@ -365,8 +341,6 @@ OUTPUT:
 ## Recommendations
 ### Immediate / Short-term / Long-term
 
-Read TaskGet, mark in_progress. Run self-verification protocol (write findings.json → prism_interview loop). Send verified findings to team-lead via SendMessage. Mark completed.
-
 ---
 
 ## Dependency
@@ -409,8 +383,6 @@ OUTPUT:
 
 ## Recommendations
 ### Immediate / Short-term / Long-term
-
-Read TaskGet, mark in_progress. Run self-verification protocol (write findings.json → prism_interview loop). Send verified findings to team-lead via SendMessage. Mark completed.
 
 ---
 
@@ -466,8 +438,6 @@ OUTPUT:
 ### Short-term (fix pipeline, add reconciliation)
 ### Long-term (automated verification, compliance hardening)
 
-Read TaskGet, mark in_progress. Run self-verification protocol (write findings.json → prism_interview loop). Send verified findings to team-lead via SendMessage. Mark completed.
-
 ---
 
 ## Custom Lens
@@ -477,6 +447,6 @@ For novel failure modes. Compose using Tier 2 Template with:
 2. Mission statement
 3. ≥3 analysis tasks
 4. Defined output sections
-5. TaskGet/SendMessage boilerplate
+5. Follow `prompts/verification-protocol.md` (injected by orchestrator)
 
 MCP verification (prism_interview) will specifically challenge whether the custom perspective findings are well-supported.
