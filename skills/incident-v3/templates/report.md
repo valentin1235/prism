@@ -77,9 +77,5 @@ Fill all sections. Write "N/A" if truly irrelevant — do NOT leave sections emp
 | Perspective | Mapped Ontology Docs | Reasoning |
 |-------------|---------------------|-----------|
 
-### Ontology Catalog
-| # | Source | Type | Path/URL | Domain | Summary |
-|---|--------|------|----------|--------|---------|
-
 ### Raw Evidence Links
 ### Related Past Incidents

@@ -51,6 +51,7 @@ Map incident characteristics to archetype candidates:
 | Race condition, deadlock, distributed lock | `concurrency` + `root-cause` + `systems` |
 | Third-party API failure, upstream outage | `dependency` + `impact` + `timeline` |
 | User-facing degradation, confusing errors | `ux` + `impact` + `root-cause` |
+| Payment discrepancy, billing error, revenue data mismatch | `financial` + `data-integrity` + `root-cause` |
 | Novel / unclassifiable | `custom` + `root-cause` + relevant core |
 
 ### Archetype Reference
@@ -69,6 +70,7 @@ Map incident characteristics to archetype candidates:
 | `concurrency` | Concurrency & Race | opus | `architect` |
 | `dependency` | External Dependency | sonnet | `architect-medium` |
 | `ux` | User Experience | sonnet | `architect-medium` |
+| `financial` | Financial & Compliance | opus | `architect` |
 | `custom` | Custom | Auto | Auto |
 
 ---
@@ -109,7 +111,7 @@ Prefer fewer targeted perspectives over broad coverage — each perspective runs
 
 ## OUTPUT FORMAT
 
-Write the following JSON to `~/.prism/state/incident-{INCIDENT_SHORT_ID}/perspective-candidates.json` AND send the same JSON via SendMessage to team-lead.
+Write the following JSON to `~/.prism/state/incident-{INCIDENT_SHORT_ID}/perspectives.json` AND send the same JSON via SendMessage to team-lead.
 
 ```json
 {

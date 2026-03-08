@@ -184,113 +184,153 @@ AskUserQuestion(
 
 → **NEXT ACTION: Proceed to Step 5 — build the final catalog.**
 
-### Step 5: Build Final Pool Catalog
+### Step 5: Build and Write `ontology-scope.json`
 
-Combine all sources into a unified catalog:
+Combine all sources into a single JSON file that contains both catalog metadata and access instructions.
 
-```
-## Ontology Pool Catalog
-
-| # | Source | Type | Path/URL | Domain | Summary | Key Topics | Status |
-|---|--------|------|----------|--------|---------|------------|--------|
-| 1..N | mcp | doc | {ONTOLOGY_DIRS[i]} | {inferred domain} | Documentation directory | search_files, read_file | available |
-| N+1 | mcp | query | {server_name} | {domain} | {description} | {key tools} | available |
-| ... | web | url | {url} | {domain} | {1-2 line summary} | {3-5 keywords} | available |
-| ... | file | file | {path} | {domain} | {1-2 line summary} | {3-5 keywords} | available |
-| ... | web | url | {url} | — | — | — | unavailable: {reason} |
-```
-
-If catalog is empty after all steps:
-- `{AVAILABILITY_MODE}`=`optional` → Pool Catalog is empty. Warn and proceed.
+If no sources after all steps:
+- `{AVAILABILITY_MODE}`=`optional` → Warn and proceed. Analysts get `{ONTOLOGY_SCOPE}` = "N/A — no ontology sources available". Skip to Exit Gate.
 - `{AVAILABILITY_MODE}`=`required` → Error: "No ontology sources available." **STOP.**
 
-**Phase A output:** Pool Catalog (unified table of available document, MCP data, web, and file sources).
-Write the Pool Catalog to `{STATE_DIR}/ontology-catalog.md`.
+Write to `{STATE_DIR}/ontology-scope.json`:
 
-If Pool Catalog is empty and `{AVAILABILITY_MODE}`=`optional` → analysts get `{ONTOLOGY_SCOPE}` = "N/A — no ontology sources available". Skip to Exit Gate.
+```json
+{
+  "sources": [
+    {
+      "id": 1,
+      "type": "doc",
+      "path": "/path/to/docs",
+      "domain": "inferred domain",
+      "summary": "Documentation directory",
+      "key_topics": ["topic1", "topic2"],
+      "status": "available",
+      "access": {
+        "tools": ["prism_docs_list", "prism_docs_read", "prism_docs_search"],
+        "instructions": "Use prism_docs_* tools. Pass directory path as argument."
+      }
+    },
+    {
+      "id": 2,
+      "type": "mcp_query",
+      "server_name": "grafana",
+      "domain": "monitoring",
+      "summary": "Grafana monitoring dashboards and metrics",
+      "key_topics": ["prometheus", "loki", "dashboards"],
+      "status": "available",
+      "access": {
+        "tools": ["mcp__grafana__query_prometheus", "mcp__grafana__query_loki_logs"],
+        "instructions": "Call ToolSearch(query=\"select:mcp__{server_name}__{tool_name}\") to load each tool before use, then call directly.",
+        "capabilities": "Query Prometheus metrics, Loki logs, dashboards",
+        "getting_started": "Start with list_datasources to discover available data",
+        "error_handling": "If a tool call fails, note the error and continue. Do NOT retry more than once.",
+        "safety": "SELECT/read-only queries only"
+      }
+    },
+    {
+      "id": 3,
+      "type": "web",
+      "url": "https://example.com/docs",
+      "domain": "API documentation",
+      "summary": "1-2 line summary",
+      "key_topics": ["keyword1", "keyword2", "keyword3"],
+      "status": "available",
+      "access": {
+        "instructions": "Content summary provided. Use WebFetch for deeper exploration.",
+        "cached_summary": "Fetched content summary from pool build time"
+      }
+    },
+    {
+      "id": 4,
+      "type": "file",
+      "path": "/path/to/file",
+      "domain": "domain",
+      "summary": "1-2 line summary",
+      "key_topics": ["keyword1", "keyword2"],
+      "status": "available",
+      "access": {
+        "instructions": "Content summary provided. Original file at path.",
+        "cached_summary": "Read content summary from pool build time"
+      }
+    },
+    {
+      "id": 5,
+      "type": "web",
+      "url": "https://failed.example.com",
+      "status": "unavailable",
+      "reason": "fetch failed: 404"
+    }
+  ],
+  "totals": {
+    "doc": 1,
+    "mcp_query": 1,
+    "web": 1,
+    "file": 1,
+    "unavailable": 1
+  },
+  "citation_format": {
+    "doc": "source:section",
+    "web": "url:section",
+    "file": "file:path:section",
+    "mcp_query": "mcp-query:server:detail"
+  }
+}
+```
 
-→ **NEXT ACTION: Proceed to Phase B — generate scoped reference blocks for analysts.**
+### Field Rules
+
+- `sources[].id`: sequential integer, starts at 1
+- `sources[].type`: one of `doc`, `mcp_query`, `web`, `file`
+- `sources[].status`: `available` or `unavailable`
+- `sources[].key_topics`: 3-5 keywords (inferred or extracted at pool build time)
+- `sources[].access`: present only when `status == "available"` — contains type-specific access instructions
+- `sources[].reason`: present only when `status == "unavailable"`
+- `totals`: count per type. `unavailable` counts all failed sources regardless of type
 
 ---
 
-## Phase B: Generate Scoped References
+## Phase B: Generate `{ONTOLOGY_SCOPE}` Text Block
 
-All perspectives (analysts) receive the **full pool** — no per-perspective filtering.
+The orchestrator reads `{STATE_DIR}/ontology-scope.json` and generates a text block for analyst prompt injection. Only `available` sources are included in the text block.
 
-**Note:** The lead generates an `{ONTOLOGY_SCOPE}` block for analysts (with access instructions). Inject at spawn time.
+### Text block format
 
-### For all analysts:
-
-Generate `{ONTOLOGY_SCOPE}` block containing all available pool entries:
-
-For **document sources** (prism-mcp docs):
-```
-- doc: prism-mcp docs (available)
-  Directories:
-  {ONTOLOGY_DIRS[] — one per line, e.g.:
-    - /Users/heechul/podo-backend/podo-docs
-    - /Users/heechul/podo-app/podo-docs
-    - /Users/heechul/grape/podo-docs}
-  Access: Use prism_docs_* tools. Always pass a directory from the list above as the path argument.
-    - prism_docs_list(path) — list directory contents
-    - prism_docs_read(path) — read a file
-    - prism_docs_search(path, pattern) — search files by glob pattern
-```
-
-For **MCP data sources** (mcp query):
-```
-- mcp-query: {server_name}: {description}
-  Tools (read-only): {tool_1}, {tool_2}, {tool_3}, ...
-  Access: Call `ToolSearch(query="select:mcp__{server_name}__{tool_name}")` to load each tool before use, then call it directly.
-  Capabilities: {what can be queried}
-  Getting started: {discovery pattern — e.g., "Call get_table_schema first to discover tables, then run_query for data"}
-  Error handling: If a tool call fails (auth error, timeout, permission denied), note the error and continue analysis with other available sources. Do NOT retry more than once.
-```
-
-For **web sources**:
-```
-- web: {url}: {domain} — {summary}
-  Access: Content summary provided below. Use WebFetch if deeper exploration needed.
-  {cached summary from pool build}
-```
-
-For **file sources**:
-```
-- file: {path}: {domain} — {summary}
-  Access: Content summary provided below. Original file at {path}.
-  {cached summary from pool build}
-```
-
-Combined per-analyst block:
 ```
 Your reference documents and data sources:
-{list of ALL available pool entries with access instructions}
+
+- doc: {summary} ({status})
+  Directories: {path}
+  Access: {access.instructions}
+    {access.tools — one per line}
+
+- mcp-query: {server_name}: {summary}
+  Tools (read-only): {access.tools}
+  Access: {access.instructions}
+  Capabilities: {access.capabilities}
+  Getting started: {access.getting_started}
+  Error handling: {access.error_handling}
+
+- web: {url}: {domain} — {summary}
+  Access: {access.instructions}
+  {access.cached_summary}
+
+- file: {path}: {domain} — {summary}
+  Access: {access.instructions}
+  {access.cached_summary}
 
 Explore these sources through your perspective's lens.
-Cite findings as "source:section" (doc sources), "url:section" (web sources), "file:path:section" (file sources), or "mcp-query:server:detail" (MCP data sources).
+Cite findings as: {citation_format values}.
 ```
 
-### Phase B Output Persistence
+The orchestrator constructs this text block from the JSON and injects it into the `{ONTOLOGY_SCOPE}` placeholder before spawning analysts.
 
-After generating the scope block above, persist to `{STATE_DIR}`:
-
-1. Write the analyst `{ONTOLOGY_SCOPE}` block to `{STATE_DIR}/ontology-scope-analyst.md`:
-   ```markdown
-   # Ontology Scope — Analyst Variant
-
-   {full analyst scope block content from "For all analysts" section above}
-   ```
-
-After writing the file, the orchestrator MAY discard the in-memory scope block data. Downstream agents obtain their scope by having the orchestrator `Read` the file and inject its contents into the `{ONTOLOGY_SCOPE}` placeholder before spawning.
-
-**Backward compatibility:** If the files do not exist at read time (e.g., older session, fast-track skip), the orchestrator injects: `{ONTOLOGY_SCOPE}` = "N/A — ontology scope files not found. Analyze using available evidence only."
+**Backward compatibility:** If `ontology-scope.json` does not exist at read time (e.g., older session, fast-track skip), the orchestrator injects: `{ONTOLOGY_SCOPE}` = "N/A — ontology scope file not found. Analyze using available evidence only."
 
 ---
 
 ## Exit Gate
 
-**Empty pool skip:** If Pool Catalog is empty and `{AVAILABILITY_MODE}`=`optional`, file-write items below are N/A.
+**Empty pool skip:** If sources array is empty and `{AVAILABILITY_MODE}`=`optional`, file-write item below is N/A.
 
 - [ ] Phase A complete: document source checked, MCP data sources selected (or skipped), external sources collected (or skipped), pool confirmed
-- [ ] `{STATE_DIR}/ontology-catalog.md` written with Pool Catalog
-- [ ] `{STATE_DIR}/ontology-scope-analyst.md` written with analyst scope block
+- [ ] `{STATE_DIR}/ontology-scope.json` written with all source metadata and access instructions

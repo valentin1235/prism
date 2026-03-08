@@ -18,15 +18,13 @@ Persist phase outputs to `~/.prism/state/incident-{short-id}/` (created in Phase
 | File | Written | Read By |
 |------|---------|---------|
 | `seed-analysis.json` | Seed Analyst (Phase 0.5) | Perspective Generator (Phase 0.55), Orchestrator |
-| `perspective-candidates.json` | Perspective Generator (Phase 0.55) | Orchestrator (Phase 0.6) |
-| `perspectives.md` | Orchestrator (Phase 0.6) | All agents |
-| `context.md` | Orchestrator (Phase 0.8) | All agents |
+| `perspectives.json` | Perspective Generator (Phase 0.55), updated by Orchestrator (Phase 0.6) | Orchestrator (Phase 0.6, 0.8, 1, 3) |
+| `context.json` | Orchestrator (Phase 0.8) | Orchestrator (Phase 1 `{INCIDENT_CONTEXT}` injection, Phase 3 re-entry) |
 | `~/.prism/state/incident-{short-id}/perspectives/{perspective-id}/findings.json` | Analyst (Phase 2) | MCP prism_interview |
 | `verified-findings-{perspective-id}.md` | Orchestrator (Phase 2) | Phase 3 synthesis |
 | `analyst-findings.md` | Orchestrator (Phase 2 exit) | Phase 3 synthesis |
 | `prior-iterations.md` | Each re-entry (append) | All agents (cumulative) |
-| `ontology-catalog.md` | Orchestrator (Phase 0.7) | Analysts |
-| `ontology-scope-analyst.md` | Orchestrator (Phase 0.7) | Analysts |
+| `ontology-scope.json` | Orchestrator (Phase 0.7) | Analysts (via `{ONTOLOGY_SCOPE}` injection) |
 
 ## Prerequisite: Agent Team Mode (HARD GATE)
 
@@ -55,6 +53,7 @@ Persist phase outputs to `~/.prism/state/incident-{short-id}/` (created in Phase
 | `concurrency` | Concurrency & Race | Opus | `architect` | Race conditions, deadlocks |
 | `dependency` | External Dependency | Sonnet | `architect-medium` | Third-party failures |
 | `ux` | User Experience | Sonnet | `architect-medium` | User-facing degradation, error UX |
+| `financial` | Financial & Compliance | Opus | `architect` | Payment discrepancies, billing errors, revenue impact, audit trail gaps |
 | `custom` | Custom | Auto | Auto | Novel failure modes |
 
 ### Verification (MCP-based)
@@ -79,6 +78,8 @@ If the user provided an incident description via `$ARGUMENTS`, use it directly. 
 
 Generate `{short-id}`: `Bash(uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-8)`. Generate ONCE and reuse throughout all phases.
 
+> **Naming note:** `{short-id}` in path templates (e.g., `incident-{short-id}/`) and `{INCIDENT_SHORT_ID}` in prompt placeholders refer to the same value. Use `{short-id}` when constructing paths, `{INCIDENT_SHORT_ID}` when replacing placeholders in agent prompts.
+
 Create state directory: `Bash(mkdir -p ~/.prism/state/incident-{short-id})`
 
 ### Phase 0 Exit Gate
@@ -88,7 +89,7 @@ MUST NOT proceed until ALL documented:
 - [ ] Incident description collected
 - [ ] `{short-id}` generated and state directory created
 
-Severity, status, and evidence types are NOT collected here — the seed-analyst will determine these automatically during active investigation in Phase 0.5.
+Severity and status are NOT collected here — the seed-analyst will determine these automatically during active investigation in Phase 0.5.
 
 → **NEXT ACTION: Proceed to Phase 0.5 Step 0.5.1 — Create team.**
 
@@ -131,7 +132,7 @@ Placeholder replacements in seed-analyst prompt:
 ### Step 0.5.3: Receive Seed Analyst Results
 
 Wait for seed-analyst to send results via `SendMessage`. The message contains a JSON object with:
-- `severity`, `status`, `evidence_types`
+- `severity`, `status`
 - `dimensions`: domain, failure_type, evidence_available, complexity, recurrence
 - `research`: findings (with source and tool_used), files_examined, mcp_queries, recent_changes
 
@@ -187,7 +188,7 @@ Task(
 > Apply worker preamble from `../shared-v3/worker-preamble.md` with:
 - `{TEAM_NAME}` = `"incident-analysis-{short-id}"`
 - `{WORKER_NAME}` = `"perspective-generator"`
-- `{WORK_ACTION}` = `"Read seed-analysis.json, apply archetype mapping rules and mandatory rules, generate perspective candidates. Write perspective-candidates.json. Report via SendMessage."`
+- `{WORK_ACTION}` = `"Read seed-analysis.json, apply archetype mapping rules and mandatory rules, generate perspective candidates. Write perspectives.json. Report via SendMessage."`
 
 Placeholder replacements:
 - `{INCIDENT_SHORT_ID}` → Phase 0 short-id
@@ -200,7 +201,7 @@ Wait for perspective-generator to send results via `SendMessage`. The message co
 - `rules_applied`: which mandatory rules were checked and enforced
 - `selection_summary`: reasoning for the selection
 
-The perspective generator also writes this JSON to `~/.prism/state/incident-{short-id}/perspective-candidates.json`.
+The perspective generator also writes this JSON to `~/.prism/state/incident-{short-id}/perspectives.json`.
 
 ### Step 0.55.3: Shutdown Perspective Generator
 
@@ -215,7 +216,7 @@ Same as Step 0.5.5 — drain all completed background task outputs via `TaskList
 MUST NOT proceed until:
 
 - [ ] Perspective generator results received
-- [ ] `perspective-candidates.json` written to state directory
+- [ ] `perspectives.json` written to state directory
 - [ ] Perspective generator shut down
 - [ ] All background task outputs drained
 
@@ -227,7 +228,7 @@ MUST NOT proceed until:
 
 ### Step 0.6.1: Present Perspectives
 
-Read `~/.prism/state/incident-{short-id}/perspective-candidates.json` and present to user.
+Read `~/.prism/state/incident-{short-id}/perspectives.json` and present to user.
 
 `AskUserQuestion` (header: "Perspectives", question: "I recommend these {N} perspectives for analysis. How to proceed?", options: "Proceed" / "Add perspective" / "Remove perspective" / "Modify perspective")
 
@@ -237,31 +238,21 @@ Include seed-analyst's research summary (from `seed-analysis.json`) for user con
 
 Repeat until user selects "Proceed". Warn if <2 dynamic perspectives.
 
-### Step 0.6.3: Write Perspectives
+### Step 0.6.3: Update Perspectives
 
-Write locked roster to `~/.prism/state/incident-{short-id}/perspectives.md`:
+Update `~/.prism/state/incident-{short-id}/perspectives.json` in-place — add approval metadata and apply any user modifications:
 
-```markdown
-# Perspectives — Locked Roster
-
-## Severity
-{SEV1-4}
-
-## Status
-{Active/Mitigated/Resolved/Recurring}
-
-## Perspectives
-
-### {perspective-id}
-- **Name:** {name}
-- **Scope:** {scope}
-- **Key Questions:**
-  1. {question}
-  2. {question}
-- **Model:** {model}
-- **Agent Type:** {agent type}
-- **Rationale:** {rationale}
+```json
+{
+  "perspectives": [...],
+  "rules_applied": {...},
+  "selection_summary": "...",
+  "approved": true,
+  "user_modifications": ["description of changes, if any"]
+}
 ```
+
+The `perspectives` array, `rules_applied`, and `selection_summary` fields are preserved from Phase 0.55. The orchestrator adds `approved` and `user_modifications` (empty array if no changes).
 
 → **NEXT ACTION: Proceed to Phase 0.7 — Ontology Scope Mapping.**
 
@@ -284,20 +275,27 @@ If `ONTOLOGY_AVAILABLE=false` → all analysts get `{ONTOLOGY_SCOPE}` = "N/A —
 
 ### Step 0.8.1: Write Context File
 
-Write `~/.prism/state/incident-{short-id}/context.md` with:
-- Incident summary (symptoms, timeline, blast radius, mitigation, evidence)
-- Severity and status
-- Evidence types
-- Seed-analyst research summary (key findings, files examined, dimension evaluation)
-- Report language (detect from user's input language)
+Write `~/.prism/state/incident-{short-id}/context.json`:
+
+```json
+{
+  "incident_summary": "Symptoms, timeline, blast radius, mitigation, evidence",
+  "research_summary": {
+    "key_findings": ["finding1", "finding2"],
+    "files_examined": ["path1", "path2"],
+    "dimensions": "domain, failure_type, complexity, recurrence from seed-analysis.json"
+  },
+  "report_language": "detected from user's input language"
+}
+```
 
 ### Phase 0.8 Exit Gate
 
 MUST NOT proceed until:
 
-- [ ] `perspectives.md` written with valid roster
-- [ ] `context.md` written with structured summary
-- [ ] Ontology scope mapping complete (check for `ontology-scope-analyst.md`) or explicitly skipped
+- [ ] `perspectives.json` updated with approved=true
+- [ ] `context.json` written with structured summary
+- [ ] Ontology scope mapping complete (check for `ontology-scope.json`) or explicitly skipped
 
 → **NEXT ACTION: Proceed to Phase 1 — Spawn analysts.**
 
@@ -325,6 +323,7 @@ MUST read prompt files before spawning. Files are relative to this SKILL.md's di
 | Network | `prompts/extended-archetypes.md` | § Network |
 | Concurrency | `prompts/extended-archetypes.md` | § Concurrency |
 | Dependency | `prompts/extended-archetypes.md` | § Dependency |
+| Financial & Compliance | `prompts/extended-archetypes.md` | § Financial Lens |
 | Custom | `prompts/extended-archetypes.md` | § Custom Lens |
 
 **Spawn pattern:**
@@ -342,8 +341,8 @@ Task(
 
 > Apply worker preamble with `{WORK_ACTION}` = `"Investigate the incident from your assigned perspective. Answer ALL key questions with evidence and code references. Run self-verification via MCP tools (prism_interview). Report verified findings via SendMessage to team-lead."`
 
-MUST replace `{INCIDENT_CONTEXT}` from `context.md`.
-MUST replace `{ONTOLOGY_SCOPE}` from `ontology-scope-analyst.md` (or "N/A" if not found).
+MUST replace `{INCIDENT_CONTEXT}` from `context.json`.
+MUST replace `{ONTOLOGY_SCOPE}` by reading `ontology-scope.json` and generating a text block per Phase B of ontology-scope-mapping.md (or "N/A" if not found).
 MUST replace `{INCIDENT_SHORT_ID}` with the incident's `{short-id}`. Analysts construct their own session path: `incident-{short-id}/perspectives/{perspective-id}`.
 
 ### Phase 1 Exit Gate
@@ -362,8 +361,8 @@ MUST NOT proceed until:
 ```
 Prerequisite → Phase 0 [intake, session ID]
 → Phase 0.5 [TeamCreate + seed-analyst (research, dimensions → seed-analysis.json) + drain]
-→ Phase 0.55 [perspective-generator (seed-analysis.json → perspective-candidates.json) + drain]
-→ Phase 0.6 [perspective approval (user reviews perspective-candidates.json)]
+→ Phase 0.55 [perspective-generator (seed-analysis.json → perspectives.json) + drain]
+→ Phase 0.6 [perspective approval (user reviews perspectives.json → update with approved)]
 → Phase 0.7 [ontology]
 → Phase 0.8 [context + state files]
 → Phase 1 [spawn analysts]

@@ -119,8 +119,7 @@ This executes the full ontology pool construction:
 - `Read` for file sources
 
 Outputs (written by ontology-scope-mapping.md):
-- `{STATE_DIR}/ontology-catalog.md`
-- `{STATE_DIR}/ontology-scope-analyst.md`
+- `{STATE_DIR}/ontology-scope.json`
 
 ### Required Mode Error Handling (prd-v2)
 
@@ -163,8 +162,7 @@ Content:
 - perspectives.md
 - context.md
 - seed-analysis.md
-- ontology-catalog.md (if applicable)
-- ontology-scope-analyst.md (if applicable)
+- ontology-scope.json (if applicable)
 
 ## Files Skipped
 - {filename} — {reason, e.g. "Fast track: ontology mapping deferred"}
@@ -204,8 +202,7 @@ The setup agent MUST attempt to write the sentinel file even on error, so the or
 | `{STATE_DIR}/seed-analysis.md` | Internal seed analysis results | YES (internal — not read by orchestrator) |
 | `{STATE_DIR}/perspectives.md` | Locked perspective roster | YES |
 | `{STATE_DIR}/context.md` | Extracted PRD context | YES |
-| `{STATE_DIR}/ontology-catalog.md` | Pool catalog table | NO (MCP unavailable in required mode → error) |
-| `{STATE_DIR}/ontology-scope-analyst.md` | Analyst ontology scope block | NO (MCP unavailable in required mode → error) |
+| `{STATE_DIR}/ontology-scope.json` | Unified ontology scope (catalog + access instructions) | NO (MCP unavailable in required mode → error) |
 | `{STATE_DIR}/setup-complete.md` | Sentinel: lists files written/skipped | YES (always last) |
 
 ---

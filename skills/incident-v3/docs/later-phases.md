@@ -77,7 +77,7 @@ Read `templates/report.md` and fill all sections with synthesized findings.
 
 **Deeper investigation re-entry (max 2 loops):**
 
-Before re-entry, increment `investigation_loops` counter in `~/.prism/state/incident-{short-id}/context.md`. If counter ≥ 2, inform user: "Maximum investigation depth reached. Proceeding with current findings." and auto-select "Complete".
+Before re-entry, increment `investigation_loops` counter in `~/.prism/state/incident-{short-id}/context.json`. If counter ≥ 2, inform user: "Maximum investigation depth reached. Proceeding with current findings." and auto-select "Complete".
 
 1. Write current findings to `~/.prism/state/incident-{short-id}/analyst-findings.md`
 2. Append iteration summary to `prior-iterations.md`
