@@ -18,5 +18,4 @@ Common quality enforcement rules for analysis output. The lead MUST reject and r
 | Unsupported claims | "INCOMPLETE: Provide {EVIDENCE_FORMAT} as evidence." |
 | Scope drift | "Stay within your perspective scope: {scope}. Redirect to {correct-analyst}." |
 | Missing key question answers | "Key question unanswered: {question}. Address before completing." |
-| Cross-analyst conflicts | Route to both analysts + DA for resolution |
-| Unaddressed DA challenges | Forward to analyst, REQUIRE evidence-based response |
+| Cross-analyst conflicts | Route to both analysts for resolution |

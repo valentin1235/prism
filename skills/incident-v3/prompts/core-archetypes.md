@@ -17,7 +17,7 @@ All prompts use these placeholders — replace at spawn time:
 3. Answer the question (re-investigate with tools if needed)
 4. Call `prism_interview(context_id="incident-{INCIDENT_SHORT_ID}", perspective_id="{perspective-id}", response="...")` → next question
 5. Call `prism_score(context_id="incident-{INCIDENT_SHORT_ID}", perspective_id="{perspective-id}")` → check score
-6. If `weighted_total > 0.8` or `INTERVIEW_COMPLETE` → PASS. If round ≥ 30 → FORCE PASS. Otherwise loop from 3.
+6. If `weighted_total > 0.8` or `INTERVIEW_COMPLETE` → PASS. If round ≥ 20 → FORCE PASS. Otherwise loop from 3.
 7. Send verified findings + score to team-lead via SendMessage
 
 ---

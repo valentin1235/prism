@@ -36,7 +36,7 @@ Fill all sections. Write "N/A" if truly irrelevant — do NOT leave sections emp
 | Analyst | Evidence Clarity | Causal Chain Clarity | Recommendation Clarity | Ambiguity Score | Verdict |
 |---------|-----------------|---------------------|----------------------|----------------|---------|
 
-### Key Clarifications from DA Q&A
+### Key Clarifications from Socratic Verification Q&A
 {For each analyst, list the most important ambiguities that were resolved through Socratic questioning}
 
 #### {Analyst Name}
@@ -48,23 +48,6 @@ Fill all sections. Write "N/A" if truly irrelevant — do NOT leave sections emp
 
 | Analyst | Ambiguity | Reason Unresolved | Impact on Conclusions |
 |---------|-----------|-------------------|-----------------------|
-
-## Tribunal Review
-
-{If tribunal was NOT requested:}
-> Tribunal not requested by user. All findings carry Socratic-verified status.
-
-{If tribunal WAS requested, fill below:}
-- Trigger: User requested
-- Consensus: {X} unanimous, {Y} w/caveats, {Z} w/dissent
-
-### Recommendation Verdicts
-| Recommendation | UX Critic | Eng Critic | Final |
-|---------------|-----------|------------|-------|
-
-### Items Requiring User Decision
-### UX Recommendations (from UX Critic)
-### Engineering Notes (from Eng Critic)
 
 ## Recommendations
 | Action | Priority | UX Impact | Eng Effort | Verified? |

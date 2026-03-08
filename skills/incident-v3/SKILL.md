@@ -295,14 +295,13 @@ MUST NOT proceed until:
 ## Gate Summary
 
 ```
-Prerequisite → Phase 0 [intake, severity, status, evidence, session ID]
-→ Phase 0.5 [TeamCreate + seed-analyst + drain background tasks]
+Prerequisite → Phase 0 [intake, session ID]
+→ Phase 0.5 [TeamCreate + seed-analyst (severity, status, evidence) + drain background tasks]
 → Phase 0.6 [perspective approval]
 → Phase 0.7 [ontology]
 → Phase 0.8 [context + state files]
 → Phase 1 [spawn analysts]
 → Phase 2 [collect verified findings — analysts self-verify via prism_interview + prism_score] ← docs/later-phases.md
-→ Phase 2.5 [AskUser: tribunal?] ← docs/later-phases.md
 → Phase 3 [report] ← docs/later-phases.md
 → Phase 4 [cleanup] ← docs/later-phases.md
 ```

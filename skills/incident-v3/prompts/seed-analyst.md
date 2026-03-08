@@ -112,7 +112,7 @@ Map incident characteristics to archetype candidates:
 
 ## PHASE 4: Generate Perspectives
 
-Generate perspectives based on incident complexity (DA is always added separately by the orchestrator).
+Generate perspectives based on incident complexity (verification is handled by each analyst via MCP self-verification).
 
 Selection rules:
 - MUST include ≥1 Core Archetype (timeline, root-cause, systems, impact)

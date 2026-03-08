@@ -211,7 +211,7 @@ Write the Pool Catalog to `{STATE_DIR}/ontology-catalog.md`.
 
 If Pool Catalog is empty and `{AVAILABILITY_MODE}`=`optional` → analysts get `{ONTOLOGY_SCOPE}` = "N/A — no ontology sources available". Skip to Exit Gate.
 
-→ **NEXT ACTION: Proceed to Phase B — generate scoped reference blocks for analysts and DA.**
+→ **NEXT ACTION: Proceed to Phase B — generate scoped reference blocks for analysts.**
 
 ---
 
@@ -219,7 +219,7 @@ If Pool Catalog is empty and `{AVAILABILITY_MODE}`=`optional` → analysts get `
 
 All perspectives (analysts) receive the **full pool** — no per-perspective filtering.
 
-**Note:** The lead MUST generate two `{ONTOLOGY_SCOPE}` variants from this phase — one for analysts (with access instructions) and one for the DA (with verification mission). Inject the correct variant per role at spawn time.
+**Note:** The lead generates an `{ONTOLOGY_SCOPE}` block for analysts (with access instructions). Inject at spawn time.
 
 ### For all analysts:
 
@@ -269,24 +269,9 @@ Explore these sources through your perspective's lens.
 Cite findings as "source:section" (doc sources), "url:section" (web sources), "file:path:section" (file sources), or "mcp-query:server:detail" (MCP data sources).
 ```
 
-### For Devil's Advocate:
-```
-You have access to ALL pool entries. Verify analysts explored thoroughly.
-
-Full Ontology Pool:
-{complete pool catalog table — available entries only}
-
-Check: Did each analyst find relevant evidence in the ontology-docs MCP?
-Check: Are there documents or sections within ontology-docs that no analyst explored?
-Check: Did analysts effectively query the available MCP data sources?
-Check: Are there MCP data sources that could have provided additional evidence but were not queried?
-Check: Did analysts reference relevant web sources from the pool?
-Check: Did analysts reference relevant file sources from the pool?
-```
-
 ### Phase B Output Persistence
 
-After generating both scope block variants above, persist them to `{STATE_DIR}`:
+After generating the scope block above, persist to `{STATE_DIR}`:
 
 1. Write the analyst `{ONTOLOGY_SCOPE}` block to `{STATE_DIR}/ontology-scope-analyst.md`:
    ```markdown
@@ -295,14 +280,7 @@ After generating both scope block variants above, persist them to `{STATE_DIR}`:
    {full analyst scope block content from "For all analysts" section above}
    ```
 
-2. Write the DA `{ONTOLOGY_SCOPE}` block to `{STATE_DIR}/ontology-scope-da.md`:
-   ```markdown
-   # Ontology Scope — DA Variant
-
-   {full DA scope block content from "For Devil's Advocate" section above}
-   ```
-
-After writing both files, the orchestrator MAY discard the in-memory scope block data. Downstream agents obtain their scope by having the orchestrator `Read` the appropriate file and inject its contents into the `{ONTOLOGY_SCOPE}` placeholder before spawning.
+After writing the file, the orchestrator MAY discard the in-memory scope block data. Downstream agents obtain their scope by having the orchestrator `Read` the file and inject its contents into the `{ONTOLOGY_SCOPE}` placeholder before spawning.
 
 **Backward compatibility:** If the files do not exist at read time (e.g., older session, fast-track skip), the orchestrator injects: `{ONTOLOGY_SCOPE}` = "N/A — ontology scope files not found. Analyze using available evidence only."
 
@@ -315,4 +293,3 @@ After writing both files, the orchestrator MAY discard the in-memory scope block
 - [ ] Phase A complete: ontology-docs checked, MCP data sources selected (or skipped), external sources collected (or skipped), pool confirmed
 - [ ] `{STATE_DIR}/ontology-catalog.md` written with Pool Catalog
 - [ ] `{STATE_DIR}/ontology-scope-analyst.md` written with analyst scope block
-- [ ] `{STATE_DIR}/ontology-scope-da.md` written with DA scope block

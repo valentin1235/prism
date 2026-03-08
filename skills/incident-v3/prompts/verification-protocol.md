@@ -59,8 +59,8 @@ mcp__prism__prism_score(
 4. **Check threshold:**
    - `weighted_total > 0.8` → **PASS** — proceed to step 4
    - `question = "INTERVIEW_COMPLETE"` → **PASS** — proceed to step 4
-   - `weighted_total ≤ 0.8` AND round < 30 → answer next question, repeat loop
-   - round ≥ 30 → **FORCE PASS** — proceed to step 4 with caveat
+   - `weighted_total ≤ 0.8` AND round < 20 → answer next question, repeat loop
+   - round ≥ 20 → **FORCE PASS** — proceed to step 4 with caveat
 
 ### 4. Report Verified Findings
 
