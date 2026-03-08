@@ -15,6 +15,7 @@ How has humanity solved its hardest problems? Diverse minds in a room, arguing u
 | **incident** | `/prism:incident` | Incident postmortem with 3-6 perspective agents + Devil's Advocate + optional Tribunal |
 | **prd** | `/prism:prd` | PRD policy conflict analysis against your reference docs via ontology-docs MCP |
 | **plan** | `/prism:plan` | Multi-perspective planning with committee debate + consensus enforcement |
+| **analyze** | `/prism:analyze` | General-purpose multi-perspective analysis with MCP-based Socratic verification + ambiguity scoring |
 
 ## Prerequisites
 
@@ -222,7 +223,115 @@ The skill will:
 
 **Output:** `plan.md` in the same directory as the input file (or CWD).
 
+### Analyze (Socratic Verification)
+
+```
+/prism:analyze
+/prism:analyze "Why is the payment queue backing up?"
+/prism:analyze path/to/error-logs.md
+```
+
+The skill will:
+
+1. **Problem Intake** — Collect description (from argument or interactive prompt)
+2. **Seed Analysis** — Opus agent actively investigates using Grep, Read, Bash, and MCP tools; evaluates severity, domain, complexity, and recurrence dimensions
+3. **Perspective Generation** — Opus agent reads seed findings and selects 2-5 optimal analysis lenses from 14 archetypes, enforcing mandatory rules (core archetype required, evidence-backed only, complexity scaling)
+4. **Perspective Approval** — User reviews, adds, removes, or modifies perspectives before proceeding
+5. **Ontology Scope Mapping** (optional) — Maps perspectives to reference docs via ontology-docs MCP
+6. **Parallel Analysis** — Spawns analyst agents in parallel, each investigating from their assigned perspective
+7. **Socratic Verification** — Each analyst self-verifies via MCP `prism_interview` loop before reporting
+8. **Synthesis & Report** — Integrates verified findings into a structured report with ambiguity scores
+
+**Socratic Interview Loop:**
+
+Each analyst, after completing their investigation, enters a Socratic verification loop powered by the `prism_interview` MCP tool:
+
+1. Analyst writes findings to `findings.json`
+2. `prism_interview` reads findings and asks probing questions
+3. Analyst answers with evidence — re-investigates using tools if needed
+4. Each answer is auto-scored on **Evidence Clarity**, **Causal Chain Clarity**, and **Recommendation Clarity**
+5. Loop continues until score threshold is met or max rounds reached
+
+```
+Analyst → write findings.json
+       → prism_interview(start) → question
+       → answer (with evidence) → score + next question
+       → answer (with evidence) → score + PASS/continue
+       → ... until PASS or max rounds
+```
+
+**Ambiguity Score Structure:**
+
+| Dimension | Weight | Measures |
+|-----------|--------|----------|
+| Evidence Clarity | 0.4 | Are findings backed by concrete evidence (file, line, log)? |
+| Causal Chain Clarity | 0.35 | Is the cause-effect chain logically sound and complete? |
+| Recommendation Clarity | 0.25 | Are recommendations specific and actionable? |
+
+Weighted total determines verdict:
+- **PASS** — Score meets threshold; findings are verified
+- **FORCE PASS** — Max rounds reached; flagged for user attention with unresolved ambiguities noted
+
+**Output:** Analysis report written to CWD, including per-analyst ambiguity scores and key Socratic Q&A clarifications.
+
+---
+
+## Inspired By
+
+Prism's multi-perspective analysis and Socratic verification approach was inspired by [Ouroboros](https://github.com/Q00/ouroboros).
+
+---
+
 ## How It Works
+
+<details>
+<summary><b>Analyze with Socratic Verification</b> (<code>/prism:analyze</code>)</summary>
+
+```mermaid
+graph TD
+    A[User Input] --> B{Prerequisite Gate}
+    B -->|Not enabled| X[Show setup guide & STOP]
+    B -->|Enabled| C[Problem Intake]
+
+    C --> D["Seed Analysis (Opus)"]
+    D -->|"severity, dimensions, research"| E["Perspective Generation (Opus)"]
+    E -->|"2-5 lenses from 14 archetypes"| F{User Approval}
+
+    F -->|Modify| E
+    F -->|Approve| G[Ontology Scope Mapping]
+    G --> H[Spawn Analysts in Parallel]
+
+    H --> I1[Analyst 1: Investigate]
+    H --> I2[Analyst 2: Investigate]
+    H --> IN[Analyst N: Investigate]
+
+    I1 --> J1["prism_interview Loop"]
+    I2 --> J2["prism_interview Loop"]
+    IN --> JN["prism_interview Loop"]
+
+    J1 -->|"score ≥ threshold → PASS"| K[Collect Verified Findings]
+    J2 -->|"score ≥ threshold → PASS"| K
+    JN -->|"score ≥ threshold → PASS"| K
+
+    K --> L[Synthesis & Report]
+    L --> M{Complete?}
+    M -->|Yes| N[Cleanup]
+    M -->|"Deeper Investigation (max 2)"| H
+
+    style D fill:#7c3aed,color:#fff
+    style E fill:#7c3aed,color:#fff
+    style I1 fill:#4a9eff,color:#fff
+    style I2 fill:#4a9eff,color:#fff
+    style IN fill:#4a9eff,color:#fff
+    style J1 fill:#ef4444,color:#fff
+    style J2 fill:#ef4444,color:#fff
+    style JN fill:#ef4444,color:#fff
+    style F fill:#f59e0b,color:#fff
+    style X fill:#dc2626,color:#fff
+    style L fill:#16a34a,color:#fff
+```
+
+</details>
 
 <details>
 <summary><b>Incident Postmortem</b> (<code>/prism:incident</code>)</summary>
