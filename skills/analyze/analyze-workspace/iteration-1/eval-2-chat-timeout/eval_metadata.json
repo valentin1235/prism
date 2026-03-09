@@ -1,0 +1,31 @@
+{
+  "eval_id": 2,
+  "eval_name": "chat-timeout-finding-verification-split",
+  "prompt": "최근 배포 이후 앱에서 채팅 메시지 전송 시 간헐적으로 504 타임아웃이 발생하고 있어. 서버 로그에서 DB connection pool exhaustion 로그도 보여. 원인 분석해줘",
+  "assertions": [
+    {
+      "text": "Phase 1에서 finding-protocol.md를 참조해야 함 (verification-protocol.md가 아님)",
+      "type": "content_check"
+    },
+    {
+      "text": "Phase 1 분석가 이름이 {perspective-id}-analyst 형식이어야 함",
+      "type": "content_check"
+    },
+    {
+      "text": "Phase 2 Stage A에서 finding 분석가를 shutdown해야 함",
+      "type": "content_check"
+    },
+    {
+      "text": "Phase 2 Stage B에서 새로운 verification 세션을 spawn해야 함",
+      "type": "content_check"
+    },
+    {
+      "text": "Verification 세션 이름이 {perspective-id}-verifier 형식이어야 함",
+      "type": "content_check"
+    },
+    {
+      "text": "Verification 세션이 findings.json을 읽고 prism_interview를 실행해야 함",
+      "type": "content_check"
+    }
+  ]
+}

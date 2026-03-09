@@ -1,0 +1,37 @@
+{
+  "eval_id": 1,
+  "config": "with_skill",
+  "expectations": [
+    {
+      "text": "Phase 1에서 finding-protocol.md를 참조해야 함 (verification-protocol.md가 아님)",
+      "passed": true,
+      "evidence": "execution-trace.md line 356-366: 'Finding protocol: skills/analyze/prompts/finding-protocol.md' concatenated to each analyst. Line 360: 'Answer: prompts/finding-protocol.md is concatenated, NOT prompts/verification-protocol.md.'"
+    },
+    {
+      "text": "Phase 1 분석가 이름이 {perspective-id}-analyst 형식이어야 함",
+      "passed": true,
+      "evidence": "execution-trace.md lines 381,419,443: root-cause-analyst, impact-analyst, data-integrity-analyst"
+    },
+    {
+      "text": "Phase 2 Stage A에서 finding 분석가를 shutdown해야 함",
+      "passed": true,
+      "evidence": "execution-trace.md lines 492-498: shutdown_request sent to all 3 finding analysts. Line 512: 'All finding sessions are now TERMINATED.'"
+    },
+    {
+      "text": "Phase 2 Stage B에서 새로운 verification 세션을 spawn해야 함",
+      "passed": true,
+      "evidence": "execution-trace.md lines 519-631: Stage B spawns 3 new verifier sessions with verification-protocol.md"
+    },
+    {
+      "text": "Verification 세션 이름이 {perspective-id}-verifier 형식이어야 함",
+      "passed": true,
+      "evidence": "execution-trace.md lines 550-554: root-cause-verifier, impact-verifier, data-integrity-verifier"
+    },
+    {
+      "text": "Verification 세션이 findings.json을 읽고 prism_interview를 실행해야 함",
+      "passed": true,
+      "evidence": "execution-trace.md lines 598-603: verifier reads findings.json, starts prism_interview, runs answer+score loop"
+    }
+  ],
+  "pass_rate": 1.0
+}

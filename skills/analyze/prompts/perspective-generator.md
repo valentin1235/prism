@@ -31,7 +31,7 @@ DESCRIPTION:
 ## STEP 1: Read Seed Analysis
 
 Read `~/.prism/state/analyze-{SHORT_ID}/seed-analysis.json` to get:
-- Severity, status, evidence types
+- Severity, status
 - Dimensions (domain, failure type, complexity, recurrence)
 - Research findings with sources
 
@@ -86,6 +86,7 @@ These rules are NON-NEGOTIABLE. Check each one and enforce:
 | Evidence-backed only | Always | MUST NOT include perspectives without supporting evidence in `research.findings` |
 | Minimum perspectives | Always | MUST have ≥2 perspectives |
 | Complexity scaling | `dimensions.complexity == "single-cause"` | 2-3 perspectives. `"multi-factor"` → 3-5 perspectives |
+| Domain-archetype match | Archetype mapping row in Step 2 matches seed analysis dimensions | The domain-specific archetype from the matched row MUST be included |
 
 After initial selection, walk through each rule and verify compliance. If any rule is violated, fix it before proceeding.
 
@@ -134,7 +135,8 @@ Write the following JSON to `~/.prism/state/analyze-{SHORT_ID}/perspectives.json
     "recurring_systems_enforced": true|false|"n/a",
     "all_evidence_backed": true,
     "min_perspectives_met": true,
-    "complexity_scaling_correct": true
+    "complexity_scaling_correct": true,
+    "domain_archetype_match_enforced": true
   },
   "selection_summary": "Brief explanation of why these perspectives were chosen and any rules that were enforced"
 }

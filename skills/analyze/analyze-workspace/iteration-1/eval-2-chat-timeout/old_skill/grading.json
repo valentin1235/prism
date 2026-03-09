@@ -1,0 +1,37 @@
+{
+  "eval_id": 2,
+  "config": "old_skill",
+  "expectations": [
+    {
+      "text": "Phase 1에서 finding-protocol.md를 참조해야 함 (verification-protocol.md가 아님)",
+      "passed": false,
+      "evidence": "Old skill uses verification-protocol.md in Phase 1 (combined finding+verification)"
+    },
+    {
+      "text": "Phase 1 분석가 이름이 {perspective-id}-analyst 형식이어야 함",
+      "passed": true,
+      "evidence": "Old skill uses {perspective-id}-analyst naming"
+    },
+    {
+      "text": "Phase 2 Stage A에서 finding 분석가를 shutdown해야 함",
+      "passed": false,
+      "evidence": "No Stage A/B. Analysts self-verify within same session."
+    },
+    {
+      "text": "Phase 2 Stage B에서 새로운 verification 세션을 spawn해야 함",
+      "passed": false,
+      "evidence": "No separate verification sessions spawned."
+    },
+    {
+      "text": "Verification 세션 이름이 {perspective-id}-verifier 형식이어야 함",
+      "passed": false,
+      "evidence": "No verifier sessions exist in old skill."
+    },
+    {
+      "text": "Verification 세션이 findings.json을 읽고 prism_interview를 실행해야 함",
+      "passed": false,
+      "evidence": "prism_interview runs in same session that wrote findings, not separate."
+    }
+  ],
+  "pass_rate": 0.167
+}

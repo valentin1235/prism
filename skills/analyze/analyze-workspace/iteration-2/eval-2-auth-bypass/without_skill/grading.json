@@ -1,0 +1,23 @@
+{
+  "eval_id": 2,
+  "eval_name": "auth-bypass-security-perspective",
+  "verdict": "FAIL",
+  "expectations": [
+    {"text": "Phase 0: uuidgen으로 short-id 생성 및 state directory 생성", "passed": false, "evidence": "No structured phase system."},
+    {"text": "Phase 0.5: seed-analyst가 oh-my-claudecode:architect + opus로 spawn", "passed": false, "evidence": "No team or sub-agent spawning."},
+    {"text": "Phase 0.5: seed-analysis.json의 dimensions.domain이 security 관련 값을 포함", "passed": false, "evidence": "No seed-analysis.json. Agent did identify security issues directly."},
+    {"text": "Phase 0.55: perspective-generator가 security 관련 dimensions을 읽고 security archetype 매핑", "passed": false, "evidence": "No perspective generation. Agent covered security aspects ad-hoc."},
+    {"text": "Phase 0.55: perspectives.json에 security perspective가 포함됨", "passed": false, "evidence": "No perspectives.json. Security analysis was done but not via structured perspective."},
+    {"text": "Phase 0.55: security perspective의 model이 opus, agent_type이 architect", "passed": false, "evidence": "No model/agent_type routing for security analysis."},
+    {"text": "Phase 0.55: perspectives.json에 rules_applied 필드가 있고 core_archetype_included=true", "passed": false, "evidence": "No mandatory rule enforcement."},
+    {"text": "Phase 0.6: AskUserQuestion으로 perspective 승인 요청 후 approved=true 추가", "passed": false, "evidence": "No user approval step."},
+    {"text": "Phase 0.7: ontology scope mapping 실행", "passed": false, "evidence": "No ontology scope mapping."},
+    {"text": "Phase 0.8: context.json에 research_summary 반영", "passed": false, "evidence": "No context.json."},
+    {"text": "Phase 1: security-analyst가 Security Lens + finding-protocol.md로 spawn", "passed": false, "evidence": "No structured Security Lens analyst. Single agent found auth bugs directly."},
+    {"text": "Phase 1: findings.json에 analyst, findings[] 필드 작성", "passed": false, "evidence": "No structured findings.json."},
+    {"text": "Phase 2A: finding 분석가 shutdown 후 TaskOutput으로 drain", "passed": false, "evidence": "No Phase 2A."},
+    {"text": "Phase 2B: verifier가 findings.json을 읽은 후 prism_interview 실행", "passed": false, "evidence": "No Socratic verification."},
+    {"text": "Phase 2B: analyst-findings.md 통합", "passed": false, "evidence": "No compiled findings."},
+    {"text": "Phase 3: report.md 템플릿 기반 리포트 생성", "passed": false, "evidence": "Free-form markdown with findings, not template-based report."}
+  ]
+}

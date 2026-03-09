@@ -1,0 +1,17 @@
+{
+  "skill_name": "prism-analyze",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "우리 podo-backend에서 결제 완료 후 포인트 적립이 안 되는 이슈가 발생했어. Sentry에 NullPointerException이 찍히고 있어. 분석해줘",
+      "expected_output": "Phase 1에서 finding-protocol.md를 사용해 분석가를 spawn하고, Phase 2 Stage A에서 findings 수집 후 shutdown, Stage B에서 verification 세션을 별도로 spawn해야 함",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "최근 배포 이후 앱에서 채팅 메시지 전송 시 간헐적으로 504 타임아웃이 발생하고 있어. 서버 로그에서 DB connection pool exhaustion 로그도 보여. 원인 분석해줘",
+      "expected_output": "여러 perspective의 분석가가 finding session과 verification session을 분리해서 실행해야 함. 각 분석가의 findings.json이 먼저 생성되고, 그 후 새 세션에서 prism_interview가 실행됨",
+      "files": []
+    }
+  ]
+}

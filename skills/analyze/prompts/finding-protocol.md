@@ -1,5 +1,11 @@
 # Analyst Protocol — Finding Phase
 
+## Perspective-Specific Questions
+
+{KEY_QUESTIONS}
+
+Answer these questions in addition to your archetype tasks. They are grounded in the seed analyst's research findings and target this specific case.
+
 ## Data Source Constraint
 
 You MUST only use data sources listed in the "Reference Documents" section above. Do NOT use `ToolSearch` to discover or call MCP servers not in your Reference Documents. If a data source is not listed there, it was not selected for this analysis and MUST NOT be used.

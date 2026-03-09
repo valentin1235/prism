@@ -1,0 +1,102 @@
+{
+  "skill_name": "prism-analyze",
+  "iteration": 1,
+  "configurations": [
+    {
+      "name": "with_skill",
+      "label": "New Skill (Session Split)",
+      "results": [
+        {
+          "eval_id": 1,
+          "eval_name": "payment-points-finding-verification-split",
+          "pass_rate": 1.0,
+          "total_tokens": 47316,
+          "duration_seconds": 176.6,
+          "assertions": [
+            {"text": "Phase 1에서 finding-protocol.md 참조", "passed": true},
+            {"text": "분석가 이름 {perspective-id}-analyst", "passed": true},
+            {"text": "Stage A에서 finding 분석가 shutdown", "passed": true},
+            {"text": "Stage B에서 새 verification 세션 spawn", "passed": true},
+            {"text": "Verifier 이름 {perspective-id}-verifier", "passed": true},
+            {"text": "Verifier가 findings.json 읽고 prism_interview 실행", "passed": true}
+          ]
+        },
+        {
+          "eval_id": 2,
+          "eval_name": "chat-timeout-finding-verification-split",
+          "pass_rate": 1.0,
+          "total_tokens": 51241,
+          "duration_seconds": 163.4,
+          "assertions": [
+            {"text": "Phase 1에서 finding-protocol.md 참조", "passed": true},
+            {"text": "분석가 이름 {perspective-id}-analyst", "passed": true},
+            {"text": "Stage A에서 finding 분석가 shutdown", "passed": true},
+            {"text": "Stage B에서 새 verification 세션 spawn", "passed": true},
+            {"text": "Verifier 이름 {perspective-id}-verifier", "passed": true},
+            {"text": "Verifier가 findings.json 읽고 prism_interview 실행", "passed": true}
+          ]
+        }
+      ],
+      "aggregate": {
+        "mean_pass_rate": 1.0,
+        "stddev_pass_rate": 0.0,
+        "mean_tokens": 49278.5,
+        "mean_duration_seconds": 170.0
+      }
+    },
+    {
+      "name": "old_skill",
+      "label": "Old Skill (Single Session)",
+      "results": [
+        {
+          "eval_id": 1,
+          "eval_name": "payment-points-finding-verification-split",
+          "pass_rate": 0.167,
+          "total_tokens": 30575,
+          "duration_seconds": 117.8,
+          "assertions": [
+            {"text": "Phase 1에서 finding-protocol.md 참조", "passed": false},
+            {"text": "분석가 이름 {perspective-id}-analyst", "passed": true},
+            {"text": "Stage A에서 finding 분석가 shutdown", "passed": false},
+            {"text": "Stage B에서 새 verification 세션 spawn", "passed": false},
+            {"text": "Verifier 이름 {perspective-id}-verifier", "passed": false},
+            {"text": "Verifier가 findings.json 읽고 prism_interview 실행", "passed": false}
+          ]
+        },
+        {
+          "eval_id": 2,
+          "eval_name": "chat-timeout-finding-verification-split",
+          "pass_rate": 0.167,
+          "total_tokens": 43603,
+          "duration_seconds": 146.7,
+          "assertions": [
+            {"text": "Phase 1에서 finding-protocol.md 참조", "passed": false},
+            {"text": "분석가 이름 {perspective-id}-analyst", "passed": true},
+            {"text": "Stage A에서 finding 분석가 shutdown", "passed": false},
+            {"text": "Stage B에서 새 verification 세션 spawn", "passed": false},
+            {"text": "Verifier 이름 {perspective-id}-verifier", "passed": false},
+            {"text": "Verifier가 findings.json 읽고 prism_interview 실행", "passed": false}
+          ]
+        }
+      ],
+      "aggregate": {
+        "mean_pass_rate": 0.167,
+        "stddev_pass_rate": 0.0,
+        "mean_tokens": 37089.0,
+        "mean_duration_seconds": 132.3
+      }
+    }
+  ],
+  "delta": {
+    "pass_rate": "+83.3%",
+    "tokens": "+32.9% (expected: new skill spawns 2x sessions per analyst)",
+    "duration": "+28.5% (expected: sequential Stage A→B adds overhead)"
+  },
+  "analyst_observations": [
+    "New skill achieves 100% pass rate on all 6 session-split assertions across both test cases",
+    "Old skill only passes 1/6 assertions (analyst naming convention, which didn't change)",
+    "Token increase (~33%) is expected: each analyst perspective now runs 2 sessions instead of 1",
+    "Duration increase (~29%) is expected due to Stage A→B sequential flow (findings collect → shutdown → verification spawn)",
+    "The token/time overhead is a deliberate tradeoff for hallucination detection quality — verification agent cannot 'remember' unfounded claims from the finding session"
+  ]
+}

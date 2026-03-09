@@ -1,0 +1,37 @@
+{
+  "eval_id": 2,
+  "config": "with_skill",
+  "expectations": [
+    {
+      "text": "Phase 1에서 finding-protocol.md를 참조해야 함 (verification-protocol.md가 아님)",
+      "passed": true,
+      "evidence": "execution-trace.md lines 245-301: finding-protocol.md concatenated to all 4 analysts. Line 300: 'Do NOT run self-verification (prism_interview) -- that happens in a separate session.'"
+    },
+    {
+      "text": "Phase 1 분석가 이름이 {perspective-id}-analyst 형식이어야 함",
+      "passed": true,
+      "evidence": "execution-trace.md lines 261,268,278,288: root-cause-analyst, performance-analyst, systems-analyst, timeline-analyst"
+    },
+    {
+      "text": "Phase 2 Stage A에서 finding 분석가를 shutdown해야 함",
+      "passed": true,
+      "evidence": "execution-trace.md lines 345-353: shutdown_request sent to all 4 finding analysts. Line 362: 'All finding sessions are TERMINATED before Stage B begins.'"
+    },
+    {
+      "text": "Phase 2 Stage B에서 새로운 verification 세션을 spawn해야 함",
+      "passed": true,
+      "evidence": "execution-trace.md lines 366-419: Stage B spawns 4 new verifier sessions with verification-protocol.md"
+    },
+    {
+      "text": "Verification 세션 이름이 {perspective-id}-verifier 형식이어야 함",
+      "passed": true,
+      "evidence": "execution-trace.md lines 517-522: root-cause-verifier, performance-verifier, systems-verifier, timeline-verifier"
+    },
+    {
+      "text": "Verification 세션이 findings.json을 읽고 prism_interview를 실행해야 함",
+      "passed": true,
+      "evidence": "execution-trace.md lines 421-426: verifier reads findings.json from disk, starts prism_interview, runs answer+score loop"
+    }
+  ],
+  "pass_rate": 1.0
+}

@@ -1,0 +1,23 @@
+{
+  "eval_id": 2,
+  "eval_name": "auth-bypass-security-perspective",
+  "prompt": "우리 앱에서 비로그인 상태로 프리미엄 콘텐츠에 접근 가능한 보안 이슈가 발견됐어. 특정 API 엔드포인트에서 JWT 검증을 건너뛰는 것 같아. 분석해줘",
+  "assertions": [
+    {"text": "Phase 0: uuidgen으로 short-id 생성 및 state directory 생성", "type": "workflow_gate"},
+    {"text": "Phase 0.5: seed-analyst가 oh-my-claudecode:architect + opus로 spawn", "type": "workflow_gate"},
+    {"text": "Phase 0.5: seed-analysis.json의 dimensions.domain이 security 관련 값을 포함", "type": "field_contract"},
+    {"text": "Phase 0.55: perspective-generator가 seed-analysis.json의 security 관련 dimensions을 읽고 security archetype 매핑", "type": "data_flow"},
+    {"text": "Phase 0.55: perspectives.json에 security perspective가 포함됨 (id='security')", "type": "field_contract"},
+    {"text": "Phase 0.55: security perspective의 model이 opus, agent_type이 architect (archetype table 일치)", "type": "field_contract"},
+    {"text": "Phase 0.55: perspectives.json에 rules_applied 필드가 있고 core_archetype_included=true", "type": "field_contract"},
+    {"text": "Phase 0.6: AskUserQuestion으로 perspective 승인 요청 후 perspectives.json에 approved=true 추가", "type": "data_flow"},
+    {"text": "Phase 0.7: ontology scope mapping 실행 (prism_docs_roots 호출 시도)", "type": "workflow_gate"},
+    {"text": "Phase 0.8: context.json에 research_summary가 seed-analysis.json의 research 데이터를 반영", "type": "data_flow"},
+    {"text": "Phase 1: security-analyst가 extended-archetypes.md의 Security Lens 섹션 + finding-protocol.md로 spawn", "type": "data_flow"},
+    {"text": "Phase 1: 각 analyst가 perspectives/{perspective-id}/findings.json에 analyst, findings[] 필드 작성", "type": "field_contract"},
+    {"text": "Phase 2A: finding 분석가 shutdown 후 TaskOutput으로 drain", "type": "workflow_gate"},
+    {"text": "Phase 2B: verifier가 findings.json을 읽은 후 prism_interview 실행", "type": "data_flow"},
+    {"text": "Phase 2B: analyst-findings.md에 모든 perspective의 검증 결과 통합", "type": "field_contract"},
+    {"text": "Phase 3: report.md 템플릿의 모든 섹션이 analyst-findings.md 기반으로 채워짐", "type": "data_flow"}
+  ]
+}

@@ -68,7 +68,7 @@ Evaluate across 5 dimensions using your research findings (NOT just the user des
 | Dimension | Values |
 |-----------|--------|
 | Domain | infra / app / data / security / network |
-| Failure type | crash / degradation / data loss / breach / misconfig |
+| Failure type | crash / degradation / data_loss / breach / misconfig |
 | Evidence available | logs / metrics / code diffs / traces |
 | Complexity | single-cause / multi-factor |
 | Recurrence | first-time / recurring |
@@ -83,7 +83,6 @@ Write the following JSON to `~/.prism/state/analyze-{SHORT_ID}/seed-analysis.jso
 {
   "severity": "SEV1|SEV2|SEV3|SEV4",
   "status": "Active|Mitigated|Resolved|Recurring",
-  "evidence_types": ["code diffs", "git history", "source code", "logs", "metrics", "traces"],
   "dimensions": {
     "domain": "infra|app|data|security|network",
     "failure_type": "crash|degradation|data_loss|breach|misconfig",

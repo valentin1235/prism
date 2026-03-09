@@ -1,0 +1,25 @@
+{
+  "eval_id": 1,
+  "eval_name": "api-slowquery-full-workflow",
+  "prompt": "우리 서비스에서 API 응답이 평균 3초 이상 걸리고, DB 슬로우쿼리 로그가 대량 발생하고 있어. 특히 /api/v1/rooms 엔드포인트가 심각해. 최근 인덱스 관련 마이그레이션을 했는데 그 이후부터 발생한 것 같아. 분석해줘",
+  "assertions": [
+    {"text": "Phase 0: uuidgen으로 short-id 생성 및 state directory 생성", "type": "workflow_gate"},
+    {"text": "Phase 0.5: seed-analyst가 oh-my-claudecode:architect + opus로 spawn", "type": "workflow_gate"},
+    {"text": "Phase 0.5: seed-analysis.json에 severity, status, dimensions, research 필드 모두 포함", "type": "field_contract"},
+    {"text": "Phase 0.55: perspective-generator가 seed-analysis.json을 읽고 dimensions.complexity로 perspective 수 결정", "type": "data_flow"},
+    {"text": "Phase 0.55: perspectives.json의 각 perspective에 id, name, scope, key_questions, model, agent_type, rationale 필드 존재", "type": "field_contract"},
+    {"text": "Phase 0.55: perspectives.json에 rules_applied 필드가 있고 core_archetype_included=true", "type": "field_contract"},
+    {"text": "Phase 0.6: AskUserQuestion으로 perspective 승인 요청 후 perspectives.json에 approved=true 추가", "type": "data_flow"},
+    {"text": "Phase 0.7: ontology scope mapping 실행 (prism_docs_roots 호출 시도)", "type": "workflow_gate"},
+    {"text": "Phase 0.8: context.json에 research_summary가 seed-analysis.json의 research 데이터를 반영", "type": "data_flow"},
+    {"text": "Phase 1: perspectives.json의 각 perspective.model과 agent_type이 spawn 파라미터에 그대로 사용됨", "type": "data_flow"},
+    {"text": "Phase 1: analyst 프롬프트에 context.json의 summary가 {CONTEXT}로, ontology-scope.json이 {ONTOLOGY_SCOPE}로 주입됨", "type": "data_flow"},
+    {"text": "Phase 1: 분석가가 finding-protocol.md 기반으로 spawn (verification-protocol 아님)", "type": "workflow_gate"},
+    {"text": "Phase 1: 각 analyst가 perspectives/{perspective-id}/findings.json에 analyst, findings[] 필드 작성", "type": "field_contract"},
+    {"text": "Phase 2A: finding 분석가 shutdown 후 TaskOutput으로 drain", "type": "workflow_gate"},
+    {"text": "Phase 2B: verifier가 findings.json을 읽은 후 prism_interview 실행", "type": "data_flow"},
+    {"text": "Phase 2B: verified-findings-{perspective-id}.md 파일이 생성됨", "type": "field_contract"},
+    {"text": "Phase 2B: analyst-findings.md에 모든 perspective의 검증 결과 통합", "type": "field_contract"},
+    {"text": "Phase 3: report.md 템플릿의 모든 섹션이 analyst-findings.md 기반으로 채워짐", "type": "data_flow"}
+  ]
+}

@@ -1,0 +1,264 @@
+{
+  "skill_name": "prism-analyze",
+  "iteration": 2,
+  "test_focus": "Full workflow trace (Phase 0-4) + field contract + data flow verification",
+  "configurations": [
+    {
+      "name": "with_skill",
+      "label": "With Skill (v4.1.0 Full Workflow)",
+      "results": [
+        {
+          "eval_id": 1,
+          "eval_name": "api-slowquery-full-workflow",
+          "pass_rate": 1.0,
+          "total_tokens": 69504,
+          "duration_seconds": 320.6,
+          "assertions": [
+            {"text": "Phase 0: uuidgen + state dir", "passed": true},
+            {"text": "Phase 0.5: seed-analyst architect+opus", "passed": true},
+            {"text": "Phase 0.5: seed-analysis.json fields complete", "passed": true},
+            {"text": "Phase 0.55: complexity-based perspective count", "passed": true},
+            {"text": "Phase 0.55: perspectives.json field completeness", "passed": true},
+            {"text": "Phase 0.55: rules_applied + core_archetype", "passed": true},
+            {"text": "Phase 0.6: AskUserQuestion + approved=true", "passed": true},
+            {"text": "Phase 0.7: ontology scope mapping", "passed": true},
+            {"text": "Phase 0.8: context.json ← seed-analysis.json", "passed": true},
+            {"text": "Phase 1: model/agent_type from perspectives.json", "passed": true},
+            {"text": "Phase 1: {CONTEXT} + {ONTOLOGY_SCOPE} injection", "passed": true},
+            {"text": "Phase 1: finding-protocol.md (not verification)", "passed": true},
+            {"text": "Phase 1: findings.json schema correct", "passed": true},
+            {"text": "Phase 2A: shutdown + drain", "passed": true},
+            {"text": "Phase 2B: verifier + prism_interview", "passed": true},
+            {"text": "Phase 2B: verified-findings-{id}.md", "passed": true},
+            {"text": "Phase 2B: analyst-findings.md compiled", "passed": true},
+            {"text": "Phase 3: report.md template filled", "passed": true}
+          ],
+          "issues": {"count": 8, "blocking": 0}
+        },
+        {
+          "eval_id": 2,
+          "eval_name": "auth-bypass-security-perspective",
+          "pass_rate": 1.0,
+          "total_tokens": 60213,
+          "duration_seconds": 279.0,
+          "assertions": [
+            {"text": "Phase 0: uuidgen + state dir", "passed": true},
+            {"text": "Phase 0.5: seed-analyst architect+opus", "passed": true},
+            {"text": "Phase 0.5: dimensions.domain=security", "passed": true},
+            {"text": "Phase 0.55: security archetype mapping", "passed": true},
+            {"text": "Phase 0.55: security perspective included", "passed": true},
+            {"text": "Phase 0.55: security opus/architect consistent", "passed": true},
+            {"text": "Phase 0.55: rules_applied + core_archetype", "passed": true},
+            {"text": "Phase 0.6: AskUserQuestion + approved=true", "passed": true},
+            {"text": "Phase 0.7: ontology scope mapping", "passed": true},
+            {"text": "Phase 0.8: context.json ← seed-analysis.json", "passed": true},
+            {"text": "Phase 1: Security Lens + finding-protocol", "passed": true},
+            {"text": "Phase 1: findings.json schema correct", "passed": true},
+            {"text": "Phase 2A: shutdown + drain", "passed": true},
+            {"text": "Phase 2B: verifier + prism_interview", "passed": true},
+            {"text": "Phase 2B: analyst-findings.md compiled", "passed": true},
+            {"text": "Phase 3: report.md template filled", "passed": true}
+          ],
+          "issues": {"count": 4, "blocking": 0}
+        },
+        {
+          "eval_id": 3,
+          "eval_name": "payment-mismatch-financial-perspective",
+          "pass_rate": 1.0,
+          "total_tokens": 61743,
+          "duration_seconds": 310.1,
+          "assertions": [
+            {"text": "Phase 0: uuidgen + state dir", "passed": true},
+            {"text": "Phase 0.5: seed-analyst architect+opus", "passed": true},
+            {"text": "Phase 0.5: dimensions.failure_type=data_loss", "passed": true},
+            {"text": "Phase 0.55: financial archetype mapping", "passed": true},
+            {"text": "Phase 0.55: financial perspective included", "passed": true},
+            {"text": "Phase 0.55: financial opus/architect consistent", "passed": true},
+            {"text": "Phase 0.55: rules_applied + complexity_scaling", "passed": true},
+            {"text": "Phase 0.6: AskUserQuestion + approved=true", "passed": true},
+            {"text": "Phase 0.7: ontology scope mapping", "passed": true},
+            {"text": "Phase 0.8: context.json ← seed-analysis.json", "passed": true},
+            {"text": "Phase 1: Financial Lens + finding-protocol", "passed": true},
+            {"text": "Phase 1: findings.json schema correct", "passed": true},
+            {"text": "Phase 2A: shutdown + drain", "passed": true},
+            {"text": "Phase 2B: verifier + prism_interview", "passed": true},
+            {"text": "Phase 2B: analyst-findings.md compiled", "passed": true},
+            {"text": "Phase 3: report.md template filled", "passed": true}
+          ],
+          "issues": {"count": 7, "blocking": 0}
+        }
+      ],
+      "aggregate": {
+        "mean_pass_rate": 1.0,
+        "stddev_pass_rate": 0.0,
+        "mean_tokens": 63820,
+        "stddev_tokens": 4092,
+        "mean_duration_seconds": 303.2,
+        "stddev_duration_seconds": 17.3
+      }
+    },
+    {
+      "name": "without_skill",
+      "label": "Without Skill (Baseline)",
+      "results": [
+        {
+          "eval_id": 1,
+          "eval_name": "api-slowquery-full-workflow",
+          "pass_rate": 0.0,
+          "total_tokens": 55912,
+          "duration_seconds": 146.4,
+          "assertions": [
+            {"text": "Phase 0: uuidgen + state dir", "passed": false},
+            {"text": "Phase 0.5: seed-analyst architect+opus", "passed": false},
+            {"text": "Phase 0.5: seed-analysis.json fields complete", "passed": false},
+            {"text": "Phase 0.55: complexity-based perspective count", "passed": false},
+            {"text": "Phase 0.55: perspectives.json field completeness", "passed": false},
+            {"text": "Phase 0.55: rules_applied + core_archetype", "passed": false},
+            {"text": "Phase 0.6: AskUserQuestion + approved=true", "passed": false},
+            {"text": "Phase 0.7: ontology scope mapping", "passed": false},
+            {"text": "Phase 0.8: context.json ← seed-analysis.json", "passed": false},
+            {"text": "Phase 1: model/agent_type from perspectives.json", "passed": false},
+            {"text": "Phase 1: {CONTEXT} + {ONTOLOGY_SCOPE} injection", "passed": false},
+            {"text": "Phase 1: finding-protocol.md (not verification)", "passed": false},
+            {"text": "Phase 1: findings.json schema correct", "passed": false},
+            {"text": "Phase 2A: shutdown + drain", "passed": false},
+            {"text": "Phase 2B: verifier + prism_interview", "passed": false},
+            {"text": "Phase 2B: verified-findings-{id}.md", "passed": false},
+            {"text": "Phase 2B: analyst-findings.md compiled", "passed": false},
+            {"text": "Phase 3: report.md template filled", "passed": false}
+          ]
+        },
+        {
+          "eval_id": 2,
+          "eval_name": "auth-bypass-security-perspective",
+          "pass_rate": 0.0,
+          "total_tokens": 76446,
+          "duration_seconds": 148.7,
+          "assertions": [
+            {"text": "Phase 0: uuidgen + state dir", "passed": false},
+            {"text": "Phase 0.5: seed-analyst architect+opus", "passed": false},
+            {"text": "Phase 0.5: dimensions.domain=security", "passed": false},
+            {"text": "Phase 0.55: security archetype mapping", "passed": false},
+            {"text": "Phase 0.55: security perspective included", "passed": false},
+            {"text": "Phase 0.55: security opus/architect consistent", "passed": false},
+            {"text": "Phase 0.55: rules_applied + core_archetype", "passed": false},
+            {"text": "Phase 0.6: AskUserQuestion + approved=true", "passed": false},
+            {"text": "Phase 0.7: ontology scope mapping", "passed": false},
+            {"text": "Phase 0.8: context.json ← seed-analysis.json", "passed": false},
+            {"text": "Phase 1: Security Lens + finding-protocol", "passed": false},
+            {"text": "Phase 1: findings.json schema correct", "passed": false},
+            {"text": "Phase 2A: shutdown + drain", "passed": false},
+            {"text": "Phase 2B: verifier + prism_interview", "passed": false},
+            {"text": "Phase 2B: analyst-findings.md compiled", "passed": false},
+            {"text": "Phase 3: report.md template filled", "passed": false}
+          ]
+        },
+        {
+          "eval_id": 3,
+          "eval_name": "payment-mismatch-financial-perspective",
+          "pass_rate": 0.0,
+          "total_tokens": 75526,
+          "duration_seconds": 187.7,
+          "assertions": [
+            {"text": "Phase 0: uuidgen + state dir", "passed": false},
+            {"text": "Phase 0.5: seed-analyst architect+opus", "passed": false},
+            {"text": "Phase 0.5: dimensions.failure_type=data_loss", "passed": false},
+            {"text": "Phase 0.55: financial archetype mapping", "passed": false},
+            {"text": "Phase 0.55: financial perspective included", "passed": false},
+            {"text": "Phase 0.55: financial opus/architect consistent", "passed": false},
+            {"text": "Phase 0.55: rules_applied + complexity_scaling", "passed": false},
+            {"text": "Phase 0.6: AskUserQuestion + approved=true", "passed": false},
+            {"text": "Phase 0.7: ontology scope mapping", "passed": false},
+            {"text": "Phase 0.8: context.json ← seed-analysis.json", "passed": false},
+            {"text": "Phase 1: Financial Lens + finding-protocol", "passed": false},
+            {"text": "Phase 1: findings.json schema correct", "passed": false},
+            {"text": "Phase 2A: shutdown + drain", "passed": false},
+            {"text": "Phase 2B: verifier + prism_interview", "passed": false},
+            {"text": "Phase 2B: analyst-findings.md compiled", "passed": false},
+            {"text": "Phase 3: report.md template filled", "passed": false}
+          ]
+        }
+      ],
+      "aggregate": {
+        "mean_pass_rate": 0.0,
+        "stddev_pass_rate": 0.0,
+        "mean_tokens": 69295,
+        "stddev_tokens": 9063,
+        "mean_duration_seconds": 160.9,
+        "stddev_duration_seconds": 18.6
+      }
+    }
+  ],
+  "delta": {
+    "pass_rate": "+100.0% (0.0% → 100.0%)",
+    "tokens": "-7.9% (with_skill uses fewer tokens on average despite deeper analysis)",
+    "duration": "+88.5% (303.2s vs 160.9s — expected: skill reads 9+ prompt files before trace)"
+  },
+  "cross_eval_issues": [
+    {
+      "id": "CROSS-1",
+      "severity": "LOW",
+      "title": "report_language 필드 미소비",
+      "description": "context.json에 report_language 필드가 작성되지만 Phase 3에서 명시적으로 참조하지 않음",
+      "found_in": ["eval-1", "eval-2", "eval-3"],
+      "fix": "later-phases.md Step 3.2에 'context.json.report_language에 지정된 언어로 리포트 작성' 추가"
+    },
+    {
+      "id": "CROSS-2",
+      "severity": "LOW",
+      "title": "key_questions가 analyst 프롬프트에 주입되지 않음",
+      "description": "perspective-generator가 생성한 key_questions가 Phase 1 analyst 프롬프트의 placeholder로 주입되지 않음",
+      "found_in": ["eval-1", "eval-2"],
+      "fix": "{KEY_QUESTIONS} placeholder를 finding-protocol.md에 추가하거나, archetype prompt에 주입"
+    },
+    {
+      "id": "CROSS-3",
+      "severity": "LOW",
+      "title": "evidence_types vs dimensions.evidence_available 중복",
+      "description": "seed-analysis.json에 evidence_types(top-level)와 dimensions.evidence_available이 중복. 후자만 downstream에서 사용",
+      "found_in": ["eval-2"],
+      "fix": "evidence_types 필드 제거 또는 용도 명시"
+    },
+    {
+      "id": "CROSS-4",
+      "severity": "LOW",
+      "title": "archetype 매핑이 mandatory rule이 아닌 guidance",
+      "description": "perspective-generator.md의 도메인별 archetype 매핑 테이블(Step 2)이 mandatory rules(Step 3)에 포함되지 않음",
+      "found_in": ["eval-2", "eval-3"],
+      "fix": "도메인-specific mandatory rule 추가 (예: domain==security → MUST include security perspective)"
+    },
+    {
+      "id": "CROSS-5",
+      "severity": "LOW",
+      "title": "{CONTEXT} 주입 형식 불명확",
+      "description": "context.json을 {CONTEXT}에 주입할 때 raw JSON vs formatted text 형식이 명시되지 않음",
+      "found_in": ["eval-1", "eval-3"],
+      "fix": "SKILL.md Phase 0.8 또는 Phase 1에 주입 형식 명시"
+    },
+    {
+      "id": "CROSS-6",
+      "severity": "INFO",
+      "title": "Phase 0.6에 formal exit gate 섹션 없음",
+      "description": "Phase 0.6은 사용자 승인이 implicit exit gate이나, 다른 phase와 달리 명시적 exit gate 체크리스트가 없음",
+      "found_in": ["eval-1", "eval-3"],
+      "fix": "Phase 0.6 Exit Gate 섹션 추가 (approved=true 확인)"
+    },
+    {
+      "id": "CROSS-7",
+      "severity": "INFO",
+      "title": "investigation_loops 초기값 미명시",
+      "description": "later-phases.md에서 investigation_loops 카운터를 사용하지만 context.json 초기 스키마에 포함되지 않음",
+      "found_in": ["eval-3"],
+      "fix": "Phase 0.8 context.json 스키마에 investigation_loops: 0 추가"
+    }
+  ],
+  "analyst_observations": [
+    "with_skill은 3개 시나리오 모두 18/18, 16/16, 16/16 assertion PASS (100%)",
+    "without_skill은 모든 구조적 워크플로우 assertion에서 0% PASS — 스킬 없이는 multi-agent 오케스트레이션, 세션 분리, Socratic 검증이 전혀 실행되지 않음",
+    "with_skill이 토큰을 약 8% 적게 사용하면서 더 체계적인 분석 수행 (63.8K vs 69.3K)",
+    "시간은 약 88% 더 소요 (303s vs 161s) — 9개 이상 프롬프트 파일을 읽고 전체 phase를 추적하기 때문",
+    "7개 cross-eval 이슈 발견: 모두 LOW/INFO 수준으로 실행 차단(blocking) 없음",
+    "가장 영향력 있는 이슈: report_language 미소비 (CROSS-1) — 한국어 사용자가 영어 리포트를 받을 수 있음",
+    "archetype 매핑 일관성: 3개 시나리오 모두에서 perspective-generator.md, archetype prompt files, SKILL.md spawn table 간 model/agent_type 100% 일치 확인"
+  ]
+}

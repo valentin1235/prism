@@ -1,0 +1,23 @@
+{
+  "eval_id": 3,
+  "eval_name": "payment-mismatch-financial-perspective",
+  "verdict": "FAIL",
+  "expectations": [
+    {"text": "Phase 0: uuidgen으로 short-id 생성 및 state directory 생성", "passed": false, "evidence": "No structured phase system."},
+    {"text": "Phase 0.5: seed-analyst가 oh-my-claudecode:architect + opus로 spawn", "passed": false, "evidence": "No team or sub-agent spawning."},
+    {"text": "Phase 0.5: seed-analysis.json의 dimensions.failure_type이 data_loss 관련 값 포함", "passed": false, "evidence": "No seed-analysis.json. Agent identified payment issues but not via structured dimensions."},
+    {"text": "Phase 0.55: perspective-generator가 financial archetype 매핑", "passed": false, "evidence": "No perspective generation phase."},
+    {"text": "Phase 0.55: perspectives.json에 financial perspective가 포함됨", "passed": false, "evidence": "No perspectives.json. Financial analysis done ad-hoc."},
+    {"text": "Phase 0.55: financial perspective의 model이 opus, agent_type이 architect", "passed": false, "evidence": "No model routing."},
+    {"text": "Phase 0.55: rules_applied와 complexity_scaling_correct 필드 존재", "passed": false, "evidence": "No mandatory rule framework."},
+    {"text": "Phase 0.6: AskUserQuestion으로 perspective 승인 요청", "passed": false, "evidence": "No user approval step."},
+    {"text": "Phase 0.7: ontology scope mapping 실행", "passed": false, "evidence": "No ontology scope mapping."},
+    {"text": "Phase 0.8: context.json에 research_summary 반영", "passed": false, "evidence": "No context.json."},
+    {"text": "Phase 1: financial-analyst가 Financial Lens + finding-protocol.md로 spawn", "passed": false, "evidence": "No Financial Lens analyst. Critical finding: discovered Apple IAP doesn't exist in codebase (Portone instead)."},
+    {"text": "Phase 1: findings.json에 analyst, findings[] 필드 작성", "passed": false, "evidence": "No structured findings.json."},
+    {"text": "Phase 2A: finding 분석가 shutdown 후 TaskOutput으로 drain", "passed": false, "evidence": "No Phase 2A."},
+    {"text": "Phase 2B: verifier가 findings.json을 읽은 후 prism_interview 실행", "passed": false, "evidence": "No Socratic verification."},
+    {"text": "Phase 2B: analyst-findings.md 통합", "passed": false, "evidence": "No compiled findings."},
+    {"text": "Phase 3: report.md 템플릿 기반 리포트 생성", "passed": false, "evidence": "Free-form markdown. Self-assessment noted lack of systematic verification."}
+  ]
+}

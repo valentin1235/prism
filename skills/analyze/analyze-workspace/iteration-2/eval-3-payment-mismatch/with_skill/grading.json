@@ -1,0 +1,25 @@
+{
+  "eval_id": 3,
+  "eval_name": "payment-mismatch-financial-perspective",
+  "verdict": "PASS",
+  "expectations": [
+    {"text": "Phase 0: uuidgen으로 short-id 생성 및 state directory 생성", "passed": true, "evidence": "Trace confirms Bash(uuidgen) and mkdir -p in Phase 0.2"},
+    {"text": "Phase 0.5: seed-analyst가 oh-my-claudecode:architect + opus로 spawn", "passed": true, "evidence": "Trace confirms oh-my-claudecode:architect + opus spawn config"},
+    {"text": "Phase 0.5: seed-analysis.json의 dimensions.failure_type이 data_loss 관련 값 포함", "passed": true, "evidence": "Expected output shows domain:'data', failure_type:'data_loss' for payment amount mismatch"},
+    {"text": "Phase 0.55: perspective-generator가 seed-analysis.json의 payment/data 관련 findings를 읽고 financial archetype 매핑", "passed": true, "evidence": "Trace shows archetype mapping: 'Payment discrepancy, billing error, revenue data mismatch -> financial + data-integrity + root-cause'"},
+    {"text": "Phase 0.55: perspectives.json에 financial perspective가 포함됨 (id='financial')", "passed": true, "evidence": "Expected output includes financial (opus/architect), data-integrity (opus/architect), root-cause (opus/architect)"},
+    {"text": "Phase 0.55: financial perspective의 model이 opus, agent_type이 architect (archetype table 일치)", "passed": true, "evidence": "Cross-verified: perspective-generator.md:73, extended-archetypes.md:392, SKILL.md spawn table - all agree on opus/architect"},
+    {"text": "Phase 0.55: perspectives.json에 rules_applied와 complexity_scaling_correct 필드 존재", "passed": true, "evidence": "Trace shows rules_applied with complexity_scaling_correct:true (multi-factor -> 3-5 perspectives, got 3)"},
+    {"text": "Phase 0.6: AskUserQuestion으로 perspective 승인 요청 후 perspectives.json에 approved=true 추가", "passed": true, "evidence": "Trace shows user approval flow with perspectives.json update"},
+    {"text": "Phase 0.7: ontology scope mapping 실행 (prism_docs_roots 호출 시도)", "passed": true, "evidence": "Trace shows Phase 0.7 execution with optional mode"},
+    {"text": "Phase 0.8: context.json에 research_summary가 seed-analysis.json의 research 데이터를 반영", "passed": true, "evidence": "Trace shows context.json sourced from seed-analysis.json research findings"},
+    {"text": "Phase 1: financial-analyst가 extended-archetypes.md의 Financial Lens 섹션 + finding-protocol.md로 spawn", "passed": true, "evidence": "Trace shows financial-analyst spawn with Financial Lens archetype (5 tasks: transaction reconciliation, payment pipeline trace, audit trail, compliance, reconciliation infrastructure) + finding-protocol.md"},
+    {"text": "Phase 1: 각 analyst가 perspectives/{perspective-id}/findings.json에 analyst, findings[] 필드 작성", "passed": true, "evidence": "Trace confirms findings.json schema with analyst and findings[] fields for each perspective"},
+    {"text": "Phase 2A: finding 분석가 shutdown 후 TaskOutput으로 drain", "passed": true, "evidence": "Trace shows Stage A shutdown + drain pattern"},
+    {"text": "Phase 2B: verifier가 findings.json을 읽은 후 prism_interview 실행", "passed": true, "evidence": "Trace shows verification-protocol steps executed for each verifier"},
+    {"text": "Phase 2B: analyst-findings.md에 모든 perspective의 검증 결과 통합", "passed": true, "evidence": "Trace shows compilation with verification scores summary"},
+    {"text": "Phase 3: report.md 템플릿의 모든 섹션이 analyst-findings.md 기반으로 채워짐", "passed": true, "evidence": "Trace confirms report generation. Notes: financial/data-integrity scope overlap identified as minor concern"}
+  ],
+  "issues_found": 7,
+  "issues_severity": {"low": 5, "info": 2}
+}

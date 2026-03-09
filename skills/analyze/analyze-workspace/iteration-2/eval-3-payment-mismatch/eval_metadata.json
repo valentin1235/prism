@@ -1,0 +1,23 @@
+{
+  "eval_id": 3,
+  "eval_name": "payment-mismatch-financial-perspective",
+  "prompt": "결제 시스템에서 Apple IAP 영수증 금액과 DB에 저장된 결제 금액이 불일치하는 케이스가 발견됐어. 약 200건 정도 되고 모두 최근 1주일 이내에 발생했어. 환불 처리도 꼬여있을 수 있어. 분석해줘",
+  "assertions": [
+    {"text": "Phase 0: uuidgen으로 short-id 생성 및 state directory 생성", "type": "workflow_gate"},
+    {"text": "Phase 0.5: seed-analyst가 oh-my-claudecode:architect + opus로 spawn", "type": "workflow_gate"},
+    {"text": "Phase 0.5: seed-analysis.json의 dimensions.failure_type이 data_loss 관련 값 포함", "type": "field_contract"},
+    {"text": "Phase 0.55: perspective-generator가 seed-analysis.json의 payment/data 관련 findings를 읽고 financial archetype 매핑", "type": "data_flow"},
+    {"text": "Phase 0.55: perspectives.json에 financial perspective가 포함됨 (id='financial')", "type": "field_contract"},
+    {"text": "Phase 0.55: financial perspective의 model이 opus, agent_type이 architect (archetype table 일치)", "type": "field_contract"},
+    {"text": "Phase 0.55: perspectives.json에 rules_applied와 complexity_scaling_correct 필드 존재", "type": "field_contract"},
+    {"text": "Phase 0.6: AskUserQuestion으로 perspective 승인 요청 후 perspectives.json에 approved=true 추가", "type": "data_flow"},
+    {"text": "Phase 0.7: ontology scope mapping 실행 (prism_docs_roots 호출 시도)", "type": "workflow_gate"},
+    {"text": "Phase 0.8: context.json에 research_summary가 seed-analysis.json의 research 데이터를 반영", "type": "data_flow"},
+    {"text": "Phase 1: financial-analyst가 extended-archetypes.md의 Financial Lens 섹션 + finding-protocol.md로 spawn", "type": "data_flow"},
+    {"text": "Phase 1: 각 analyst가 perspectives/{perspective-id}/findings.json에 analyst, findings[] 필드 작성", "type": "field_contract"},
+    {"text": "Phase 2A: finding 분석가 shutdown 후 TaskOutput으로 drain", "type": "workflow_gate"},
+    {"text": "Phase 2B: verifier가 findings.json을 읽은 후 prism_interview 실행", "type": "data_flow"},
+    {"text": "Phase 2B: analyst-findings.md에 모든 perspective의 검증 결과 통합", "type": "field_contract"},
+    {"text": "Phase 3: report.md 템플릿의 모든 섹션이 analyst-findings.md 기반으로 채워짐", "type": "data_flow"}
+  ]
+}
