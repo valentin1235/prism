@@ -32,9 +32,9 @@ Fill all sections. Write "N/A" if truly irrelevant — do NOT leave sections emp
 
 ## Socratic Verification Summary
 
-### Per-Analyst Ambiguity Scores
-| Analyst | Evidence Clarity | Causal Chain Clarity | Recommendation Clarity | Ambiguity Score | Verdict |
-|---------|-----------------|---------------------|----------------------|----------------|---------|
+### Per-Analyst Verification Scores
+| Analyst | Rounds | Weighted Total | Verdict |
+|---------|--------|---------------|---------|
 
 ### Key Clarifications from Socratic Verification Q&A
 {For each analyst, list the most important ambiguities that were resolved through Socratic questioning}

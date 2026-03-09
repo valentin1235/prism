@@ -82,7 +82,7 @@ Task(
 > Apply worker preamble from `../shared-v3/worker-preamble.md` with:
 - `{TEAM_NAME}` = `"analyze-{short-id}"`
 - `{WORKER_NAME}` = `"{perspective-id}-verifier"`
-- `{WORK_ACTION}` = `"Read your findings from ~/.prism/state/analyze-{SHORT_ID}/perspectives/{perspective-id}/findings.json. Run self-verification via MCP tools (prism_interview). Re-investigate with tools as needed to answer interview questions. Report verified findings via SendMessage to team-lead."`
+- `{WORK_ACTION}` = `"Read your findings from the path specified in your verification protocol. Run self-verification via MCP tools (prism_interview). Re-investigate with tools as needed to answer interview questions. Report verified findings via SendMessage to team-lead."`
 
 MUST replace `{CONTEXT}` from `context.json`.
 MUST replace `{ONTOLOGY_SCOPE}` by reading `ontology-scope.json` and generating a text block per Phase B of ontology-scope-mapping.md (or "N/A" if not found).
@@ -123,7 +123,7 @@ For each analyst perspective:
 After ALL verifiers are done:
 
 1. Compile all verified findings into `~/.prism/state/analyze-{short-id}/analyst-findings.md`
-2. Include ambiguity scores summary table (per perspective: perspective_id, goal, constraints, criteria, weighted_total, verdict)
+2. Include verification scores summary table (per perspective: perspective_id, rounds, weighted_total, verdict)
 3. Flag any FORCE PASS analysts for user attention
 
 ### Phase 2 Exit Gate
