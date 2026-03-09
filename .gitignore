@@ -1,4 +1,5 @@
 .omc/
 skills/incident-v3-workspace/
 skills/test-analyze/analyze-workspace/
+skills/test-analyze/test-results/
 .claude/
