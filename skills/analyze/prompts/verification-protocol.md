@@ -1,5 +1,9 @@
 # Analyst Protocol — Verification Phase
 
+## Role Clarification
+
+The archetype prompt above describes your analytical perspective and domain expertise. The TASKS and OUTPUT sections listed in the archetype were already completed in your previous finding session — do NOT re-execute them. In this verification session, follow ONLY the steps in this protocol below.
+
 ## Data Source Constraint
 
 You MUST only use data sources listed in the "Reference Documents" section above. Do NOT use `ToolSearch` to discover or call MCP servers not in your Reference Documents. If a data source is not listed there, it was not selected for this analysis and MUST NOT be used.
