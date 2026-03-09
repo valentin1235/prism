@@ -61,7 +61,7 @@ MUST read prompt files before spawning. Files are relative to the SKILL.md direc
 1. Read archetype section from `prompts/core-archetypes.md` or `prompts/extended-archetypes.md` (same archetype as Phase 1 — use the same `agent_type` and `model` from the archetype table)
 2. Read `prompts/verification-protocol.md`
 3. Concatenate: `[worker preamble] + [archetype prompt] + [verification protocol]`
-4. Replace placeholders (`{CONTEXT}`, `{ONTOLOGY_SCOPE}`, `{SHORT_ID}`, `{perspective-id}`)
+4. Replace placeholders (`{CONTEXT}`, `{ONTOLOGY_SCOPE}`, `{SHORT_ID}`, `{perspective-id}`, `{summary}`)
 5. Spawn via `Task(...)`
 
 > `{perspective-id}` is derived from the perspective's `id` field in `perspectives.json`. The orchestrator MUST replace it in both the archetype prompt and the verification protocol before spawning.
@@ -75,7 +75,7 @@ Task(
   team_name="analyze-{short-id}",
   model="{model}",
   run_in_background=true,
-  prompt="{verification prompt with {CONTEXT}, {ONTOLOGY_SCOPE}, {SHORT_ID}, {perspective-id} replaced}"
+  prompt="{verification prompt with {CONTEXT}, {ONTOLOGY_SCOPE}, {SHORT_ID}, {perspective-id}, {summary} replaced}"
 )
 ```
 
@@ -87,6 +87,7 @@ Task(
 MUST replace `{CONTEXT}` with a text summary derived from `context.json`: format as `Summary: {summary}\nKey Findings: {research_summary.key_findings joined}\nFiles Examined: {research_summary.files_examined joined}\nDimensions: {research_summary.dimensions}`.
 MUST replace `{ONTOLOGY_SCOPE}` by reading `ontology-scope.json` and generating a text block per Phase B of ontology-scope-mapping.md (or "N/A" if not found).
 MUST replace `{SHORT_ID}` with the session's `{short-id}`. Verifiers use the same session path as their finding counterpart: `analyze-{short-id}/perspectives/{perspective-id}`.
+MUST replace `{summary}` with a short description of the case, derived from `context.json`'s `summary` field.
 
 #### Step 2B.2: Wait for Verified Findings
 
