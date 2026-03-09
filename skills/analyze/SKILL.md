@@ -20,7 +20,7 @@ Persist phase outputs to `~/.prism/state/analyze-{short-id}/` (created in Phase 
 | `seed-analysis.json` | Seed Analyst (Phase 0.5) | Perspective Generator (Phase 0.55), Orchestrator |
 | `perspectives.json` | Perspective Generator (Phase 0.55), updated by Orchestrator (Phase 0.6) | Orchestrator (Phase 0.6, 0.8, 1, 3) |
 | `context.json` | Orchestrator (Phase 0.8) | Orchestrator (Phase 1 `{CONTEXT}` injection, Phase 3 re-entry) |
-| `~/.prism/state/analyze-{short-id}/perspectives/{perspective-id}/findings.json` | Analyst (Phase 2) | MCP prism_interview |
+| `~/.prism/state/analyze-{short-id}/perspectives/{perspective-id}/findings.json` | Analyst (Phase 1 — Finding Session) | Analyst (Phase 2 — Verification Session), MCP prism_interview |
 | `verified-findings-{perspective-id}.md` | Orchestrator (Phase 2) | Phase 3 synthesis |
 | `analyst-findings.md` | Orchestrator (Phase 2 exit) | Phase 3 synthesis |
 | `prior-iterations.md` | Each re-entry (append) | All agents (cumulative) |
@@ -269,9 +269,9 @@ MUST NOT proceed until:
 
 ---
 
-## Phase 1: Spawn Analysts
+## Phase 1: Spawn Analysts (Finding Phase)
 
-Team already exists from Phase 0.5. Spawn all analyst agents in parallel. Each analyst runs self-verification via MCP tools (prism_interview) before reporting.
+Team already exists from Phase 0.5. Spawn all analyst agents in parallel. Each analyst investigates and writes findings only — verification happens in separate sessions (Phase 2).
 
 ### Step 1.1: Spawn Analysts
 
@@ -279,8 +279,8 @@ MUST read prompt files before spawning. Files are relative to this SKILL.md's di
 
 **Prompt assembly order:** For each analyst:
 1. Read archetype section from `prompts/core-archetypes.md` or `prompts/extended-archetypes.md`
-2. Read `prompts/verification-protocol.md`
-3. Concatenate: `[worker preamble] + [archetype prompt] + [verification protocol]`
+2. Read `prompts/finding-protocol.md`
+3. Concatenate: `[worker preamble] + [archetype prompt] + [finding protocol]`
 4. Replace placeholders (`{CONTEXT}`, `{ONTOLOGY_SCOPE}`, `{SHORT_ID}`)
 5. Spawn via `Task(...)`
 
@@ -314,7 +314,7 @@ Task(
 )
 ```
 
-> Apply worker preamble with `{WORK_ACTION}` = `"Investigate from your assigned perspective. Answer ALL key questions with evidence and code references. Run self-verification via MCP tools (prism_interview). Report verified findings via SendMessage to team-lead."`
+> Apply worker preamble with `{WORK_ACTION}` = `"Investigate from your assigned perspective. Answer ALL key questions with evidence and code references. Write findings to findings.json. Report findings via SendMessage to team-lead. Do NOT run self-verification — that happens in a separate session."`
 
 MUST replace `{CONTEXT}` from `context.json`.
 MUST replace `{ONTOLOGY_SCOPE}` by reading `ontology-scope.json` and generating a text block per Phase B of ontology-scope-mapping.md (or "N/A" if not found).
@@ -327,7 +327,7 @@ MUST NOT proceed until:
 - [ ] All analyst tasks created and owners pre-assigned → ERROR: "Phase 1 blocked: run TaskCreate + TaskUpdate(owner=...) for each perspective."
 - [ ] All analysts spawned in parallel → ERROR: "Spawn all analysts via Task(..., run_in_background=true). Check TaskList for missing spawns."
 
-→ **NEXT ACTION: Read `docs/later-phases.md` and proceed to Phase 2 — MCP Socratic Verification.**
+→ **NEXT ACTION: Read `docs/later-phases.md` and proceed to Phase 2 — Collect Findings & Spawn Verification Sessions.**
 
 ---
 
@@ -340,8 +340,8 @@ Prerequisite → Phase 0 [intake, session ID]
 → Phase 0.6 [perspective approval (user reviews perspectives.json → update with approved)]
 → Phase 0.7 [ontology]
 → Phase 0.8 [context + state files]
-→ Phase 1 [spawn analysts]
-→ Phase 2 [collect verified findings — analysts self-verify via prism_interview] ← docs/later-phases.md
+→ Phase 1 [spawn analysts — finding only]
+→ Phase 2 [collect findings → shutdown → spawn verification sessions → collect verified findings] ← docs/later-phases.md
 → Phase 3 [report] ← docs/later-phases.md
 → Phase 4 [cleanup] ← docs/later-phases.md
 ```

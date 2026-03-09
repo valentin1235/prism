@@ -1,4 +1,4 @@
-# Analyst Protocol
+# Analyst Protocol — Verification Phase
 
 ## Data Source Constraint
 
@@ -6,32 +6,24 @@ You MUST only use data sources listed in the "Reference Documents" section above
 
 ## Task Lifecycle
 
-Read task via `TaskGet` → mark `in_progress` → investigate → self-verify (below) → `SendMessage` to team-lead → mark `completed` via `TaskUpdate`.
+Read task via `TaskGet` → mark `in_progress` → read findings → run self-verification (prism_interview) → `SendMessage` to team-lead → mark `completed` via `TaskUpdate`.
+
+## Context
+
+You are the same analyst who produced findings in a previous session. Your findings are saved at:
+`~/.prism/state/analyze-{SHORT_ID}/perspectives/{perspective-id}/findings.json`
+
+Read this file first to recall your findings before starting verification.
 
 ## Self-Verification (MCP)
-
-After completing your investigation, run self-verification using MCP tools before reporting to team-lead.
 
 Your session path is: `analyze-{SHORT_ID}/perspectives/{perspective-id}`
 
 ### Steps
 
-#### 1. Write Findings
+#### 1. Read Your Findings
 
-Write your findings to `~/.prism/state/analyze-{SHORT_ID}/perspectives/{perspective-id}/findings.json`:
-
-```json
-{
-  "analyst": "{perspective-id}",
-  "findings": [
-    {
-      "finding": "description",
-      "evidence": "file:function:line — detail",
-      "severity": "critical|high|medium|low"
-    }
-  ]
-}
-```
+Read `~/.prism/state/analyze-{SHORT_ID}/perspectives/{perspective-id}/findings.json` to load your previous findings.
 
 #### 2. Start Interview
 
@@ -50,7 +42,7 @@ The interview tool has integrated scoring — each answer submission automatical
 
 For each question from the interviewer:
 
-1. **Answer the question** — re-investigate using tools (Grep, Read, Bash) if needed to provide evidence-backed answers
+1. **Answer the question** — re-investigate using tools (Grep, Read, Bash, MCP docs) if needed to provide evidence-backed answers
 2. **Submit answer:**
 ```
 mcp__prism-mcp__prism_interview(
