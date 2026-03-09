@@ -84,7 +84,7 @@ Task(
 - `{WORKER_NAME}` = `"{perspective-id}-verifier"`
 - `{WORK_ACTION}` = `"Read your findings from the path specified in your verification protocol. Run self-verification via MCP tools (prism_interview). Re-investigate with tools as needed to answer interview questions. Report verified findings via SendMessage to team-lead."`
 
-MUST replace `{CONTEXT}` from `context.json`.
+MUST replace `{CONTEXT}` with a text summary derived from `context.json`: format as `Summary: {summary}\nKey Findings: {research_summary.key_findings joined}\nFiles Examined: {research_summary.files_examined joined}\nDimensions: {research_summary.dimensions}`.
 MUST replace `{ONTOLOGY_SCOPE}` by reading `ontology-scope.json` and generating a text block per Phase B of ontology-scope-mapping.md (or "N/A" if not found).
 MUST replace `{SHORT_ID}` with the session's `{short-id}`. Verifiers use the same session path as their finding counterpart: `analyze-{short-id}/perspectives/{perspective-id}`.
 
