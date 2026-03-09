@@ -1,6 +1,6 @@
 {
   "skill_name": "test-analyze",
-  "skill_path": "../analyze",
+  "analyze_skill_path": "../analyze",
   "config": {
     "parallel": false,
     "skip_ontology": true,

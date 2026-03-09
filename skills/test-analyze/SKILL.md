@@ -26,8 +26,13 @@ Three categories of assertions, each verified against real execution artifacts:
 
 1. Read test cases from `evals/evals.json` (relative to this SKILL.md)
 2. Generate a test run ID: `test-{short-id}` via `uuidgen | cut -c1-8`
-3. Create workspace: `~/.prism/state/{test-run-id}/`
-4. Show user: "Running {N} test cases. Estimated time: ~5-8 min per test case."
+3. Resolve paths:
+   - `{skill-dir}` = absolute path to this SKILL.md's parent directory
+   - `{analyze-skill-path}` = resolve evals.json `analyze_skill_path` relative to `{skill-dir}` → absolute path
+   - `{ontology_instruction}` = if evals.json `config.skip_ontology` is true: `"Skip ontology scope mapping. Write N/A to ontology-scope.json."`, else: `"Execute ontology scope mapping normally."`
+4. Create workspace: `~/.prism/state/{test-run-id}/`
+5. Create results directory: `{skill-dir}/test-results/{test-run-id}/`
+6. Show user: "Running {N} test cases. Estimated time: ~5-8 min per test case."
 
 ### Phase T1: Execute Test Cases
 
@@ -53,7 +58,7 @@ Agent(
   name="{eval-id}-orchestrator",
   run_in_background=true,
   mode="bypassPermissions",
-  prompt="You are the orchestrator for prism:analyze. Read {skill_path}/SKILL.md and execute the FULL workflow.
+  prompt="You are the orchestrator for prism:analyze. Read {analyze-skill-path}/SKILL.md and execute the FULL workflow.
 
 TASK: {prompt}
 TARGET CODEBASE: {target_codebase}
