@@ -59,6 +59,13 @@ gh release download "$TAG" \
   --clobber
 
 chmod +x "$INSTALL_DIR/prism-mcp"
+
+# macOS: ad-hoc code sign to prevent SIGKILL (Code Signature Invalid)
+if [ "$OS" = "darwin" ]; then
+  codesign --sign - --force "$INSTALL_DIR/prism-mcp"
+  echo "Code signed (ad-hoc) for macOS"
+fi
+
 echo "Installed to $INSTALL_DIR/prism-mcp"
 ```
 
