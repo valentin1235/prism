@@ -68,7 +68,7 @@ Evaluate across 5 dimensions using your research findings (NOT just the user des
 | Dimension | Values |
 |-----------|--------|
 | Domain | infra / app / data / security / network |
-| Failure type | crash / degradation / data loss / breach / misconfig |
+| Failure type | crash / degradation / data_loss / breach / misconfig |
 | Evidence available | logs / metrics / code diffs / traces |
 | Complexity | single-cause / multi-factor |
 | Recurrence | first-time / recurring |
