@@ -130,7 +130,9 @@ For each perspective, extract:
 
 #### T2.4: Write Grading Results
 
-For each test case, write `grading.json`:
+Results directory: `{skill-dir}/test-results/{test-run-id}/`
+
+For each test case, write to `{skill-dir}/test-results/{test-run-id}/{eval-id}/grading.json`:
 
 ```json
 {
@@ -177,5 +179,5 @@ For each test case, write `grading.json`:
 ### Phase T4: Cleanup
 
 - Kill any remaining background agents
-- Optionally clean up state directory (ask user)
-- Save full results to `{skill-dir}/test-results/{test-run-id}/`
+- Optionally clean up state directory `~/.prism/state/{test-run-id}/` (ask user)
+- Write aggregate summary to `{skill-dir}/test-results/{test-run-id}/summary.json`
