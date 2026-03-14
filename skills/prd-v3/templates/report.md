@@ -1,125 +1,125 @@
-# PRD 정책 분석 리포트
+# PRD Policy Analysis Report
 
-이 템플릿은 PM(기획자)이 읽는 리포트입니다. 기술 용어를 최소화하고, 정책 충돌과 의사결정이 필요한 항목에 집중합니다.
+This template produces a report for PMs (product managers). Minimize technical jargon and focus on policy conflicts and actionable decision items.
 
 ---
 
 ## Executive Summary
 
-[2-3문장: 어떤 PRD를 분석했는지, 핵심 발견사항, PM이 취해야 할 즉각적 행동]
+[2-3 sentences: what PRD was analyzed, key findings, immediate actions PM should take]
 
-## 분석 개요
+## Analysis Overview
 
-- **분석 대상**: {PRD 제목}
-- **분석 일시**: {date}
-- **분석 방법**: {N}개 관점 다관점 분석 + Socratic 검증
-- **참고 문서**: {ontology 문서 수}개 정책 문서 참조
-- **분석 관점**: {사용된 관점 목록}
+- **Target**: {PRD title}
+- **Analysis Date**: {date}
+- **Method**: {N}-perspective multi-perspective analysis + Socratic verification
+- **Reference Docs**: {number of ontology documents} policy documents referenced
+- **Perspectives Used**: {list of perspectives}
 
 ---
 
-## PM 의사결정 체크리스트
+## PM Decision Checklist
 
-PM이 이 PRD를 진행하기 전에 결정해야 할 항목들입니다. 우선순위순으로 정렬되어 있습니다.
+Items that PM must decide before proceeding with this PRD. Sorted by priority.
 
-| # | 항목 | 심각도 | 신뢰도 | 결정 여부 |
-|---|------|--------|--------|-----------|
-| 1 | {의사결정 항목} | {CRITICAL/HIGH/MEDIUM} | {검증됨/부분검증/미검증} | - [ ] |
+| # | Item | Severity | Confidence | Decision |
+|---|------|----------|------------|----------|
+| 1 | {decision item} | {CRITICAL/HIGH/MEDIUM} | {Verified/Partial/Unverified} | - [ ] |
 | 2 | ... | ... | ... | - [ ] |
 
-> **심각도 기준**
-> - **CRITICAL**: 기존 정책과 직접 충돌. 해결 없이 진행 불가
-> - **HIGH**: 해석이 여러 가지. 명확한 정의 필요
-> - **MEDIUM**: 정의되지 않은 엣지케이스. 정책 보완 권장
+> **Severity Criteria**
+> - **CRITICAL**: Direct conflict with existing policy. Cannot proceed without resolution
+> - **HIGH**: Multiple interpretations possible. Clear definition needed
+> - **MEDIUM**: Undefined edge case. Policy supplement recommended
 
-> **신뢰도 기준** (Socratic 검증 결과 기반)
-> - ✅ **검증됨**: 코드/문서 근거 확인 완료 (score ≥ 0.7)
-> - ⚠️ **부분검증**: 일부 근거 확인, 추가 확인 권장 (0.4 ≤ score < 0.7)
-> - ❌ **미검증**: 근거 불충분, 반드시 확인 필요 (score < 0.4)
-
----
-
-## 정책 충돌 상세
-
-각 발견된 충돌/모호성을 상세히 설명합니다.
-
-### [{심각도}-{N}] {충돌 제목}
-
-**PRD에서**: {PRD가 정의하는 내용}
-
-**기존 정책에서**: {기존 정책 문서가 정의하는 내용} (출처: {문서명:섹션})
-
-**충돌/모호성**: {왜 이것이 문제인지 PM이 이해할 수 있는 설명}
-
-**PM이 결정할 사항**:
-- [ ] {구체적인 의사결정 항목 1}
-- [ ] {구체적인 의사결정 항목 2}
-
-**신뢰도**: {✅검증됨 | ⚠️부분검증 | ❌미검증}
+> **Confidence Criteria** (based on Socratic verification results)
+> - ✅ **Verified**: Code/document evidence confirmed (score >= 0.7)
+> - ⚠️ **Partial**: Some evidence confirmed, additional verification recommended (0.4 <= score < 0.7)
+> - ❌ **Unverified**: Insufficient evidence, must verify (score < 0.4)
 
 ---
 
-## PRD 내부 모호성
+## Policy Conflict Details
 
-PRD 자체에서 발견된 모호하거나 자기모순적인 부분들입니다. 기존 정책과의 충돌이 아닌, PRD 내부의 문제입니다.
+Detailed description of each conflict/ambiguity found.
 
-| # | 위치 | 모호한 내용 | 왜 문제인지 | 제안 |
-|---|------|-----------|------------|------|
+### [{Severity}-{N}] {Conflict Title}
 
----
+**PRD states**: {what the PRD defines}
 
-## 관점별 분석 요약
+**Existing policy states**: {what existing policy documents define} (source: {document:section})
 
-각 분석 관점에서 발견한 주요 사항을 요약합니다.
+**Conflict/Ambiguity**: {explanation of why this is a problem, written for PM comprehension}
 
-### {관점 이름}
-- **분석 범위**: {이 관점이 살펴본 정책 도메인}
-- **발견 건수**: {N}건 (CRITICAL: {n}, HIGH: {n}, MEDIUM: {n})
-- **핵심 발견**: {1-2문장 요약}
-- **검증 점수**: {score} ({verdict})
+**PM decisions needed**:
+- [ ] {specific decision item 1}
+- [ ] {specific decision item 2}
 
----
-
-## 관점 간 교차 분석
-
-- **공통 발견**: 여러 관점에서 독립적으로 동일한 충돌을 발견한 항목
-- **관점 간 상충**: 관점마다 다른 결론에 도달한 항목
-- **통합 인사이트**: 개별 관점으로는 보이지 않았지만 종합하면 드러나는 문제
+**Confidence**: {✅ Verified | ⚠️ Partial | ❌ Unverified}
 
 ---
 
-## 신뢰도 요약 (Socratic 검증)
+## PRD Internal Ambiguities
 
-| 관점 | 검증 라운드 | 점수 | 판정 |
-|------|-----------|------|------|
+Ambiguous or self-contradictory parts found within the PRD itself. These are internal PRD issues, not conflicts with existing policies.
 
-### 검증 과정에서 해소된 모호성
-{Socratic Q&A를 통해 명확해진 항목들}
-
-### 미해소 모호성
-{검증에서도 해소되지 않은 항목 — PM의 추가 확인 필요}
+| # | Location | Ambiguous Content | Why It's a Problem | Suggestion |
+|---|----------|-------------------|-------------------|------------|
 
 ---
 
-## 권고사항
+## Per-Perspective Analysis Summary
 
-### 즉시 조치 (PRD 수정 전 필수)
-1. {CRITICAL 항목에 대한 구체적 권고}
+Summary of key findings from each analysis perspective.
 
-### 단기 조치 (PRD 확정 전 권장)
-1. {HIGH 항목에 대한 구체적 권고}
-
-### 장기 고려 (정책 보완 차원)
-1. {MEDIUM 항목 또는 정책 갭에 대한 권고}
+### {Perspective Name}
+- **Scope**: {policy domain this perspective examined}
+- **Findings**: {N} items (CRITICAL: {n}, HIGH: {n}, MEDIUM: {n})
+- **Key Finding**: {1-2 sentence summary}
+- **Verification Score**: {score} ({verdict})
 
 ---
 
-## 부록
+## Cross-Perspective Analysis
 
-### 참조된 정책 문서 목록
-| # | 문서 경로 | 관련 관점 | 참조 횟수 |
-|---|----------|----------|----------|
+- **Common Findings**: Items where multiple perspectives independently identified the same conflict
+- **Cross-Perspective Conflicts**: Items where perspectives reached different conclusions
+- **Integrated Insights**: Issues only visible when combining perspectives
 
-### 온톨로지 스코프 매핑
-| 관점 | 매핑된 정책 문서 | 선택 이유 |
-|------|----------------|----------|
+---
+
+## Confidence Summary (Socratic Verification)
+
+| Perspective | Verification Rounds | Score | Verdict |
+|-------------|-------------------|-------|---------|
+
+### Ambiguities Resolved During Verification
+{Items clarified through Socratic Q&A}
+
+### Unresolved Ambiguities
+{Items not resolved even through verification — requires additional PM confirmation}
+
+---
+
+## Recommendations
+
+### Immediate Actions (Required before PRD revision)
+1. {specific recommendation for CRITICAL items}
+
+### Short-Term Actions (Recommended before PRD finalization)
+1. {specific recommendation for HIGH items}
+
+### Long-Term Considerations (Policy supplement level)
+1. {recommendation for MEDIUM items or policy gaps}
+
+---
+
+## Appendix
+
+### Referenced Policy Documents
+| # | Document Path | Related Perspective | Reference Count |
+|---|--------------|-------------------|-----------------|
+
+### Ontology Scope Mapping
+| Perspective | Mapped Policy Documents | Selection Rationale |
+|-------------|----------------------|-------------------|
