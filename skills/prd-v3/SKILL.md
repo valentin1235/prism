@@ -70,13 +70,12 @@ Write the following JSON to `~/.prism/state/prd-{short-id}/analyze-config.json`:
 {
   "topic": "PRD policy conflict analysis: {PRD title} — multi-perspective analysis of whether this PRD conflicts with or has ambiguities against existing codebase policies",
   "input_context": "{PRD file absolute path}",
-  "report_template": "{absolute path to this skill}/templates/report.md",
-  "seed_hints": "First, Read the PRD file at {PRD file absolute path}. Extract policy domains from a PM (product manager) perspective. Focus on business policy conflicts, rule contradictions, undefined edge cases, and ambiguous requirements — NOT engineering implementation details. Classify each functional requirement as either conflicting with existing policy documents or covering a new area not addressed by existing policies.",
+  "seed_hints": "First, Read the PRD file at {PRD file absolute path}. Extract policy domains from a PM (product manager) perspective. Focus on business policy conflicts, rule contradictions, undefined edge cases, and ambiguous requirements — NOT engineering implementation details. Classify each functional requirement as either conflicting with existing policy documents or covering a new area not addressed by existing policies. Generated perspectives should focus on policy/business domains, not engineering/architecture domains.",
   "ontology_mode": "required"
 }
 ```
 
-> `{absolute path to this skill}` is the absolute path of the directory containing this SKILL.md. Determine via `Bash` by extracting the directory from this SKILL.md's file path.
+> Determine the absolute path of the directory containing this SKILL.md via `Bash`. Store it as `{SKILL_DIR}` for use in Step 2.1.
 
 ### Step 1.3: Snapshot Before Analyze
 
@@ -92,7 +91,9 @@ ls -d ~/.prism/state/analyze-* 2>/dev/null > ~/.prism/state/prd-{short-id}/analy
 Skill(skill="prism:analyze", args="--config ~/.prism/state/prd-{short-id}/analyze-config.json")
 ```
 
-Wait for analyze to complete. Analyze internally handles:
+Wait for analyze to complete. If analyze fails or the user cancels mid-execution → ERROR: "Analyze skill failed or was cancelled. Check ~/.prism/state/ for partial results." and terminate.
+
+Analyze internally handles:
 - Seed analyst investigation of PRD and policy domains
 - Multi-perspective generation and user approval
 - Per-perspective analyst spawning (policy conflict analysis)
@@ -111,7 +112,7 @@ There should be exactly 1 new directory. If 0 → ERROR: "analyze did not create
 
 Verify the following files exist in that directory:
 - `analyst-findings.md` — verified analysis results
-- `verification-log.json` — Socratic verification scores (may not exist)
+- `verification-log.json` — Socratic verification scores (may not exist — this is tolerated because the post-processor has a 3-tier fallback for confidence scores)
 
 Store this path as `{ANALYZE_STATE_DIR}`.
 
@@ -149,6 +150,7 @@ Placeholder replacements:
 - `{PRD_STATE_DIR}` → `~/.prism/state/prd-{short-id}`
 - `{REPORT_LANGUAGE}` → language determined in Phase 0.3
 - `{SHORT_ID}` → session ID
+- `{REPORT_TEMPLATE_PATH}` → `{SKILL_DIR}/templates/report.md` (absolute path, from Step 1.2)
 
 ### Step 2.2: Verify Output
 
