@@ -48,7 +48,7 @@ PMs are not developers. Code-level details, file paths, and function names are n
 
 Read the report template at `{REPORT_TEMPLATE_PATH}`.
 
-If the path is empty or file not found, search via `Glob` for `**/prd-v3/templates/report.md`.
+If the path is empty or file not found, search via `Glob` for `**/prd/templates/report.md`.
 
 ### Step 3: Transform — Analyze Report → PM Report
 
