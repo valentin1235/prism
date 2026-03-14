@@ -4,7 +4,7 @@
 
 {KEY_QUESTIONS}
 
-Answer these questions in addition to your archetype tasks. They are grounded in the seed analyst's research findings and target this specific case.
+Answer these questions in addition to your investigation tasks. They are grounded in the seed analyst's research findings and target this specific case.
 
 ## Data Source Constraint
 
@@ -24,7 +24,7 @@ Your findings path is: `~/.prism/state/analyze-{SHORT_ID}/perspectives/{perspect
 
 #### 1. Investigate
 
-Answer ALL key questions from your archetype with evidence and code references. Use available tools (Grep, Read, Bash, MCP docs) to gather evidence.
+Answer ALL key questions and complete ALL tasks from your prompt with evidence and code references. Use available tools (Grep, Read, Bash, MCP docs) to gather evidence.
 
 #### 2. Write Findings
 
@@ -38,13 +38,13 @@ Write your findings to `~/.prism/state/analyze-{SHORT_ID}/perspectives/{perspect
     {
       "finding": "description",
       "evidence": "file:function:line — detail",
-      "severity": "critical|high|medium|low"
+      "severity": "use the severity scale defined in your output format"
     }
   ]
 }
 ```
 
-`{ORIGINAL_INPUT}` is the original problem description from context.json. Copy it exactly — the verification interviewer uses this to evaluate whether your findings address the original problem.
+`{ORIGINAL_INPUT}` is the original topic description from context.json. Copy it exactly — the verification interviewer uses this to evaluate whether your findings address the original topic.
 
 #### 3. Report Findings
 

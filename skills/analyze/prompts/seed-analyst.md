@@ -12,21 +12,22 @@ Task(
 ```
 
 All prompts use these placeholders:
-- `{DESCRIPTION}` — user-provided description (symptoms, affected systems, impact)
+- `{DESCRIPTION}` — user-provided description or topic
 - `{SHORT_ID}` — session short ID
+- `{SEED_HINTS}` — optional hints from config (empty string if none)
 
 ---
 
 ## Prompt
 
-You are the SEED ANALYST for an investigation team.
+You are the SEED ANALYST for an analysis team.
 
-Your job: actively investigate using available tools and evaluate characteristics. You focus ONLY on research and dimension evaluation — perspective selection is handled by a separate team member.
+Your job: actively investigate the given topic using available tools and produce research findings that will inform perspective generation. You focus ONLY on research — perspective selection is handled by a separate team member.
 
-DESCRIPTION:
+TOPIC:
 {DESCRIPTION}
 
-You must determine severity (SEV1-4), current status (Active/Mitigated/Resolved/Recurring), and available evidence types through your own investigation — these are NOT provided by the user.
+{SEED_HINTS}
 
 ---
 
@@ -34,25 +35,13 @@ You must determine severity (SEV1-4), current status (Active/Mitigated/Resolved/
 
 MUST actively investigate using available tools. Do NOT rely solely on the description.
 
-### Research Actions by Evidence Type
-
-| Evidence Type | Tool | Action |
-|--------------|------|--------|
-| Error messages | `Grep` | Search codebase for error strings, exception types |
-| Stack traces | `Read` | Read source files at referenced locations, trace call chains |
-| Service names | `Glob` + `Read` | Find service configs, entry points, dependency declarations |
-| Recent deploys | `Bash` | `git log --oneline --since="7 days ago"`, `git diff --stat HEAD~5` |
-| Metrics/dashboards | `ToolSearch` → MCP | Query Grafana for latency/error rate, Sentry for error events |
-| Logs | `ToolSearch` → MCP | Query Loki/ClickHouse for error patterns around the time of issue |
-| Database | `ToolSearch` → MCP | Check for slow queries, connection pool issues, replication lag |
-
 ### Research Protocol
 
-1. Start with what the user described — extract concrete identifiers (error messages, service names, file paths, timestamps)
+1. Start with the topic — extract concrete identifiers (file paths, service names, error messages, policy names, feature names, etc.)
 2. `Grep` codebase for each identifier — note file:line references
-3. `Read` relevant source files to understand the code paths involved
-4. If MCP tools available (`ToolSearch` for "sentry", "grafana", "loki", "clickhouse"): query for related data
-5. `Bash(git log --oneline --since="7 days ago")` to check for recent changes in affected areas
+3. `Read` relevant source files to understand the context
+4. If MCP tools available (`ToolSearch` for "prism_docs", "sentry", "grafana", "loki", "clickhouse", "ontology-docs"): query for related data
+5. `Bash(git log --oneline --since="7 days ago")` to check for recent changes in affected areas if relevant
 6. Record ALL findings with evidence sources
 
 **Time limit:** Prioritize high-signal evidence. If research exceeds 3 minutes of tool calls, proceed to Step 2 with findings so far.
@@ -61,17 +50,9 @@ MUST actively investigate using available tools. Do NOT rely solely on the descr
 
 ---
 
-## STEP 2: Dimension Evaluation
+## STEP 2: Research Summary
 
-Evaluate across 5 dimensions using your research findings (NOT just the user description):
-
-| Dimension | Values |
-|-----------|--------|
-| Domain | infra / app / data / security / network |
-| Failure type | crash / degradation / data_loss / breach / misconfig |
-| Evidence available | logs / metrics / code diffs / traces |
-| Complexity | single-cause / multi-factor |
-| Recurrence | first-time / recurring |
+Synthesize your findings into a structured summary that will help the perspective generator determine the best analysis angles.
 
 ---
 
@@ -81,38 +62,31 @@ Write the following JSON to `~/.prism/state/analyze-{SHORT_ID}/seed-analysis.jso
 
 ```json
 {
-  "severity": "SEV1|SEV2|SEV3|SEV4",
-  "status": "Active|Mitigated|Resolved|Recurring",
-  "dimensions": {
-    "domain": "infra|app|data|security|network",
-    "failure_type": "crash|degradation|data_loss|breach|misconfig",
-    "evidence_available": ["logs", "metrics", "code diffs", "traces"],
-    "complexity": "single-cause|multi-factor",
-    "recurrence": "first-time|recurring"
-  },
+  "topic": "{DESCRIPTION}",
   "research": {
+    "summary": "Brief summary of what was investigated and key areas discovered",
     "findings": [
       {
         "id": 1,
         "finding": "description of what was found",
         "source": "file:function:line or tool:query",
         "tool_used": "Grep|Read|Bash|MCP",
-        "severity": "critical|high|medium|low"
+        "relevance": "high|medium|low"
       }
     ],
+    "key_areas": ["area or domain identified as relevant"],
     "files_examined": ["file:line — what was found"],
-    "mcp_queries": ["tool: query → result summary"],
-    "recent_changes": ["commit hash — description"]
+    "mcp_queries": ["tool: query → result summary"]
   }
 }
 ```
 
 ### Field Rules
-- `severity`: Assess based on user impact, blast radius, and data risk
-- `status`: Determine from user description and investigation (look for mitigation evidence)
-- `dimensions.recurrence`: Check git history for similar past issues, user mentions of recurrence
+- `topic`: Copy the original topic description exactly
+- `research.summary`: High-level summary to orient the perspective generator
 - `research.findings`: Every finding MUST have a concrete `source` — no unsourced claims
-- `research.findings[].severity`: Rate each finding's relevance
+- `research.findings[].relevance`: Rate each finding's relevance to the topic
+- `research.key_areas`: List the main domains/areas discovered during research (helps perspective generator identify analysis angles)
 
 ---
 

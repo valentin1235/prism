@@ -58,13 +58,15 @@ Create verifier task via `TaskCreate`, pre-assign owner via `TaskUpdate(owner="{
 MUST read prompt files before spawning. Files are relative to the SKILL.md directory.
 
 **Prompt assembly order:** For each verifier:
-1. Read archetype section from `prompts/core-archetypes.md` or `prompts/extended-archetypes.md` (same archetype as Phase 1 — use the same `agent_type` and `model` from the archetype table)
+1. Read the perspective's `prompt` object from `perspectives.json` (same dynamic prompt used in Phase 1)
 2. Read `prompts/verification-protocol.md`
-3. Concatenate: `[worker preamble] + [archetype prompt] + [verification protocol]`
-4. Replace placeholders (`{CONTEXT}`, `{ONTOLOGY_SCOPE}`, `{SHORT_ID}`, `{perspective-id}`, `{summary}`)
+3. Assemble: `[worker preamble] + [perspective prompt] + [verification protocol]`
+4. Replace placeholders (`{CONTEXT}`, `{ONTOLOGY_SCOPE}`, `{SHORT_ID}`, `{perspective-id}`, `{TOPIC_SUMMARY}`)
 5. Spawn via `Task(...)`
 
-> `{perspective-id}` is derived from the perspective's `id` field in `perspectives.json`. The orchestrator MUST replace it in both the archetype prompt and the verification protocol before spawning.
+> **Note:** Unlike Phase 1 (which appends `finding-protocol.md`), Phase 2B appends `verification-protocol.md`. Therefore `{KEY_QUESTIONS}` and `{ORIGINAL_INPUT}` are intentionally omitted — they exist only in `finding-protocol.md`.
+
+> `{perspective-id}` is derived from the perspective's `id` field in `perspectives.json`. The orchestrator MUST replace it in both the perspective prompt and the verification protocol before spawning.
 
 **Spawn pattern:**
 
@@ -75,7 +77,7 @@ Task(
   team_name="analyze-{short-id}",
   model="{model}",
   run_in_background=true,
-  prompt="{verification prompt with {CONTEXT}, {ONTOLOGY_SCOPE}, {SHORT_ID}, {perspective-id}, {summary} replaced}"
+  prompt="{verification prompt with placeholders replaced}"
 )
 ```
 
@@ -84,11 +86,13 @@ Task(
 - `{WORKER_NAME}` = `"{perspective-id}-verifier"`
 - `{WORK_ACTION}` = `"Read your findings from the path specified in your verification protocol. Run self-verification via MCP tools (prism_interview). Re-investigate with tools as needed to answer interview questions. Report verified findings via SendMessage to team-lead."`
 
-MUST replace `{CONTEXT}` with a text summary derived from `context.json`: format as `Summary: {summary}\nKey Findings: {research_summary.key_findings joined}\nFiles Examined: {research_summary.files_examined joined}\nDimensions: {research_summary.dimensions}`.
+`{model}` and `{agent_type}` come from each perspective's fields in `perspectives.json` — same values used in Phase 1.
+
+MUST replace `{CONTEXT}` with a text summary derived from `context.json`: format as `Summary: {summary}\nKey Findings: {research_summary.key_findings joined}\nFiles Examined: {research_summary.files_examined joined}\nKey Areas: {research_summary.key_areas joined}`.
 MUST replace `{ONTOLOGY_SCOPE}` by reading `ontology-scope.json` and generating a text block per Phase B of ontology-scope-mapping.md (or "N/A" if not found).
 MUST replace `{SHORT_ID}` with the session's `{short-id}`. Verifiers use the same session path as their finding counterpart: `analyze-{short-id}/perspectives/{perspective-id}`.
 MUST replace `{perspective-id}` with the perspective's `id` field from `perspectives.json`. This value appears in the findings path, the `prism_interview` call, and throughout the verification protocol.
-MUST replace `{summary}` with a short description of the case, derived from `context.json`'s `summary` field.
+MUST replace `{TOPIC_SUMMARY}` with a short description of the topic, derived from `context.json`'s `summary` field.
 
 #### Step 2B.2: Wait for Verified Findings
 
@@ -146,9 +150,14 @@ After ALL verifiers are done:
 
 Integrate all verified analyst findings. Read from `~/.prism/state/analyze-{short-id}/analyst-findings.md`.
 
-### Step 3.2
+### Step 3.2: Select Report Template
 
-Read `templates/report.md` and fill all sections with synthesized findings. Write the report in the language specified by `context.json.report_language`.
+Check for config-provided report template:
+1. Read `~/.prism/state/analyze-{short-id}/config.json` (if exists)
+2. If `config.report_template` is set → Read the template at that path
+3. If no config or no `report_template` → Read `templates/report.md` (default template, relative to SKILL.md)
+
+Fill the selected template with synthesized findings. Write the report in the language specified by `context.json.report_language`.
 
 ### Step 3.3
 

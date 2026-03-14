@@ -3,27 +3,21 @@
 Fill all sections. Write "N/A" if truly irrelevant — do NOT leave sections empty.
 
 ## Executive Summary
-[2-3 sentences: what happened, why, what to do]
+[2-3 sentences: what was analyzed, key findings, what to do]
 
 ## Analysis Overview
-- **Subject**: {description}
-- **Severity**: {SEV}
-- **Duration**: {start} to {end/ongoing}
-- **Status**: {Active/Mitigated/Resolved}
-- **Affected Systems**: {list}
-- **User Impact**: {summary}
+- **Topic**: {description}
+- **Analysis Date**: {date}
+- **Method**: {N}-perspective multi-agent analysis with Socratic verification
 - **Perspectives Used**: {list of active lenses}
-
-## Timeline
-| Time | Event | Evidence | Confidence |
-|------|-------|----------|------------|
+- **Reference Docs**: {ontology source summary}
 
 ## Perspective Findings
 
 {For EACH perspective:}
 
-### {Lens Name}
-{Full findings per archetype output format}
+### {Perspective Name}
+{Full findings per analyst output format}
 
 ## Integrated Analysis
 - **Convergence**: Where perspectives independently agreed
@@ -50,20 +44,12 @@ Fill all sections. Write "N/A" if truly irrelevant — do NOT leave sections emp
 |---------|-----------|-------------------|-----------------------|
 
 ## Recommendations
-| Action | Priority | UX Impact | Eng Effort | Verified? |
-|--------|----------|-----------|------------|-----------|
+| Action | Priority | Impact | Effort | Verified? |
+|--------|----------|--------|--------|-----------|
 
-### Immediate (This Week)
-### Short-Term (This Month)
-### Long-Term (This Quarter)
-### Monitoring & Alerting
-
-## Prevention Checklist
-- [ ] Root cause permanently fixed
-- [ ] Monitoring for early detection
-- [ ] Runbook updated
-- [ ] Post-review scheduled
-- [ ] Similar risks elsewhere mitigated
+### Immediate
+### Short-Term
+### Long-Term
 
 ## Appendix
 
@@ -78,4 +64,3 @@ Fill all sections. Write "N/A" if truly irrelevant — do NOT leave sections emp
 |-------------|---------------------|-----------|
 
 ### Raw Evidence Links
-### Related Past Cases
