@@ -7,19 +7,19 @@ Complete list of JSON contracts between prism:analyze phases. Each contract spec
 ```
 Phase 0.5 (seed-analyst)
   └─ seed-analysis.json
-       ├─→ Phase 0.55 (perspective-generator) reads: dimensions, research
+       ├─→ Phase 0.55 (perspective-generator) reads: topic, research (findings, key_areas)
        └─→ Phase 0.8 (orchestrator) reads: research → context.json
 
 Phase 0.55 (perspective-generator)
   └─ perspectives.json
        ├─→ Phase 0.6 (orchestrator) adds: approved, user_modifications
-       ├─→ Phase 1 (orchestrator) reads: id, model, agent_type, key_questions
-       └─→ Phase 2B (orchestrator) reads: id, model, agent_type
+       ├─→ Phase 1 (orchestrator) reads: id, model, agent_type, key_questions, prompt
+       └─→ Phase 2B (orchestrator) reads: id, model, agent_type, prompt
 
 Phase 0.8 (orchestrator)
   └─ context.json
        ├─→ Phase 1 (orchestrator) reads: summary → {CONTEXT}
-       ├─→ Phase 2B (orchestrator) reads: summary → {CONTEXT}, {summary}
+       ├─→ Phase 2B (orchestrator) reads: summary → {CONTEXT}, {TOPIC_SUMMARY}
        └─→ Phase 3 (orchestrator) reads: report_language
 
 Phase 1 (analysts)
@@ -49,22 +49,20 @@ For each arrow (→) in the map above:
 **Producer fields:**
 ```json
 {
-  "dimensions": {
-    "domain": "security|infra|app|data|network",
-    "failure_type": "crash|degradation|data_loss|breach|misconfig",
-    "complexity": "single-cause|multi-factor"
-  },
+  "topic": "description",
   "research": {
-    "findings": [{"finding": "...", "source": "..."}]
+    "summary": "...",
+    "findings": [{"finding": "...", "source": "...", "relevance": "high|medium|low"}],
+    "key_areas": ["area1", "area2"]
   }
 }
 ```
 
 **Consumer expectations:**
-- `perspectives[].scope` should reference topics from `research.findings`
-- Perspective count respects `complexity`: single-cause → 2-3, multi-factor → 3-5
-- If `domain=security`, security archetype must be in perspectives
-- `rules_applied.domain_archetype_match_enforced` must be `true`
+- `perspectives[].scope` should reference topics from `research.findings` and `research.key_areas`
+- Perspective count: minimum 2, typically 3-5
+- Perspectives should cover key areas identified in seed research
+- `quality_gate` fields must all be `true` (all_orthogonal, all_evidence_backed, all_specific, all_actionable, min_perspectives_met)
 
 #### 2. perspectives.json → findings.json (per perspective)
 
@@ -97,7 +95,7 @@ For each arrow (→) in the map above:
 **Consumer expectations:**
 - `context.json.research_summary.key_findings` derived from `research.findings[].finding`
 - `context.json.research_summary.files_examined` derived from `research.files_examined`
-- `context.json.research_summary.dimensions` reflects seed dimensions
+- `context.json.research_summary.key_areas` reflects seed key_areas
 
 #### 4. context.json → report.md
 

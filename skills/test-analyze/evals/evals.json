@@ -18,28 +18,28 @@
       "assertions": [
         {"text": "Phase 0: uuidgen + state dir 생성", "type": "workflow_gate"},
         {"text": "Phase 0.5: seed-analyst architect+opus spawn", "type": "workflow_gate"},
-        {"text": "Phase 0.5: seed-analysis.json에 dimensions.domain=security 포함", "type": "field_contract"},
-        {"text": "Phase 0.55: security archetype 매핑 + domain_archetype_match_enforced", "type": "data_flow"},
+        {"text": "Phase 0.5: seed-analysis.json에 topic, research.findings[], research.key_areas 포함", "type": "field_contract"},
+        {"text": "Phase 0.55: security 관련 perspective 포함", "type": "data_flow"},
         {"text": "Phase 0.55: security perspective 포함", "type": "field_contract"},
-        {"text": "Phase 0.55: security perspective opus/architect 일치", "type": "field_contract"},
-        {"text": "Phase 0.55: rules_applied 6개 필드 모두 존재", "type": "field_contract"},
+        {"text": "Phase 0.55: perspective에 prompt 객체(role, tasks, output_format) 포함", "type": "field_contract"},
+        {"text": "Phase 0.55: quality_gate 필드 모두 존재 (all_orthogonal, all_evidence_backed, all_specific, all_actionable, min_perspectives_met)", "type": "field_contract"},
         {"text": "Phase 0.6: perspectives.json에 approved=true 추가", "type": "data_flow"},
         {"text": "Phase 0.7: ontology scope (skip or N/A)", "type": "workflow_gate"},
         {"text": "Phase 0.8: context.json에 investigation_loops:0 + report_language 포함", "type": "field_contract"},
         {"text": "Phase 1: Security Lens + finding-protocol + {KEY_QUESTIONS} 주입", "type": "data_flow"},
         {"text": "Phase 1: findings.json에 analyst, findings[] 필드 존재", "type": "field_contract"},
         {"text": "Phase 2A: finding analysts shutdown + drain", "type": "workflow_gate"},
-        {"text": "Phase 2B: verifier + prism_interview + {summary} + {perspective-id} 교체", "type": "data_flow"},
+        {"text": "Phase 2B: verifier + prism_interview + {TOPIC_SUMMARY} + {perspective-id} 교체", "type": "data_flow"},
         {"text": "Phase 2B: analyst-findings.md 생성", "type": "field_contract"},
         {"text": "Phase 3: report.md 한국어로 작성", "type": "data_flow"}
       ],
       "contract_checks": [
         {
-          "name": "seed → perspectives: dimensions 전달",
+          "name": "seed → perspectives: research 전달",
           "producer": "seed-analysis.json",
           "consumer": "perspectives.json",
-          "fields": ["dimensions.domain", "dimensions.failure_type", "dimensions.complexity"],
-          "rule": "consumer의 perspective 선택이 producer의 dimensions 값에 기반해야 함"
+          "fields": ["research.findings", "research.key_areas"],
+          "rule": "consumer의 perspective 선택이 producer의 research findings와 key_areas에 기반해야 함"
         },
         {
           "name": "perspectives → Phase 1: spawn 파라미터",
