@@ -38,8 +38,9 @@ For each `field_contract` assertion, read the relevant JSON and verify fields:
 ### seed-analysis.json
 ```
 Required: topic,
-          research.summary, research.findings[], research.key_areas,
-          research.files_examined
+          research.summary, research.findings[], research.findings[].area,
+          research.findings[].description, research.findings[].source,
+          research.key_areas, research.files_examined
 ```
 
 ### perspectives.json

@@ -123,7 +123,7 @@ Task(
 > Apply worker preamble from `../shared-v3/worker-preamble.md` with:
 - `{TEAM_NAME}` = `"analyze-{short-id}"`
 - `{WORKER_NAME}` = `"seed-analyst"`
-- `{WORK_ACTION}` = `"Actively investigate using available tools (Grep, Read, Bash, MCP). Research the topic and produce findings. Write findings to seed-analysis.json. Report via SendMessage."`
+- `{WORK_ACTION}` = `"Actively investigate using available tools (Grep, Read, Bash, MCP). Map related code areas and systems. Write discoveries to seed-analysis.json. Report via SendMessage."`
 
 Placeholder replacements in seed-analyst prompt:
 - `{DESCRIPTION}` → Phase 0 description
@@ -134,7 +134,7 @@ Placeholder replacements in seed-analyst prompt:
 
 Wait for seed-analyst to send results via `SendMessage`. The message contains a JSON object with:
 - `topic`: original description
-- `research`: summary, findings (with source and tool_used), key_areas, files_examined, mcp_queries
+- `research`: summary, findings (with area, description, source, and tool_used), key_areas, files_examined, mcp_queries
 
 The seed analyst also writes this JSON to `~/.prism/state/analyze-{short-id}/seed-analysis.json`.
 
@@ -282,7 +282,7 @@ Write `~/.prism/state/analyze-{short-id}/context.json`:
 {
   "summary": "Topic description and key context",
   "research_summary": {
-    "key_findings": ["finding1", "finding2"],
+    "key_findings": ["area1: description1", "area2: description2"],
     "files_examined": ["path1", "path2"],
     "key_areas": ["area1", "area2"]
   },
