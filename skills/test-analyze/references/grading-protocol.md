@@ -37,29 +37,30 @@ For each `field_contract` assertion, read the relevant JSON and verify fields:
 
 ### seed-analysis.json
 ```
-Required: severity, status, dimensions.domain, dimensions.failure_type,
-          dimensions.evidence_available, dimensions.complexity, dimensions.recurrence,
-          research.findings[], research.files_examined
+Required: topic,
+          research.summary, research.findings[], research.key_areas,
+          research.files_examined
 ```
 
 ### perspectives.json
 ```
 Required: perspectives[].id, perspectives[].name, perspectives[].scope,
           perspectives[].key_questions, perspectives[].model, perspectives[].agent_type,
+          perspectives[].prompt.role, perspectives[].prompt.tasks,
+          perspectives[].prompt.output_format,
           perspectives[].rationale
-          rules_applied.core_archetype_included,
-          rules_applied.domain_archetype_match_enforced,
-          rules_applied.complexity_scaling_correct,
-          rules_applied.all_evidence_backed,
-          rules_applied.min_perspectives_met,
-          rules_applied.recurring_systems_enforced
+          quality_gate.all_orthogonal,
+          quality_gate.all_evidence_backed,
+          quality_gate.all_specific,
+          quality_gate.all_actionable,
+          quality_gate.min_perspectives_met
           selection_summary
 ```
 
 ### context.json
 ```
 Required: summary, research_summary.key_findings, research_summary.files_examined,
-          research_summary.dimensions, report_language, investigation_loops
+          research_summary.key_areas, report_language, investigation_loops
 ```
 
 ### findings.json (per perspective)
@@ -78,9 +79,9 @@ For each `data_flow` assertion and each `contract_check`:
 **Concrete checks:**
 
 ### seed-analysis → perspectives
-- perspectives.json's archetype selection should match seed-analysis.json's `dimensions.domain`
-- If `domain=security`, security archetype must be included
-- Perspective count should respect `dimensions.complexity` (single-cause: 2-3, multi-factor: 3-5)
+- perspectives.json's perspective selection should be grounded in seed-analysis.json's `research.findings` and `research.key_areas`
+- Security-related findings should result in a security-focused perspective
+- Perspective count: minimum 2, typically 3-5
 
 ### perspectives → findings
 - Each findings.json `analyst` field must match a perspectives.json `id`

@@ -1,15 +1,36 @@
 ---
 name: analyze
-description: Runs multi-perspective agent team analysis with ontology-scoped investigation and MCP-based Socratic verification. Handles incident analysis, postmortem reports, outage investigation, root cause analysis, and system analysis requiring verified findings with hallucination detection.
-version: 4.1.0
+description: Runs multi-perspective agent team analysis with ontology-scoped investigation and MCP-based Socratic verification. General-purpose analysis engine — any topic can be seeded for multi-perspective analysis against ontology documents. Supports config-based customization for wrapper skills (e.g., PRD analysis).
+version: 5.0.0
 user-invocable: true
-allowed-tools: Task, SendMessage, TeamCreate, TeamDelete, TaskCreate, TaskUpdate, TaskList, TaskGet, TaskOutput, Read, Glob, Grep, Bash, Write, WebFetch, WebSearch, ToolSearch, ListMcpResourcesTool, mcp__prism-mcp__prism_docs_roots, mcp__prism-mcp__prism_docs_list, mcp__prism-mcp__prism_docs_read, mcp__prism-mcp__prism_docs_search, mcp__prism-mcp__prism_interview---
+allowed-tools: Task, SendMessage, TeamCreate, TeamDelete, TaskCreate, TaskUpdate, TaskList, TaskGet, TaskOutput, Read, Glob, Grep, Bash, Write, WebFetch, WebSearch, ToolSearch, ListMcpResourcesTool, mcp__prism-mcp__prism_docs_roots, mcp__prism-mcp__prism_docs_list, mcp__prism-mcp__prism_docs_read, mcp__prism-mcp__prism_docs_search, mcp__prism-mcp__prism_interview
+---
 
 # Multi-Perspective Analysis
+
+General-purpose analysis engine. Any topic is seeded, researched, and analyzed from dynamically generated perspectives with Socratic verification.
 
 Prompt templates and report template are in subdirectories relative to this file. Read them at spawn time — do NOT preload into memory.
 
 Later phases (Phase 2+) are in `docs/later-phases.md`. Read that file ONLY when entering Phase 2.
+
+## Config-Based Customization
+
+Wrapper skills (e.g., `/prd`) can customize analyze behavior by providing a config file. The config path is passed via `$ARGUMENTS` as `--config <path>`.
+
+### Config Schema
+
+```json
+{
+  "topic": "What to analyze (overrides description if provided)",
+  "input_context": "Path to input file (e.g., PRD file path)",
+  "report_template": "Path to custom report template (overrides default)",
+  "seed_hints": "Additional guidance for seed analyst (e.g., 'Focus on policy domain extraction')",
+  "ontology_mode": "required|optional (default: optional)"
+}
+```
+
+If no config is provided, analyze runs with defaults (topic from user input, default report template, optional ontology).
 
 ## Artifact Persistence
 
@@ -17,12 +38,14 @@ Persist phase outputs to `~/.prism/state/analyze-{short-id}/` (created in Phase 
 
 | File | Written | Read By |
 |------|---------|---------|
+| `config.json` | Orchestrator (Phase 0, if config provided) | Orchestrator (all phases) |
 | `seed-analysis.json` | Seed Analyst (Phase 0.5) | Perspective Generator (Phase 0.55), Orchestrator |
 | `perspectives.json` | Perspective Generator (Phase 0.55), updated by Orchestrator (Phase 0.6) | Orchestrator (Phase 0.6, 0.8, 1, 3) |
 | `context.json` | Orchestrator (Phase 0.8) | Orchestrator (Phase 1 `{CONTEXT}` injection, Phase 3 re-entry) |
 | `~/.prism/state/analyze-{short-id}/perspectives/{perspective-id}/findings.json` | Analyst (Phase 1 — Finding Session) | Analyst (Phase 2 — Verification Session), MCP prism_interview |
 | `verified-findings-{perspective-id}.md` | Orchestrator (Phase 2 Stage B) | Phase 3 synthesis |
 | `analyst-findings.md` | Orchestrator (Phase 2 exit) | Phase 3 synthesis |
+| `verification-log.json` | Orchestrator (Phase 2 Step 2B.6) | Phase 3 synthesis (Socratic Verification Summary section) |
 | `prior-iterations.md` | Each re-entry (append) | All agents (cumulative) |
 | `ontology-scope.json` | Orchestrator (Phase 0.7) | Analysts (via `{ONTOLOGY_SCOPE}` injection) |
 
@@ -30,11 +53,9 @@ Persist phase outputs to `~/.prism/state/analyze-{short-id}/` (created in Phase 
 
 > Read and execute `../shared-v3/prerequisite-gate.md`. Set `{PROCEED_TO}` = "Phase 0".
 
-## Archetype Reference
+## Team Size
 
-Full archetype table (ID, Lens, Model, Agent Type) is in `prompts/perspective-generator.md § Archetype Reference`. Phase 1 spawn table below maps agents to prompt file sections.
-
-Team size: 2 min analysts, no hard max (typically 3-5; complex cases may need more). Verification runs via MCP `prism_interview` tool, not sidecar agents.
+2 min analysts, no hard max (typically 3-5; complex cases may need more). Verification runs via MCP `prism_interview` tool, not sidecar agents.
 
 ---
 
@@ -42,9 +63,13 @@ Team size: 2 min analysts, no hard max (typically 3-5; complex cases may need mo
 
 Orchestrator handles intake directly — NOT delegated.
 
-### Step 0.1: Collect Description
+### Step 0.1: Parse Arguments & Config
 
-If the user provided a description via `$ARGUMENTS`, use it directly. Otherwise, ask via `AskUserQuestion` (header: "Analysis"): "Please describe the problem: What symptoms? Which systems affected? Business impact?"
+Check if `$ARGUMENTS` contains `--config <path>`:
+- **Config provided**: Read the config file. Copy it to `~/.prism/state/analyze-{short-id}/config.json` (after state dir creation in Step 0.2). Use `config.topic` as description if present, otherwise fall back to remaining arguments.
+- **No config**: Use `$ARGUMENTS` as the description directly. If empty, ask via `AskUserQuestion` (header: "Analysis"): "Please describe what you'd like to analyze."
+
+Store the resolved description and config values for use in subsequent phases.
 
 ### Step 0.2: Generate Session ID and State Directory
 
@@ -54,14 +79,15 @@ Generate `{short-id}`: `Bash(uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-8)`.
 
 Create state directory: `Bash(mkdir -p ~/.prism/state/analyze-{short-id})`
 
+If config was provided in Step 0.1, copy it to state directory now.
+
 ### Phase 0 Exit Gate
 
 MUST NOT proceed until ALL checked:
 
-- [ ] Description collected → ERROR: "Phase 0 blocked: user description is empty. Re-run Step 0.1 with AskUserQuestion."
+- [ ] Description collected → ERROR: "Phase 0 blocked: description is empty. Re-run Step 0.1."
 - [ ] `{short-id}` generated and state directory created → ERROR: "Phase 0 blocked: run `uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-8` and `mkdir -p ~/.prism/state/analyze-{short-id}`"
-
-Severity and status are NOT collected here — the seed-analyst will determine these automatically during active investigation in Phase 0.5.
+- [ ] Config copied to state directory (if provided) → ERROR: "Copy config to ~/.prism/state/analyze-{short-id}/config.json"
 
 → **NEXT ACTION: Proceed to Phase 0.5 Step 0.5.1 — Create team.**
 
@@ -75,7 +101,7 @@ Severity and status are NOT collected here — the seed-analyst will determine t
 TeamCreate(team_name: "analyze-{short-id}", description: "Analysis: {summary}")
 ```
 
-> Replace `{summary}` with a short (≤10 word) summary derived from the user's description (Phase 0.1). `context.json` is not yet available at this point.
+> Replace `{summary}` with a short (≤10 word) summary derived from the description (Phase 0.1). `context.json` is not yet available at this point.
 
 ### Step 0.5.2: Spawn Seed Analyst
 
@@ -97,22 +123,20 @@ Task(
 > Apply worker preamble from `../shared-v3/worker-preamble.md` with:
 - `{TEAM_NAME}` = `"analyze-{short-id}"`
 - `{WORKER_NAME}` = `"seed-analyst"`
-- `{WORK_ACTION}` = `"Actively investigate using available tools (Grep, Read, Bash, MCP). Evaluate dimensions and severity. Write findings to seed-analysis.json. Report via SendMessage."`
+- `{WORK_ACTION}` = `"Actively investigate using available tools (Grep, Read, Bash, MCP). Research the topic and produce findings. Write findings to seed-analysis.json. Report via SendMessage."`
 
 Placeholder replacements in seed-analyst prompt:
 - `{DESCRIPTION}` → Phase 0 description
 - `{SHORT_ID}` → Phase 0 short-id
+- `{SEED_HINTS}` → config's `seed_hints` value if present, otherwise empty string
 
 ### Step 0.5.3: Receive Seed Analyst Results
 
 Wait for seed-analyst to send results via `SendMessage`. The message contains a JSON object with:
-- `severity`, `status`
-- `dimensions`: domain, failure_type, evidence_available, complexity, recurrence
-- `research`: findings (with source and tool_used), files_examined, mcp_queries, recent_changes
+- `topic`: original description
+- `research`: summary, findings (with source and tool_used), key_areas, files_examined, mcp_queries
 
 The seed analyst also writes this JSON to `~/.prism/state/analyze-{short-id}/seed-analysis.json`.
-
-Note: The seed analyst focuses on research and dimension evaluation only — perspective generation is handled separately in Phase 0.55.
 
 ### Step 0.5.4: Shutdown Seed Analyst
 
@@ -158,7 +182,7 @@ Task(
 > Apply worker preamble from `../shared-v3/worker-preamble.md` with:
 - `{TEAM_NAME}` = `"analyze-{short-id}"`
 - `{WORKER_NAME}` = `"perspective-generator"`
-- `{WORK_ACTION}` = `"Read seed-analysis.json, apply archetype mapping rules and mandatory rules, generate perspective candidates. Write perspectives.json. Report via SendMessage."`
+- `{WORK_ACTION}` = `"Read seed-analysis.json and analyst-prompt-structure.md. Generate perspective candidates with tailored analyst prompts. Write perspectives.json. Report via SendMessage."`
 
 Placeholder replacements:
 - `{SHORT_ID}` → Phase 0 short-id
@@ -167,8 +191,8 @@ Placeholder replacements:
 ### Step 0.55.2: Receive Perspective Generator Results
 
 Wait for perspective-generator to send results via `SendMessage`. The message contains a JSON object with:
-- `perspectives`: array of perspective candidates (id, name, scope, key_questions, model, agent_type, rationale)
-- `rules_applied`: which mandatory rules were checked and enforced
+- `perspectives`: array of perspective candidates (id, name, scope, key_questions, model, agent_type, prompt, rationale)
+- `quality_gate`: which checks were verified
 - `selection_summary`: reasoning for the selection
 
 The perspective generator also writes this JSON to `~/.prism/state/analyze-{short-id}/perspectives.json`.
@@ -202,11 +226,11 @@ Read `~/.prism/state/analyze-{short-id}/perspectives.json` and present to user.
 
 `AskUserQuestion` (header: "Perspectives", question: "I recommend these {N} perspectives for analysis. How to proceed?", options: "Proceed" / "Add perspective" / "Remove perspective" / "Modify perspective")
 
-Include seed-analyst's research summary (from `seed-analysis.json`) for user context. Show `rules_applied` so user knows which mandatory rules were enforced.
+Include seed-analyst's research summary (from `seed-analysis.json`) for user context. Show each perspective's name, scope, model, and a brief summary of the generated prompt tasks.
 
 ### Step 0.6.2: Iterate Until Approved
 
-Repeat until user selects "Proceed". Warn if <2 dynamic perspectives.
+Repeat until user selects "Proceed". Warn if <2 perspectives.
 
 ### Step 0.6.3: Update Perspectives
 
@@ -215,14 +239,14 @@ Update `~/.prism/state/analyze-{short-id}/perspectives.json` in-place — add ap
 ```json
 {
   "perspectives": [...],
-  "rules_applied": {...},
+  "quality_gate": {...},
   "selection_summary": "...",
   "approved": true,
   "user_modifications": ["description of changes, if any"]
 }
 ```
 
-The `perspectives` array, `rules_applied`, and `selection_summary` fields are preserved from Phase 0.55. The orchestrator adds `approved` and `user_modifications` (empty array if no changes).
+The `perspectives` array, `quality_gate`, and `selection_summary` fields are preserved from Phase 0.55. The orchestrator adds `approved` and `user_modifications` (empty array if no changes).
 
 ### Phase 0.6 Exit Gate
 
@@ -238,7 +262,7 @@ MUST NOT proceed until:
 ## Phase 0.7: Ontology Scope Mapping
 
 > Read and execute `../shared-v3/ontology-scope-mapping.md` with:
-- `{AVAILABILITY_MODE}` = `optional`
+- `{AVAILABILITY_MODE}` = config's `ontology_mode` if present, otherwise `optional`
 - `{CALLER_CONTEXT}` = `"analysis"`
 - `{STATE_DIR}` = `~/.prism/state/analyze-{short-id}`
 
@@ -256,20 +280,21 @@ Write `~/.prism/state/analyze-{short-id}/context.json`:
 
 ```json
 {
-  "summary": "Symptoms, timeline, blast radius, mitigation, evidence",
+  "summary": "Topic description and key context",
   "research_summary": {
     "key_findings": ["finding1", "finding2"],
     "files_examined": ["path1", "path2"],
-    "dimensions": "domain, failure_type, complexity, recurrence from seed-analysis.json"
+    "key_areas": ["area1", "area2"]
   },
   "report_language": "detected from user's input language",
-  "investigation_loops": 0
+  "investigation_loops": 0,
+  "config": "{config object if provided, null otherwise}"
 }
 ```
 
 ### Phase 0.8 Exit Gate
 
-MUST NOT proceed until:
+MUST NOT proceed until ALL checked:
 
 - [ ] `perspectives.json` updated with approved=true → ERROR: "Phase 0.8 blocked: perspectives.json missing 'approved: true'. Re-run Phase 0.6."
 - [ ] `context.json` written with structured summary → ERROR: "Write context.json to ~/.prism/state/analyze-{short-id}/context.json per Step 0.8.1."
@@ -285,53 +310,59 @@ Team already exists from Phase 0.5. Spawn all analyst agents in parallel. Each a
 
 ### Step 1.1: Spawn Analysts
 
-MUST read prompt files before spawning. Files are relative to this SKILL.md's directory.
+Read `perspectives.json` to get each perspective's dynamically generated prompt.
 
 **Prompt assembly order:** For each analyst:
-1. Read archetype section from `prompts/core-archetypes.md` or `prompts/extended-archetypes.md`
+1. Read the perspective's `prompt` object from `perspectives.json`
 2. Read `prompts/finding-protocol.md`
-3. Concatenate: `[worker preamble] + [archetype prompt] + [finding protocol]`
+3. Assemble the full prompt using the prompt structure:
+   ```
+   [worker preamble]
+
+   {prompt.role}
+
+   CONTEXT:
+   {CONTEXT}
+
+   ### Reference Documents
+   {ONTOLOGY_SCOPE}
+
+   {prompt.investigation_scope}
+
+   TASKS:
+   {prompt.tasks}
+
+   OUTPUT:
+   {prompt.output_format}
+
+   [finding protocol]
+   ```
 4. Replace placeholders (`{CONTEXT}`, `{ONTOLOGY_SCOPE}`, `{SHORT_ID}`, `{perspective-id}`, `{KEY_QUESTIONS}`, `{ORIGINAL_INPUT}`)
 5. Spawn via `Task(...)`
-
-| Agent | Prompt File | Section |
-|-------|-------------|---------|
-| Timeline | `prompts/core-archetypes.md` | § Timeline Lens |
-| Root Cause | `prompts/core-archetypes.md` | § Root Cause Lens |
-| Systems & Architecture | `prompts/core-archetypes.md` | § Systems Lens |
-| Impact | `prompts/core-archetypes.md` | § Impact Lens |
-| Security | `prompts/extended-archetypes.md` | § Security Lens |
-| Data Integrity | `prompts/extended-archetypes.md` | § Data Integrity Lens |
-| Performance | `prompts/extended-archetypes.md` | § Performance Lens |
-| UX | `prompts/extended-archetypes.md` | § UX Lens |
-| Deployment | `prompts/extended-archetypes.md` | § Deployment |
-| Network | `prompts/extended-archetypes.md` | § Network |
-| Concurrency | `prompts/extended-archetypes.md` | § Concurrency |
-| Dependency | `prompts/extended-archetypes.md` | § Dependency |
-| Financial & Compliance | `prompts/extended-archetypes.md` | § Financial Lens |
-| Custom | `prompts/extended-archetypes.md` | § Custom Lens |
 
 **Spawn pattern:**
 
 ```
 Task(
   subagent_type="oh-my-claudecode:{agent_type}",
-  name="{archetype-id}-analyst",
+  name="{perspective-id}-analyst",
   team_name="analyze-{short-id}",
   model="{model}",
   run_in_background=true,
-  prompt="{analyst prompt with {CONTEXT}, {ONTOLOGY_SCOPE}, {SHORT_ID}, {perspective-id}, {KEY_QUESTIONS} replaced}"
+  prompt="{assembled analyst prompt}"
 )
 ```
 
 > Apply worker preamble with `{WORK_ACTION}` = `"Investigate from your assigned perspective. Answer ALL key questions with evidence and code references. Write findings to findings.json. Report findings via SendMessage to team-lead. Do NOT run self-verification — that happens in a separate session."`
 
-MUST replace `{CONTEXT}` with a text summary derived from `context.json`: format as `Summary: {summary}\nKey Findings: {research_summary.key_findings joined}\nFiles Examined: {research_summary.files_examined joined}\nDimensions: {research_summary.dimensions}`.
+MUST replace `{CONTEXT}` with a text summary derived from `context.json`: format as `Summary: {summary}\nKey Findings: {research_summary.key_findings joined}\nFiles Examined: {research_summary.files_examined joined}\nKey Areas: {research_summary.key_areas joined}`.
 MUST replace `{ONTOLOGY_SCOPE}` by reading `ontology-scope.json` and generating a text block per Phase B of ontology-scope-mapping.md (or "N/A" if not found).
 MUST replace `{SHORT_ID}` with the session's `{short-id}`. Analysts construct their own session path: `analyze-{short-id}/perspectives/{perspective-id}`.
 MUST replace `{KEY_QUESTIONS}` from `perspectives.json` for the matching perspective's `key_questions` array, formatted as a numbered list.
 MUST replace `{perspective-id}` with the perspective's `id` field from `perspectives.json`. This value appears in findings paths and SendMessage output in finding-protocol.md.
-MUST replace `{ORIGINAL_INPUT}` with `context.json`'s `summary` field. This is written into findings.json so the verification interviewer can evaluate relevance to the original problem.
+MUST replace `{ORIGINAL_INPUT}` with `context.json`'s `summary` field. This is written into findings.json so the verification interviewer can evaluate relevance to the original topic.
+
+`{model}` and `{agent_type}` come from each perspective's fields in `perspectives.json` — these were dynamically determined by the perspective generator.
 
 ### Phase 1 Exit Gate
 
@@ -347,15 +378,15 @@ MUST NOT proceed until:
 ## Gate Summary
 
 ```
-Prerequisite → Phase 0 [intake, session ID]
-→ Phase 0.5 [TeamCreate + seed-analyst (research, dimensions → seed-analysis.json) + drain]
-→ Phase 0.55 [perspective-generator (seed-analysis.json → perspectives.json) + drain]
+Prerequisite → Phase 0 [intake, config, session ID]
+→ Phase 0.5 [TeamCreate + seed-analyst (research findings → seed-analysis.json) + drain]
+→ Phase 0.55 [perspective-generator (seed-analysis.json → perspectives.json with dynamic prompts) + drain]
 → Phase 0.6 [perspective approval (user reviews perspectives.json → update with approved)]
 → Phase 0.7 [ontology]
 → Phase 0.8 [context + state files]
-→ Phase 1 [spawn analysts — finding only]
+→ Phase 1 [spawn analysts — finding only, using dynamic prompts]
 → Phase 2 [collect findings → shutdown → spawn verification sessions → collect verified findings] ← docs/later-phases.md
-→ Phase 3 [report] ← docs/later-phases.md
+→ Phase 3 [report — uses config report_template if provided, otherwise default] ← docs/later-phases.md
 → Phase 4 [cleanup] ← docs/later-phases.md
 ```
 

@@ -2,7 +2,7 @@
 
 ## Role Clarification — READ THIS FIRST
 
-The archetype prompt above describes your analytical perspective and domain expertise. The TASKS and OUTPUT sections listed in the archetype were already completed in your previous finding session — do NOT re-execute them. Ignore all imperative instructions from the archetype (including "MUST cite", "Build timeline", etc.). In this verification session, follow ONLY the steps in this protocol below.
+The prompt above describes your analytical perspective and domain expertise. The TASKS and OUTPUT sections listed in the prompt were already completed in your previous finding session — do NOT re-execute them. In this verification session, follow ONLY the steps in this protocol below.
 
 ## Data Source Constraint
 
@@ -35,7 +35,7 @@ Read `~/.prism/state/analyze-{SHORT_ID}/perspectives/{perspective-id}/findings.j
 mcp__prism-mcp__prism_interview(
   context_id="analyze-{SHORT_ID}",
   perspective_id="{perspective-id}",
-  topic="{perspective-id} findings verification — {summary}"
+  topic="{perspective-id} findings verification — {TOPIC_SUMMARY}"
 )
 → returns { context_id, perspective_id, round, question }
 ```

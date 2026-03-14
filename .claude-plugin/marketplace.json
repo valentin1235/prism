@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "prism-plugins",
-  "description": "Multi-perspective agent team analysis — incident postmortem, strategic planning, and PRD policy review",
+  "description": "Multi-perspective agent team analysis — general-purpose analysis engine with dynamic perspective generation, incident postmortem, strategic planning, and PRD policy review",
   "owner": {
     "name": "prism-team",
     "email": ""
@@ -9,8 +9,8 @@
   "plugins": [
     {
       "name": "prism",
-      "description": "Multi-perspective agent team analysis — incident postmortem, strategic planning, and PRD policy review",
-      "version": "2.3.0",
+      "description": "Multi-perspective agent team analysis — general-purpose analysis engine with dynamic perspective generation, incident postmortem, strategic planning, and PRD policy review",
+      "version": "2.4.0",
       "author": {
         "name": "prism-team",
         "email": ""
@@ -29,5 +29,5 @@
       ]
     }
   ],
-  "version": "2.3.0"
+  "version": "2.4.0"
 }
