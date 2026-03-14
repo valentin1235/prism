@@ -131,6 +131,21 @@ After ALL verifiers are done:
 1. Compile all verified findings into `~/.prism/state/analyze-{short-id}/analyst-findings.md`
 2. Include verification scores summary table (per perspective: perspective_id, rounds, weighted_total, verdict)
 3. Flag any FORCE PASS analysts for user attention
+4. Write verification log to `~/.prism/state/analyze-{short-id}/verification-log.json`:
+   ```json
+   {
+     "verification_executed": true,
+     "verifiers_spawned": ["perspective-id-1", "perspective-id-2"],
+     "scores": [
+       {"perspective_id": "...", "rounds": 3, "weighted_total": 0.82, "verdict": "PASS"},
+       {"perspective_id": "...", "rounds": 5, "weighted_total": 0.65, "verdict": "FORCE PASS"}
+     ],
+     "key_clarifications": [
+       {"perspective_id": "...", "round": 2, "question": "...", "answer": "...", "impact": "..."}
+     ]
+   }
+   ```
+   This file is the authoritative source for Phase 3 report generation — verification scores MUST appear in the final report.
 
 ### Phase 2 Exit Gate
 
@@ -139,6 +154,7 @@ After ALL verifiers are done:
 - [ ] All verifiers shut down
 - [ ] All verified findings persisted
 - [ ] Compiled findings written to `analyst-findings.md`
+- [ ] `verification-log.json` written with per-analyst scores and verdicts → ERROR: "Phase 2 blocked: verification-log.json missing. Write it per Step 2B.6 item 4."
 
 → **NEXT ACTION: Proceed to Phase 3 — Synthesis & Report.**
 
@@ -146,9 +162,13 @@ After ALL verifiers are done:
 
 ## Phase 3: Synthesis & Report
 
-### Step 3.1
+### Step 3.1: Integrate Findings and Verification Data
 
-Integrate all verified analyst findings. Read from `~/.prism/state/analyze-{short-id}/analyst-findings.md`.
+Integrate all verified analyst findings. Read BOTH files:
+1. `~/.prism/state/analyze-{short-id}/analyst-findings.md` — compiled findings
+2. `~/.prism/state/analyze-{short-id}/verification-log.json` — verification scores and clarifications
+
+The verification data MUST be included in the final report's "Socratic Verification Summary" section. This is a core differentiator of the analysis — omitting verification scores defeats the purpose of the Socratic verification phase.
 
 ### Step 3.2: Select Report Template
 
@@ -158,6 +178,20 @@ Check for config-provided report template:
 3. If no config or no `report_template` → Read `templates/report.md` (default template, relative to SKILL.md)
 
 Fill the selected template with synthesized findings. Write the report in the language specified by `context.json.report_language`.
+
+### Step 3.2.1: Report Template Compliance Check
+
+Before presenting to user, verify the generated report contains ALL required sections from the template:
+
+- [ ] Executive Summary
+- [ ] Analysis Overview (topic, date, method, perspectives, reference docs)
+- [ ] Perspective Findings (one subsection per analyst)
+- [ ] Integrated Analysis (convergence, divergence, emergent insights)
+- [ ] Socratic Verification Summary (per-analyst scores table, key clarifications, unresolved ambiguities) → ERROR: "Report missing verification scores. Read verification-log.json and populate the Socratic Verification Summary section."
+- [ ] Recommendations (with priority/impact/effort table + immediate/short/long-term)
+- [ ] Appendix
+
+If any section is missing or empty, fix it before proceeding. The "Socratic Verification Summary" section is the most commonly omitted — explicitly check for the per-analyst scores table.
 
 ### Step 3.3
 
