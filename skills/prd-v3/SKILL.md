@@ -136,7 +136,7 @@ Read `prompts/post-processor.md` (relative to this SKILL.md).
 
 ```
 Task(
-  subagent_type="oh-my-claudecode:analyst",
+  subagent_type="prism:finder",
   model="opus",
   prompt="{post-processor prompt with placeholders replaced}"
 )
