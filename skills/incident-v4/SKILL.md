@@ -175,15 +175,7 @@ If missing → ERROR: "Post-processor agent failed to generate report."
 
 ## Phase 3: Output
 
-### Step 3.1: Copy Report to Working Directory
-
-Save a copy of the report to the current working directory for easy access:
-
-```bash
-cp ~/.prism/state/incident-{short-id}/incident-rca-report.md ./incident-rca-report-{short-id}.md
-```
-
-### Step 3.2: Report to User
+### Step 3.1: Report to User
 
 Inform the user of the results:
 
@@ -191,7 +183,6 @@ Inform the user of the results:
 Incident RCA analysis complete.
 
 Report location:
-- ./incident-rca-report-{short-id}.md
 - ~/.prism/state/incident-{short-id}/incident-rca-report.md
 
 Analyze raw results: {ANALYZE_STATE_DIR}/
