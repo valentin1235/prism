@@ -26,7 +26,8 @@ Wrapper skills (e.g., `/prd`) can customize analyze behavior by providing a conf
   "input_context": "Path to input file (e.g., PRD file path)",
   "report_template": "Path to custom report template (overrides default)",
   "seed_hints": "Additional guidance for seed analyst (e.g., 'Focus on policy domain extraction')",
-  "ontology_mode": "required|optional (default: optional)"
+  "ontology_mode": "required|optional (default: optional)",
+  "session_id": "Pre-generated session ID (optional — if provided, reuse instead of generating new one)"
 }
 ```
 
@@ -48,6 +49,7 @@ Persist phase outputs to `~/.prism/state/analyze-{short-id}/` (created in Phase 
 | `verification-log.json` | Orchestrator (Phase 2 Step 2B.6) | Phase 3 synthesis (Socratic Verification Summary section) |
 | `prior-iterations.md` | Each re-entry (append) | All agents (cumulative) |
 | `ontology-scope.json` | Orchestrator (Phase 0.7) | Analysts (via `{ONTOLOGY_SCOPE}` injection) |
+| `perspective_injection.json` | Wrapper skill (optional, before analyze invocation) | Merge script (Step 0.55.5) |
 
 ## Prerequisite: Agent Team Mode (HARD GATE)
 
@@ -73,11 +75,11 @@ Store the resolved description and config values for use in subsequent phases.
 
 ### Step 0.2: Generate Session ID and State Directory
 
-Generate `{short-id}`: `Bash(uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-8)`. Generate ONCE and reuse throughout all phases.
+If `config.session_id` is provided, use it as `{short-id}`. Otherwise, generate `{short-id}`: `Bash(uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-8)`. Either way, generate/resolve ONCE and reuse throughout all phases.
 
 > **Naming note:** `{short-id}` in path templates (e.g., `analyze-{short-id}/`) and `{SHORT_ID}` in prompt placeholders refer to the same value. Use `{short-id}` when constructing paths, `{SHORT_ID}` when replacing placeholders in agent prompts.
 
-Create state directory: `Bash(mkdir -p ~/.prism/state/analyze-{short-id})`
+Create state directory (if it doesn't already exist): `Bash(mkdir -p ~/.prism/state/analyze-{short-id})`
 
 If config was provided in Step 0.1, copy it to state directory now.
 
@@ -205,12 +207,27 @@ After receiving results: `SendMessage(type: "shutdown_request", recipient: "pers
 
 Same as Step 0.5.5 — drain all completed background task outputs via `TaskList` → `TaskOutput`.
 
+### Step 0.55.5: Merge Injected Perspectives
+
+After perspective generator completes and `perspectives.json` is written, run the merge script:
+
+```bash
+bash {SKILL_DIR}/scripts/merge-perspective-injection.sh ~/.prism/state/analyze-{short-id}
+```
+
+> Determine `{SKILL_DIR}` as the absolute path of the directory containing this SKILL.md via `Bash`.
+
+This script is deterministic and safe:
+- If `perspective_injection.json` does not exist → no-op (silent exit)
+- If it exists → appends injected perspectives to `perspectives.json`'s `perspectives` array
+
 ### Phase 0.55 Exit Gate
 
 MUST NOT proceed until:
 
 - [ ] Perspective generator results received → ERROR: "Phase 0.55 blocked: no SendMessage from perspective-generator. Run TaskList."
 - [ ] `perspectives.json` written → ERROR: "File missing at ~/.prism/state/analyze-{short-id}/perspectives.json"
+- [ ] Merge script executed → ERROR: "Run Step 0.55.5: bash {SKILL_DIR}/scripts/merge-perspective-injection.sh ~/.prism/state/analyze-{short-id}"
 - [ ] Perspective generator shut down → ERROR: "Send shutdown_request to perspective-generator."
 - [ ] All background task outputs drained → ERROR: "Run TaskList → TaskOutput for each completed task."
 

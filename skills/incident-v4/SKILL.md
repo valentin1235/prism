@@ -32,10 +32,11 @@ Extract the incident description from `$ARGUMENTS`.
 uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-8
 ```
 
-Generate ONCE, reuse throughout. Create state directory:
+Generate ONCE, reuse throughout. Create state directories for both incident and analyze (shared session ID):
 
 ```bash
 mkdir -p ~/.prism/state/incident-{short-id}
+mkdir -p ~/.prism/state/analyze-{short-id}
 ```
 
 ### Step 0.3: Language Detection
@@ -76,18 +77,19 @@ Write the following JSON to `~/.prism/state/incident-{short-id}/analyze-config.j
   "input_context": "{INCIDENT_DESCRIPTION with screenshot paths if any}",
   "report_template": "{SKILL_DIR}/templates/report.md",
   "seed_hints": "This is an incident/outage analysis. Investigate root cause, contributing factors, and timeline. One perspective SHOULD focus on UX impact — analyze how the incident affected end users' experience, what users saw or experienced during the incident, and how the implementation caused user-facing problems. Other perspectives should cover technical root cause, system architecture implications, and operational gaps. Use available tools (Grep, Read, Bash, MCP) to trace the incident through the codebase.",
-  "ontology_mode": "optional"
+  "ontology_mode": "optional",
+  "session_id": "{short-id}"
 }
 ```
 
 > Determine the absolute path of the directory containing this SKILL.md via `Bash`. Store it as `{SKILL_DIR}` for use in Step 2.1.
 
-### Step 1.3: Snapshot Before Analyze
+### Step 1.3: Write Perspective Injection
 
-Take a snapshot of existing analyze directories **before** invoking analyze:
+Copy the UX impact perspective to the analyze state directory. This file will be merged into `perspectives.json` by analyze's merge script after perspective generation.
 
 ```bash
-ls -d ~/.prism/state/analyze-* 2>/dev/null > ~/.prism/state/incident-{short-id}/analyze-dirs-before.txt || touch ~/.prism/state/incident-{short-id}/analyze-dirs-before.txt
+cp {SKILL_DIR}/perspectives/ux-impact.json ~/.prism/state/analyze-{short-id}/perspective_injection.json
 ```
 
 ### Step 1.4: Invoke Analyze
@@ -100,26 +102,20 @@ Wait for analyze to complete. If analyze fails or the user cancels mid-execution
 
 Analyze internally handles:
 - Seed analyst investigation of incident and related code areas
-- Multi-perspective generation (including UX impact perspective guided by seed_hints)
+- Multi-perspective generation + merging injected UX perspective (from perspective_injection.json)
 - Per-perspective analyst spawning
 - Socratic verification of findings
 - Report generation
 
 ### Step 1.5: Locate Analyze Output
 
-After analyze completes, compare directories before and after to find the newly created analyze directory:
+The analyze state directory is already known: `~/.prism/state/analyze-{short-id}` (shared session ID).
 
-```bash
-comm -13 <(sort ~/.prism/state/incident-{short-id}/analyze-dirs-before.txt) <(ls -d ~/.prism/state/analyze-* 2>/dev/null | sort)
-```
+Verify the following files exist:
+- `~/.prism/state/analyze-{short-id}/analyst-findings.md` — verified analysis results
+- `~/.prism/state/analyze-{short-id}/verification-log.json` — Socratic verification scores (may not exist — this is tolerated because the post-processor has a 3-tier fallback for confidence scores)
 
-There should be exactly 1 new directory. If 0 → ERROR: "analyze did not create a state directory." If 2+ → select the most recent one.
-
-Verify the following files exist in that directory:
-- `analyst-findings.md` — verified analysis results
-- `verification-log.json` — Socratic verification scores (may not exist — this is tolerated because the post-processor has a fallback for confidence scores)
-
-Store this path as `{ANALYZE_STATE_DIR}`.
+Store `~/.prism/state/analyze-{short-id}` as `{ANALYZE_STATE_DIR}`.
 
 ### Phase 1 Exit Gate
 

@@ -32,10 +32,11 @@ Extract the PRD file path from `$ARGUMENTS`.
 uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-8
 ```
 
-Generate ONCE, reuse throughout. Create state directory:
+Generate ONCE, reuse throughout. Create state directories for both prd and analyze (shared session ID):
 
 ```bash
 mkdir -p ~/.prism/state/prd-{short-id}
+mkdir -p ~/.prism/state/analyze-{short-id}
 ```
 
 ### Step 0.3: Language Detection
@@ -71,21 +72,14 @@ Write the following JSON to `~/.prism/state/prd-{short-id}/analyze-config.json`:
   "topic": "PRD policy conflict analysis: {PRD title} — multi-perspective analysis of whether this PRD conflicts with or has ambiguities against existing codebase policies",
   "input_context": "{PRD file absolute path}",
   "seed_hints": "First, Read the PRD file at {PRD file absolute path}. Extract policy domains from a PM (product manager) perspective. Focus on business policy conflicts, rule contradictions, undefined edge cases, and ambiguous requirements — NOT engineering implementation details. Classify each functional requirement as either conflicting with existing policy documents or covering a new area not addressed by existing policies. Generated perspectives should focus on policy/business domains, not engineering/architecture domains.",
-  "ontology_mode": "required"
+  "ontology_mode": "required",
+  "session_id": "{short-id}"
 }
 ```
 
 > Determine the absolute path of the directory containing this SKILL.md via `Bash`. Store it as `{SKILL_DIR}` for use in Step 2.1.
 
-### Step 1.3: Snapshot Before Analyze
-
-Take a snapshot of existing analyze directories **before** invoking analyze:
-
-```bash
-ls -d ~/.prism/state/analyze-* 2>/dev/null > ~/.prism/state/prd-{short-id}/analyze-dirs-before.txt || touch ~/.prism/state/prd-{short-id}/analyze-dirs-before.txt
-```
-
-### Step 1.4: Invoke Analyze
+### Step 1.3: Invoke Analyze
 
 ```
 Skill(skill="prism:analyze", args="--config ~/.prism/state/prd-{short-id}/analyze-config.json")
@@ -100,21 +94,15 @@ Analyze internally handles:
 - Socratic verification of findings
 - Report generation
 
-### Step 1.5: Locate Analyze Output
+### Step 1.4: Locate Analyze Output
 
-After analyze completes, compare directories before and after to find the newly created analyze directory:
+The analyze state directory is already known: `~/.prism/state/analyze-{short-id}` (shared session ID).
 
-```bash
-comm -13 <(sort ~/.prism/state/prd-{short-id}/analyze-dirs-before.txt) <(ls -d ~/.prism/state/analyze-* 2>/dev/null | sort)
-```
+Verify the following files exist:
+- `~/.prism/state/analyze-{short-id}/analyst-findings.md` — verified analysis results
+- `~/.prism/state/analyze-{short-id}/verification-log.json` — Socratic verification scores (may not exist — this is tolerated because the post-processor has a 3-tier fallback for confidence scores)
 
-There should be exactly 1 new directory. If 0 → ERROR: "analyze did not create a state directory." If 2+ → select the most recent one.
-
-Verify the following files exist in that directory:
-- `analyst-findings.md` — verified analysis results
-- `verification-log.json` — Socratic verification scores (may not exist — this is tolerated because the post-processor has a 3-tier fallback for confidence scores)
-
-Store this path as `{ANALYZE_STATE_DIR}`.
+Store `~/.prism/state/analyze-{short-id}` as `{ANALYZE_STATE_DIR}`.
 
 ### Phase 1 Exit Gate
 
@@ -145,7 +133,7 @@ Task(
 **CRITICAL: Do NOT add `run_in_background=true`.** Must wait for post-processing results.
 
 Placeholder replacements:
-- `{ANALYZE_STATE_DIR}` → analyze result directory path identified in Step 1.5
+- `{ANALYZE_STATE_DIR}` → analyze result directory path identified in Step 1.4
 - `{PRD_FILE_PATH}` → PRD file absolute path
 - `{PRD_STATE_DIR}` → `~/.prism/state/prd-{short-id}`
 - `{REPORT_LANGUAGE}` → language determined in Phase 0.3
