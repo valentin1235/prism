@@ -10,12 +10,6 @@ allowed-tools: Skill, Task, Read, Write, Bash, Glob, Grep, AskUserQuestion, Tool
 
 Takes a PRD file as input, cross-references it against codebase policy documents (ontology) to find policy conflicts and ambiguities. Internally delegates the full multi-perspective analysis to `prism:analyze`, then post-processes the results into a PM-readable format.
 
-## Prerequisite
-
-> Read and execute `../shared-v3/prerequisite-gate.md`. Set `{PROCEED_TO}` = "Phase 0".
-
----
-
 ## Phase 0: Input
 
 ### Step 0.1: Get PRD File Path
