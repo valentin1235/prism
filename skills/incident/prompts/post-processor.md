@@ -44,7 +44,7 @@ The target reader is a developer. Include technical details, code references, an
 
 Read the report template at `{REPORT_TEMPLATE_PATH}`.
 
-If the path is empty or file not found, search via `Glob` for `**/incident-v4/templates/report.md`.
+If the path is empty or file not found, search via `Glob` for `**/incident/templates/report.md`.
 
 ### Step 3: Transform — Analyze Report → RCA Report
 

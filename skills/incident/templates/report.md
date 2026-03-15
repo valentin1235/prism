@@ -1,85 +1,119 @@
-# Incident Analysis Report Template
+# Incident RCA Report
 
-Fill all sections. Write "N/A" if truly irrelevant — do NOT leave sections empty.
+---
 
 ## Executive Summary
-[2-3 sentences: what happened, why, what to do]
+
+[2-3 sentences: what happened, root cause, severity, current status]
 
 ## Incident Overview
-- **Incident**: {description}
-- **Severity**: {SEV}
-- **Duration**: {start} to {end/ongoing}
-- **Status**: {Active/Mitigated/Resolved}
-- **Affected Systems**: {list}
-- **User Impact**: {summary}
-- **Perspectives Used**: {list of active lenses}
+
+- **Incident**: {incident title}
+- **Analysis Date**: {date}
+- **Method**: {N}-perspective multi-perspective analysis + Socratic verification
+- **Reference Docs**: {number of ontology documents} documents referenced
+- **Perspectives Used**: {list of perspectives}
+
+---
 
 ## Timeline
-| Time | Event | Evidence | Confidence |
-|------|-------|----------|------------|
 
-## Perspective Findings
+| Time | Event | Source |
+|------|-------|--------|
+| {time} | {event description} | {how this was determined} |
 
-{For EACH perspective (excluding DA):}
+> If timeline data is insufficient, state: "Timeline could not be fully reconstructed from available evidence."
 
-### {Lens Name}
-{Full findings per archetype output format}
+---
 
-## Integrated Analysis
-- **Convergence**: Where perspectives independently agreed
-- **Divergence**: Where they disagreed + resolution
-- **Emergent Insights**: Findings only visible when combining perspectives
+## Root Cause
 
-## Devil's Advocate Findings
-### Fallacy Check Results
-| # | Analyst | Claim | Verdict | Fallacy / Issue | Severity | Detail |
-|---|---------|-------|---------|-----------------|----------|--------|
+### Primary Root Cause
 
-### Cross-Analyst Contradictions
-| Analyst A Claims | Analyst B Claims | Contradiction | Question to Resolve |
-|-----------------|-----------------|---------------|-------------------|
+**What**: {description of the root cause}
 
-### Perspective Critique
-| Perspective | Appropriateness | What It Might Miss | Question for Analyst |
-|-------------|----------------|-------------------|---------------------|
+**Where**: {code path / system component}
 
-### Unanswered Questions
-- [Questions that MUST be answered before conclusions can be drawn]
+**Why**: {explanation of why this caused the incident}
 
-### Aggregate Verdict
-- BLOCKING: {count}
-- MAJOR: {count}
-- MINOR: {count}
+**Confidence**: {Verified / Partial / Unverified}
 
-## Tribunal Review (if activated)
-- Trigger: {reason}
-- Consensus: {X} unanimous, {Y} w/caveats, {Z} w/dissent
+### Contributing Factors
 
-### Recommendation Verdicts
-| Recommendation | DA | UX Critic | Eng Critic | Final |
-|---------------|----|-----------|------------|-------|
+| # | Factor | Relationship to Root Cause | Confidence |
+|---|--------|---------------------------|------------|
+| 1 | {factor} | {how it contributed} | {badge} |
 
-### Items Requiring User Decision
-### UX Recommendations (from UX Critic)
-### Engineering Notes (from Eng Critic)
+### Trigger
 
-## Recommendations
-| Action | Priority | UX Impact | Eng Effort | Tribunal Verdict |
-|--------|----------|-----------|------------|-----------------|
+{The immediate event that initiated the incident}
 
-### Immediate (This Week)
-### Short-Term (This Month)
-### Long-Term (This Quarter)
-### Monitoring & Alerting
+---
 
-## Prevention Checklist
-- [ ] Root cause permanently fixed
-- [ ] Monitoring for early detection
-- [ ] Runbook updated
-- [ ] Post-incident review scheduled
-- [ ] Similar risks elsewhere mitigated
+## UX Impact Analysis
+
+### User Experience During Incident
+
+{What users saw, experienced, or were unable to do}
+
+### Affected User Flows
+
+| # | Flow | Impact | Affected Users |
+|---|------|--------|---------------|
+| 1 | {user flow} | {what broke / degraded} | {scope: all users / segment / %} |
+
+### Technical Cause → UX Effect Mapping
+
+| Technical Cause | UX Effect | Severity |
+|----------------|-----------|----------|
+| {code/system issue} | {what user experienced} | {CRITICAL/HIGH/MEDIUM} |
+
+---
+
+## Per-Perspective Analysis Summary
+
+### {Perspective Name}
+- **Scope**: {what this perspective examined}
+- **Findings**: {N} items (CRITICAL: {n}, HIGH: {n}, MEDIUM: {n})
+- **Key Finding**: {1-2 sentence summary}
+- **Verification Score**: {score} ({verdict})
+
+---
+
+## Cross-Perspective Analysis
+
+- **Corroborated Root Causes**: Items where multiple perspectives independently identified the same cause
+- **Conflicting Conclusions**: Items where perspectives reached different conclusions
+- **Integrated Insights**: Issues only visible when combining perspectives
+
+---
+
+## Action Items
+
+### Immediate Fixes (Prevent Recurrence)
+- [ ] {specific action with code/system reference}
+
+### Short-Term Improvements (Monitoring / Alerting / Testing)
+- [ ] {specific improvement}
+
+### Long-Term Considerations (Architecture / Process)
+- [ ] {specific consideration}
+
+---
+
+## Confidence Summary (Socratic Verification)
+
+| Perspective | Verification Rounds | Score | Verdict |
+|-------------|-------------------|-------|---------|
+| {name} | {rounds} | {score} | {verdict} |
+
+---
 
 ## Appendix
-- Perspectives and rationale
-- Raw evidence links
-- Related past incidents
+
+### Referenced Documents
+| # | Document Path | Related Perspective | Reference Count |
+|---|--------------|-------------------|-----------------|
+
+### Raw Evidence
+{Key code snippets, log entries, or data points that support the root cause determination}

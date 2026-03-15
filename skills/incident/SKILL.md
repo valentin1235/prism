@@ -1,417 +1,189 @@
 ---
 name: incident
-description: Multi-perspective agent team incident postmortem with devil's advocate challenge
-version: 2.1.0
+description: Incident root cause analysis with UX impact — takes an incident description (text + optional screenshots) as input, runs multi-perspective analysis including UX impact perspective via analyze, then post-processes into a developer-facing RCA report. Use this skill for "incident analysis", "incident postmortem", "RCA", "root cause analysis", "incident review", "장애 분석", "인시던트 분석", "장애 리뷰", "포스트모템", or any request about analyzing an incident or outage.
+version: 1.0.0
 user-invocable: true
-allowed-tools: Task, SendMessage, TeamCreate, TeamDelete, TaskCreate, TaskUpdate, TaskList, TaskGet, Read, Glob, Grep, Bash, WebFetch, WebSearch, mcp__ontology-docs__search_files, mcp__ontology-docs__read_file, mcp__ontology-docs__list_directory, mcp__ontology-docs__directory_tree
+allowed-tools: Skill, Task, Read, Write, Bash, Glob, Grep, AskUserQuestion, ToolSearch
 ---
 
-# Table of Contents
+# Incident RCA Analysis (Wrapper for analyze)
 
-- [Archetype Index](#archetype-index)
-- [Phase 0: Problem Intake](#phase-0-problem-intake)
-- [Phase 0.5: Perspective Generation](#phase-05-perspective-generation)
-- [Phase 1: Team Formation](#phase-1-team-formation)
-- [Phase 2: Analysis Execution](#phase-2-analysis-execution)
-- [Phase 2.5: Conditional Tribunal](#phase-25-conditional-tribunal)
-- [Phase 3: Synthesis & Report](#phase-3-synthesis--report)
-- [Phase 4: Cleanup](#phase-4-cleanup)
+Takes an incident description (text + optional screenshots) as input, runs multi-perspective analysis via `prism:analyze` with UX impact perspective guidance, then post-processes the results into a developer-facing RCA report.
 
-Prompt templates and report template are in subdirectories relative to this file. Read them at spawn time — do NOT preload into memory.
+## Prerequisite
 
-## Prerequisite: Agent Team Mode (HARD GATE)
-
-**This gate MUST be checked before ALL other phases. Do NOT skip.**
-
-### Step 1: Check Settings
-
-Read `~/.claude/settings.json` using the `Read` tool and verify:
-
-```
-env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS === "1"
-```
-
-### Step 2: Decision
-
-| Condition | Action |
-|-----------|--------|
-| `"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"` exists | → Proceed to Phase 0 |
-| Value is `"0"` or key is missing | → **STOP immediately**, show message below |
-| `~/.claude/settings.json` file does not exist | → **STOP immediately**, show message below |
-
-### On Failure: Show This Message and STOP
-
-If the setting is not satisfied, output the following message to the user and **terminate skill execution entirely**:
-
-```
-Agent Team Mode is not enabled.
-
-This plugin (prism) requires Agent Team Mode because it uses multi-agent team
-features (TeamCreate, TaskList, SendMessage, etc.).
-
-How to enable:
-
-1. Open ~/.claude/settings.json (create it if it doesn't exist)
-2. Add the following to the "env" section:
-
-   {
-     "env": {
-       "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
-     }
-   }
-
-   If you already have an "env" section, just add this key inside it:
-
-   "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
-
-3. Restart Claude Code
-4. Run this skill again after restarting
-```
-
-**HARD STOP**: Do NOT proceed to Phase 0 or any subsequent phase if this gate fails. Output the message above and terminate immediately.
-
-## Archetype Index
-
-### Core Archetypes
-
-| ID | Lens | Model | Agent Type |
-|----|------|-------|------------|
-| `timeline` | Timeline | Sonnet | `architect-medium` |
-| `root-cause` | Root Cause | Opus | `architect` |
-| `systems` | Systems & Architecture | Opus | `architect` |
-| `impact` | Impact | Sonnet | `architect-medium` |
-
-### Extended Archetypes
-
-| ID | Lens | Model | Agent Type | When |
-|----|------|-------|------------|------|
-| `security` | Security & Threat | Opus | `architect` | Breaches, data leaks, compliance |
-| `data-integrity` | Data Integrity | Opus | `architect` | Corruption, replication failures |
-| `performance` | Performance & Capacity | Sonnet | `architect-medium` | Latency, resource exhaustion |
-| `deployment` | Deployment & Change | Sonnet | `architect-medium` | Post-deploy failures, config drift |
-| `network` | Network & Connectivity | Sonnet | `architect-medium` | Partitions, DNS, LB issues |
-| `concurrency` | Concurrency & Race | Opus | `architect` | Race conditions, deadlocks |
-| `dependency` | External Dependency | Sonnet | `architect-medium` | Third-party failures |
-| `ux` | User Experience | Sonnet | `architect-medium` | User-facing degradation, error UX, journey disruption |
-| `custom` | Custom | Auto | Auto | Novel failure modes |
-
-Team size: 3 min (DA + 2) — 6 max (DA + 5). Devil's Advocate is ALWAYS present.
+> Read and execute `../shared-v3/prerequisite-gate.md`. Set `{PROCEED_TO}` = "Phase 0".
 
 ---
 
-## Phase 0: Problem Intake
+## Phase 0: Input
 
-MUST complete ALL steps. Skipping intake → unfocused analysis.
+### Step 0.1: Get Incident Description
 
-### Step 0.1: Collect Incident
+Extract the incident description from `$ARGUMENTS`.
 
-If the user provided an incident description via `$ARGUMENTS`, use it directly and skip to Step 0.2.
+- Description provided → store as `{INCIDENT_DESCRIPTION}`
+- No description → `AskUserQuestion` (header: "Incident", question: "Please describe the incident to analyze. You can include text description and optional screenshot paths.")
+- If the description references image/screenshot paths → verify files exist via `Read`. Store paths as `{SCREENSHOT_PATHS}` (comma-separated). If no images, set `{SCREENSHOT_PATHS}` to empty string.
 
-Otherwise, ask the user to describe the incident:
+### Step 0.2: Generate Session ID
 
-"Please describe the incident:
-- What symptoms are you observing?
-- Which systems are affected?
-- What is the business impact?"
+```bash
+uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-8
+```
 
-After receiving the user's description, proceed IMMEDIATELY to Step 0.2 — do NOT stop or wait for additional input.
+Generate ONCE, reuse throughout. Create state directories for both incident and analyze (shared session ID):
 
-### Step 0.2: Severity & Context
+```bash
+mkdir -p ~/.prism/state/incident-{short-id}
+mkdir -p ~/.prism/state/analyze-{short-id}
+```
 
-`AskUserQuestion` (3 questions):
+### Step 0.3: Language Detection
 
-1. Severity → "SEV1 — Full outage" / "SEV2 — Partial degradation" / "SEV3 — Limited impact" / "SEV4 — Minor"
-2. Status → "Active — Ongoing" / "Mitigated — Temp fix" / "Resolved — Postmortem" / "Recurring — Patterns"
-3. Evidence (multiSelect) → "Logs & errors" / "Metrics/dashboards" / "Code changes" / "All of the above"
-
-### Step 0.3: Gather Evidence
-
-Collect: error messages, stack traces, logs, event timeline, recent deploys, affected services/endpoints/regions, monitoring data, initial hypotheses.
-
-### Step 0.3.5: Documentation & Codebase Discovery
-
-1. Discover docs structure via `mcp__ontology-docs__directory_tree` (root)
-2. Identify top-level directories (e.g., frontend/, backend/, shared/, etc.)
-3. Build `{CODEBASE_REFERENCE}` block:
-
-Template:
-- Search `{discovered_path_1}` for {detected domain} docs
-- Search `{discovered_path_2}` for {detected domain} docs
-- Trace from documentation to source code (file:line)
-
-4. If MCP unavailable → error: "ontology-docs MCP not configured. See plugin README for setup."
+1. If CLAUDE.md contains a `Language` directive → use that language
+2. Otherwise → detect from user's input language in this session
+3. Store as `{REPORT_LANGUAGE}`
 
 ### Phase 0 Exit Gate
 
-MUST NOT proceed until ALL documented:
+- [ ] Incident description collected and stored as `{INCIDENT_DESCRIPTION}`
+- [ ] `{SCREENSHOT_PATHS}` determined (may be empty)
+- [ ] `{short-id}` generated and `~/.prism/state/incident-{short-id}/` directory created
+- [ ] `{REPORT_LANGUAGE}` determined
 
-- [ ] What happened (symptoms)
-- [ ] When (timeline)
-- [ ] What's affected (blast radius)
-- [ ] What's been tried (mitigation)
-- [ ] What evidence exists (logs, metrics, code)
-
-If ANY missing → ask user. Error: "Cannot proceed: missing {item}."
-
-Summarize and confirm with user before continuing.
-
-### Step 0.4: Seed Analysis (Internal — not shown to user)
-
-Evaluate the incident across 5 dimensions, then map to archetype candidates:
-
-| Dimension | Evaluate | Impact on Selection |
-|-----------|----------|-------------------|
-| Domain | infra / app / data / security / network | Maps to archetype categories |
-| Failure type | crash / degradation / data loss / breach / misconfig | Determines analytical frameworks |
-| Evidence available | logs / metrics / code diffs / traces | MUST NOT select perspectives without evidence |
-| Complexity | single-cause / multi-factor | Simple: 2-3 perspectives. Complex: 4-5 |
-| Recurrence | first-time / recurring | Recurring → add `systems` for pattern analysis |
-
-#### Characteristic → Archetype Mapping
-
-| Incident Characteristics | Recommended Archetypes |
-|-------------------------|----------------------|
-| Security breach, unauthorized access | `security` + `timeline` + `systems` |
-| Data corruption, stale reads, replication lag | `data-integrity` + `root-cause` + `systems` |
-| Latency spike, OOM, resource exhaustion | `performance` + `root-cause` + `systems` |
-| Post-deployment failure, config drift | `deployment` + `timeline` + `root-cause` |
-| Network partition, DNS failure, LB issue | `network` + `systems` + `timeline` |
-| Race condition, deadlock, distributed lock | `concurrency` + `root-cause` + `systems` |
-| Third-party API failure, upstream outage | `dependency` + `impact` + `timeline` |
-| User-facing degradation, confusing errors, UX breakage | `ux` + `impact` + `root-cause` |
-| Novel / unclassifiable | `custom` + `root-cause` + relevant core |
-
-Use this mapping as starting point, then refine based on specific evidence.
+→ **NEXT: Phase 1 — Create config and invoke analyze**
 
 ---
 
-## Phase 0.5: Perspective Generation
+## Phase 1: Config & Analyze Invocation
 
-### Track Selection
+### Step 1.1: Prepare Context
 
-| Condition | Track |
-|-----------|-------|
-| SEV1 OR Active | **FAST TRACK**: Deploy Timeline + Root Cause + Systems + Impact + DA immediately → Phase 1 |
-| Otherwise | **PERSPECTIVE TRACK**: Continue below |
+Combine the incident description and any screenshot references into a single context block.
 
-### Perspective Track
-
-**0.5.1** Select 3-5 archetypes using Seed Analysis mapping + Archetype Index.
-
-Per selected archetype, document:
-- **Lens Name**: From Archetype Index
-- **Why this perspective**: 1-2 sentences explaining why THIS incident demands it
-- **Key Questions**: 2-3 specific questions this lens will answer
-- **Model**: From Archetype Index
-
-Selection rules:
-- MUST include ≥1 Core Archetype
-- MUST NOT select perspectives without supporting evidence
-- Fewer targeted > broad coverage
-
-#### Perspective Quality Gate
-
-Each selected perspective MUST pass ALL:
-- [ ] **Orthogonal**: Does NOT overlap analysis scope with other selected perspectives
-- [ ] **Evidence-backed**: Available evidence can answer this lens's key questions
-- [ ] **Incident-specific**: Selected because THIS incident demands it, not "always useful"
-- [ ] **Actionable**: Will produce concrete recommendations, not just observations
-
-If a perspective fails any check → replace with a better-fitting archetype or drop it.
-
-**Example** (Payment 503, SEV3, Resolved):
+If `{SCREENSHOT_PATHS}` is not empty, append to the description:
 ```
-Seed: domain=app, type=degradation, evidence=logs+metrics+deploys, complexity=multi
-Selected:
-  1. timeline (Core) — reconstruct 503 failure sequence from logs
-  2. root-cause (Core) — trace payment service error chain to code
-  3. dependency (Extended) — payment gateway showed elevated latency
-  + DA (mandatory)
-Rejected: security (no breach indicators), performance (metrics show normal CPU/mem)
+Referenced screenshots: {SCREENSHOT_PATHS}
 ```
 
-**0.5.2** Present via `AskUserQuestion`:
-- "I recommend these perspectives. How to proceed?"
-- Options: "Proceed" / "Add perspective" / "Remove perspective" / "Modify perspective"
+### Step 1.2: Create Analyze Config
 
-**0.5.3** Iterate until approved. Warn if <2 dynamic perspectives.
+Write the following JSON to `~/.prism/state/incident-{short-id}/analyze-config.json`:
 
-**0.5.4** Lock roster: archetype, model, key questions, rationale per perspective.
+```json
+{
+  "topic": "Incident root cause analysis: {first 80 chars of INCIDENT_DESCRIPTION} — multi-perspective analysis of root cause, contributing factors, and user-facing UX impact",
+  "input_context": "{INCIDENT_DESCRIPTION with screenshot paths if any}",
+  "report_template": "{SKILL_DIR}/templates/report.md",
+  "seed_hints": "This is an incident/outage analysis. Investigate root cause, contributing factors, and timeline. Perspectives should cover technical root cause, system architecture implications, and operational gaps. Use available tools (Grep, Read, Bash, MCP) to trace the incident through the codebase.",
+  "ontology_mode": "optional",
+  "session_id": "{short-id}"
+}
+```
+
+> Determine the absolute path of the directory containing this SKILL.md via `Bash`. Store it as `{SKILL_DIR}` for use in Step 2.1.
+
+### Step 1.3: Write Perspective Injection
+
+Copy the UX impact perspective to the analyze state directory. This file will be merged into `perspectives.json` by analyze's merge script after perspective generation.
+
+```bash
+cp {SKILL_DIR}/perspectives/ux-impact.json ~/.prism/state/analyze-{short-id}/perspective_injection.json
+```
+
+### Step 1.4: Invoke Analyze
+
+```
+Skill(skill="prism:analyze", args="--config ~/.prism/state/incident-{short-id}/analyze-config.json")
+```
+
+Wait for analyze to complete. If analyze fails or the user cancels mid-execution → ERROR: "Analyze skill failed or was cancelled. Check ~/.prism/state/ for partial results." and terminate.
+
+Analyze internally handles:
+- Seed analyst investigation of incident and related code areas
+- Multi-perspective generation + merging injected UX perspective (from perspective_injection.json)
+- Per-perspective analyst spawning
+- Socratic verification of findings
+- Report generation
+
+### Step 1.5: Locate Analyze Output
+
+The analyze state directory is already known: `~/.prism/state/analyze-{short-id}` (shared session ID).
+
+Verify the following files exist:
+- `~/.prism/state/analyze-{short-id}/analyst-findings.md` — verified analysis results
+- `~/.prism/state/analyze-{short-id}/verification-log.json` — Socratic verification scores (may not exist — this is tolerated because the post-processor has a 3-tier fallback for confidence scores)
+
+Store `~/.prism/state/analyze-{short-id}` as `{ANALYZE_STATE_DIR}`.
+
+### Phase 1 Exit Gate
+
+- [ ] `analyze-config.json` written
+- [ ] `prism:analyze` skill invocation completed
+- [ ] `{ANALYZE_STATE_DIR}` identified and `analyst-findings.md` exists
+
+→ **NEXT: Phase 2 — Post-processing (RCA report generation)**
 
 ---
 
-## Phase 1: Team Formation
+## Phase 2: Post-Processing (RCA Report Generation)
 
-### Step 1.1
+The output from analyze is a multi-perspective analysis report. A post-processor agent transforms it into a developer-facing RCA report with UX impact analysis.
 
-```
-TeamCreate(team_name: "incident-analysis-{short-id}", description: "Incident: {summary}")
-```
+### Step 2.1: Spawn Post-Processor Agent
 
-### Step 1.2
+Read `prompts/post-processor.md` (relative to this SKILL.md).
 
-Create tasks: one per perspective + DA + Synthesis.
-
-### Step 1.3: Spawn ALL Teammates in Parallel
-
-MUST read prompt files before spawning. Files are relative to this SKILL.md's directory.
-
-| Agent | Prompt File | Section |
-|-------|-------------|---------|
-| Devil's Advocate (ALWAYS) | `prompts/devil-advocate.md` + `../shared-v1/da-evaluation-protocol.md` | full file + inline protocol |
-| Timeline | `prompts/core-archetypes.md` | § Timeline Lens |
-| Root Cause | `prompts/core-archetypes.md` | § Root Cause Lens |
-| Systems & Architecture | `prompts/core-archetypes.md` | § Systems Lens |
-| Impact | `prompts/core-archetypes.md` | § Impact Lens |
-| Security / Data Integrity / Performance | `prompts/extended-archetypes.md` | § respective section |
-| Deployment / Network / Concurrency / Dependency / UX | `prompts/extended-archetypes.md` | § respective section |
-| Custom | `prompts/extended-archetypes.md` | § Custom Lens |
-
-**Spawn pattern:**
 ```
 Task(
-  subagent_type="oh-my-claudecode:{agent_type}",
-  name="{archetype-id}-analyst",
-  team_name="incident-analysis-{id}",
-  model="{model}",
-  prompt="{prompt from file with {INCIDENT_CONTEXT} and {CODEBASE_REFERENCE} replaced}"
+  subagent_type="prism:finder",
+  model="opus",
+  prompt="{post-processor prompt with placeholders replaced}"
 )
 ```
 
-MUST replace `{INCIDENT_CONTEXT}` in every prompt with actual Phase 0 details.
+**CRITICAL: Do NOT add `run_in_background=true`.** Must wait for post-processing results.
 
----
+Placeholder replacements:
+- `{ANALYZE_STATE_DIR}` → analyze result directory path identified in Step 1.5
+- `{INCIDENT_DESCRIPTION}` → original incident description
+- `{INCIDENT_STATE_DIR}` → `~/.prism/state/incident-{short-id}`
+- `{REPORT_LANGUAGE}` → language determined in Phase 0.3
+- `{SHORT_ID}` → session ID
+- `{REPORT_TEMPLATE_PATH}` → `{SKILL_DIR}/templates/report.md` (absolute path, from Step 1.2)
 
-## Phase 2: Analysis Execution
+### Step 2.2: Verify Output
 
-### Step 2.1: Monitor & Coordinate
+After post-processor agent completes, verify report file exists:
 
-Monitor via `TaskList`. Forward findings between analysts. Unblock stuck analysts.
+```
+~/.prism/state/incident-{short-id}/incident-rca-report.md
+```
 
-### Step 2.2: Clarity Enforcement
-
-MUST reject and return these patterns:
-
-| Pattern Found | Required Response |
-|---------------|------------------|
-| "probably", "might", "seems like" | "Cite specific evidence. What file:line supports this?" |
-| Unexplained timeline gaps | TaskCreate: "Investigate gap {time_a}–{time_b}" |
-| Cross-analyst conflicts | Route to both analysts + DA |
-| Unaddressed DA challenges | Forward to analyst, REQUIRE evidence-based response |
-| Missing code references | "INCOMPLETE: Cite file:function:line. Re-investigate." |
-
-### Step 2.3: Cross-Perspective Validation
-
-| Signal | Action |
-|--------|--------|
-| Convergence | Note for synthesis — strengthens confidence |
-| Divergence | Route to DA + analysts for resolution |
-| Blind spot | Targeted follow-up or spawn specialist |
-
-### Step 2.4: DA Challenge-Response Loop
-
-The DA evaluates analyst findings using the evaluation protocol (`../shared-v1/da-evaluation-protocol.md`). The orchestrator mediates a multi-round loop:
-
-**Round 1:**
-1. DA receives analyst findings and produces Fallacy Check Results (per-claim verdicts with severity)
-2. Orchestrator extracts FAIL items (BLOCKING and MAJOR)
-3. Orchestrator forwards each FAIL item to the responsible analyst via `SendMessage`, including the fallacy name and explanation
-4. Analysts respond with corrected reasoning, additional evidence, or acknowledged limitations
-
-**Round N (if needed):**
-5. Orchestrator forwards analyst responses to DA for re-evaluation
-6. DA marks each item: RESOLVED / PARTIALLY RESOLVED / UNRESOLVED
-7. If UNRESOLVED items remain → repeat from step 3
-
-**Termination:**
-
-| DA Aggregate Verdict | Condition | Action |
-|---------------------|-----------|--------|
-| SUFFICIENT | Zero BLOCKING + all MAJOR resolved or acknowledged | → Proceed to Phase 2 Exit Gate |
-| NOT SUFFICIENT | BLOCKING items remain | → Continue loop (next round) |
-| NEEDS TRIBUNAL | BLOCKING persists after 2 rounds | → Proceed to Phase 2.5 |
-
-Orchestrator tracks round count. Maximum 2 challenge-response rounds before escalation.
+If missing → ERROR: "Post-processor agent failed to generate report."
 
 ### Phase 2 Exit Gate
 
-MUST NOT proceed until ALL verified:
+- [ ] Post-processor agent completed
+- [ ] `incident-rca-report.md` exists
+- [ ] Report contains "Root Cause" section (verify via `Grep`)
 
-- [ ] All perspective key questions answered
-- [ ] No unexplained timeline gaps
-- [ ] ≥1 root cause hypothesis with strong evidence + code references
-- [ ] DA Aggregate Verdict is SUFFICIENT (zero BLOCKING, all MAJOR resolved or acknowledged)
-- [ ] All cross-perspective discrepancies resolved
-- [ ] Impact quantified with actual data
-
-If DA Aggregate Verdict is NEEDS TRIBUNAL → skip Exit Gate, proceed directly to Phase 2.5.
-If ANY other item fails → create follow-up tasks, continue Phase 2. Error: "Cannot synthesize: {item} not satisfied."
+→ **NEXT: Phase 3 — Deliver report**
 
 ---
 
-## Phase 2.5: Conditional Tribunal
+## Phase 3: Output
 
-### Trigger (ANY one)
+### Step 3.1: Report to User
 
-1. DA marks "NEEDS TRIBUNAL"
-2. ≥2 unresolved cross-perspective contradictions
-3. User requests tribunal
-
-If NONE → announce "DA: analysis sufficient. Proceeding to report." → skip to Phase 3.
-
-### Execution
-
-1. Compile findings package (~10-15K tokens): summary, key findings, recommendations, DA Fallacy Check Results, contradictions, trigger reason
-2. Shut down completed analysts (keep DA)
-3. Read `prompts/tribunal.md` for critic prompts
-4. Spawn UX Critic (Sonnet) + Engineering Critic (Opus) in parallel
-5. Collect independent reviews
-6. Consensus round:
-
-| Level | Condition | Label |
-|-------|-----------|-------|
-| Strong | 3/3 APPROVE | `[Unanimous]` |
-| Caveat | 2+ APPROVE, 1 CONDITIONAL | `[Approved w/caveat]` |
-| Majority | 2 APPROVE, 1 REJECT | `[Majority, dissent: {critic}]` |
-| Split | 2+ REJECT | `[No consensus]` → user decision |
-
-Split → share rationale, 1 final round only. Still split → present to user.
-
-7. Compile verdict, shut down critics, proceed to Phase 3.
-
----
-
-## Phase 3: Synthesis & Report
-
-### Step 3.1
-
-Integrate all analyst findings.
-
-### Step 3.2
-
-Read `templates/report.md` and fill all sections with synthesized findings.
-
-### Step 3.3
-
-`AskUserQuestion`:
-- "Is the analysis complete?"
-- Options: "Complete" / "Need deeper investigation" / "Request Tribunal" / "Add recommendations" / "Share with team"
-
-Deeper investigation → Phase 2. Tribunal → Phase 2.5.
-
----
-
-## Phase 4: Cleanup
-
-1. `SendMessage(type: "shutdown_request")` to all active teammates
-2. `TeamDelete`
-
----
-
-## Gate Summary
+Inform the user of the results:
 
 ```
-Phase 0 ──[5-item gate]──→ Phase 0.5 ──→ Phase 1 ──→ Phase 2 ──[6-item gate]──→ Phase 2.5? ──→ Phase 3 ──→ Phase 4
-```
+Incident RCA analysis complete.
 
-Every gate specifies exact missing items. Fix before proceeding.
+Report location:
+- ~/.prism/state/incident-{short-id}/incident-rca-report.md
+
+Analyze raw results: {ANALYZE_STATE_DIR}/
+```

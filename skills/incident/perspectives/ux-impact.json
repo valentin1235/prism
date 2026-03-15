@@ -15,6 +15,6 @@
       "tasks": "1. Start from the user's reported symptom. Identify what the user saw and which flows were broken.\n2. Trace the cause through the entire system — frontend, API, backend — until you find why.\n3. Assess the blast radius and what conditions make the symptom appear or not.",
       "output_format": "## UX Impact Analysis\n\n### 1. Affected User Flows\n| # | Flow | Impact | Affected Users | Severity |\n|---|------|--------|---------------|----------|\n\n### 2. Technical Cause → UX Effect Mapping\n| Technical Cause | UX Effect | User Saw | Severity |\n|----------------|-----------|----------|----------|\n\n### 3. Blast Radius\n- **Affected user segments**: [details]\n- **Duration of impact**: [details]\n- **Severity distribution**: [CRITICAL/HIGH/MEDIUM breakdown]\n\n### 4. Frontend Resilience Assessment\n- Error boundaries present: [yes/no, details]\n- Graceful degradation: [yes/no, details]\n- User-facing error messages: [quality assessment]\n\n### 5. Recommendations\n| Priority | Action | Expected UX Improvement |"
     },
-    "rationale": "Injected by incident-v4 wrapper to ensure UX impact is always analyzed as a dedicated perspective, connecting technical root causes to user-facing consequences."
+    "rationale": "Injected by incident wrapper to ensure UX impact is always analyzed as a dedicated perspective, connecting technical root causes to user-facing consequences."
   }
 ]
