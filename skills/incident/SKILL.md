@@ -10,12 +10,6 @@ allowed-tools: Skill, Task, Read, Write, Bash, Glob, Grep, AskUserQuestion, Tool
 
 Takes an incident description (text + optional screenshots) as input, runs multi-perspective analysis via `prism:analyze` with UX impact perspective guidance, then post-processes the results into a developer-facing RCA report.
 
-## Prerequisite
-
-> Read and execute `../shared-v3/prerequisite-gate.md`. Set `{PROCEED_TO}` = "Phase 0".
-
----
-
 ## Phase 0: Input
 
 ### Step 0.1: Get Incident Description

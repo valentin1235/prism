@@ -53,7 +53,7 @@ Persist phase outputs to `~/.prism/state/analyze-{short-id}/` (created in Phase 
 
 ## Prerequisite: Agent Team Mode (HARD GATE)
 
-> Read and execute `../shared-v3/prerequisite-gate.md`. Set `{PROCEED_TO}` = "Phase 0".
+> Read and execute `protocols/prerequisite-gate.md`. Set `{PROCEED_TO}` = "Phase 0".
 
 ## Team Size
 
@@ -122,7 +122,7 @@ Task(
 )
 ```
 
-> Apply worker preamble from `../shared-v3/worker-preamble.md` with:
+> Apply worker preamble from `protocols/worker-preamble.md` with:
 - `{TEAM_NAME}` = `"analyze-{short-id}"`
 - `{WORKER_NAME}` = `"seed-analyst"`
 - `{WORK_ACTION}` = `"Actively investigate using available tools (Grep, Read, Bash, MCP). Map related code areas and systems. Write discoveries to seed-analysis.json. Report via SendMessage."`
@@ -181,7 +181,7 @@ Task(
 )
 ```
 
-> Apply worker preamble from `../shared-v3/worker-preamble.md` with:
+> Apply worker preamble from `protocols/worker-preamble.md` with:
 - `{TEAM_NAME}` = `"analyze-{short-id}"`
 - `{WORKER_NAME}` = `"perspective-generator"`
 - `{WORK_ACTION}` = `"Read seed-analysis.json and analyst-prompt-structure.md. Generate perspective candidates with tailored analyst prompts. Write perspectives.json. Report via SendMessage."`
@@ -278,7 +278,7 @@ MUST NOT proceed until:
 
 ## Phase 0.7: Ontology Scope Mapping
 
-> Read and execute `../shared-v3/ontology-scope-mapping.md` with:
+> Read and execute `protocols/ontology-scope-mapping.md` with:
 - `{AVAILABILITY_MODE}` = config's `ontology_mode` if present, otherwise `optional`
 - `{CALLER_CONTEXT}` = `"analysis"`
 - `{STATE_DIR}` = `~/.prism/state/analyze-{short-id}`

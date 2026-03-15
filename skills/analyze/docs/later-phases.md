@@ -81,7 +81,7 @@ Task(
 )
 ```
 
-> Apply worker preamble from `../shared-v3/worker-preamble.md` with:
+> Apply worker preamble from `protocols/worker-preamble.md` with:
 - `{TEAM_NAME}` = `"analyze-{short-id}"`
 - `{WORKER_NAME}` = `"{perspective-id}-verifier"`
 - `{WORK_ACTION}` = `"Read your findings from the path specified in your verification protocol. Run self-verification via MCP tools (prism_interview). Re-investigate with tools as needed to answer interview questions. Report verified findings via SendMessage to team-lead."`
@@ -217,4 +217,4 @@ Before re-entry, increment `investigation_loops` counter in `~/.prism/state/anal
 
 ## Phase 4: Cleanup
 
-> Execute `../shared-v3/team-teardown.md`.
+> Execute `protocols/team-teardown.md`.
