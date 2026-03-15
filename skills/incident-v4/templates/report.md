@@ -80,6 +80,14 @@
 
 ---
 
+## Cross-Perspective Analysis
+
+- **Corroborated Root Causes**: Items where multiple perspectives independently identified the same cause
+- **Conflicting Conclusions**: Items where perspectives reached different conclusions
+- **Integrated Insights**: Issues only visible when combining perspectives
+
+---
+
 ## Action Items
 
 ### Immediate Fixes (Prevent Recurrence)

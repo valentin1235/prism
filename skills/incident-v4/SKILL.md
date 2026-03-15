@@ -74,7 +74,8 @@ Write the following JSON to `~/.prism/state/incident-{short-id}/analyze-config.j
 {
   "topic": "Incident root cause analysis: {first 80 chars of INCIDENT_DESCRIPTION} — multi-perspective analysis of root cause, contributing factors, and user-facing UX impact",
   "input_context": "{INCIDENT_DESCRIPTION with screenshot paths if any}",
-  "seed_hints": "This is an incident/outage analysis. Investigate root cause, contributing factors, and timeline. IMPORTANT: One perspective MUST focus on UX impact — analyze how the incident affected end users' experience, what users saw or experienced during the incident, and how the implementation caused user-facing problems. Other perspectives should cover technical root cause, system architecture implications, and operational gaps. Use available tools (Grep, Read, Bash, MCP) to trace the incident through the codebase.",
+  "report_template": "{SKILL_DIR}/templates/report.md",
+  "seed_hints": "This is an incident/outage analysis. Investigate root cause, contributing factors, and timeline. One perspective SHOULD focus on UX impact — analyze how the incident affected end users' experience, what users saw or experienced during the incident, and how the implementation caused user-facing problems. Other perspectives should cover technical root cause, system architecture implications, and operational gaps. Use available tools (Grep, Read, Bash, MCP) to trace the incident through the codebase.",
   "ontology_mode": "optional"
 }
 ```
@@ -178,7 +179,15 @@ If missing → ERROR: "Post-processor agent failed to generate report."
 
 ## Phase 3: Output
 
-### Step 3.1: Report to User
+### Step 3.1: Copy Report to Working Directory
+
+Save a copy of the report to the current working directory for easy access:
+
+```bash
+cp ~/.prism/state/incident-{short-id}/incident-rca-report.md ./incident-rca-report-{short-id}.md
+```
+
+### Step 3.2: Report to User
 
 Inform the user of the results:
 
@@ -186,6 +195,7 @@ Inform the user of the results:
 Incident RCA analysis complete.
 
 Report location:
+- ./incident-rca-report-{short-id}.md
 - ~/.prism/state/incident-{short-id}/incident-rca-report.md
 
 Analyze raw results: {ANALYZE_STATE_DIR}/

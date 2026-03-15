@@ -37,8 +37,8 @@ The target reader is a developer. Include technical details, code references, an
    > "Socratic verification data was unavailable. All confidence levels are marked as 'Unverified'."
 
 **Additional references** (read if available):
-3. `{ANALYZE_STATE_DIR}/perspectives.json` — perspective information
-4. `{ANALYZE_STATE_DIR}/verified-findings-*.md` — per-perspective detailed results (use `Glob` to find)
+- `{ANALYZE_STATE_DIR}/perspectives.json` — perspective information
+- `{ANALYZE_STATE_DIR}/verified-findings-*.md` — per-perspective detailed results (use `Glob` to find)
 
 ### Step 2: Read Report Template
 
@@ -65,6 +65,9 @@ Extract all UX-related findings (from the UX perspective and cross-cutting UX me
 - What was the blast radius (% of users, specific segments)?
 - How did the technical failure manifest in the user interface?
 
+If no dedicated UX perspective was included in the analysis, note this explicitly in the UX Impact Analysis section:
+> "No dedicated UX perspective was included in this analysis. UX impact information is limited to cross-cutting mentions from other perspectives."
+
 #### 3.3 Timeline Reconstruction
 
 If temporal information is available in the findings, reconstruct a timeline:
@@ -87,7 +90,14 @@ Convert scores to badges:
 
 Each finding inherits the badge of its parent perspective.
 
-#### 3.5 Action Items Generation
+#### 3.5 Cross-Perspective Analysis
+
+Compare findings across perspectives:
+- **Corroborated root causes**: Items where multiple perspectives independently identified the same cause (higher confidence)
+- **Conflicting conclusions**: Items where perspectives reached different root cause conclusions (needs explicit resolution)
+- **Integrated insights**: Issues only visible when combining perspectives (e.g., technical root cause + UX impact together reveal the full picture)
+
+#### 3.6 Action Items Generation
 
 Extract actionable items from findings and categorize:
 - **Immediate fixes**: What to fix right now to prevent recurrence
@@ -105,9 +115,11 @@ The report MUST be written in `{REPORT_LANGUAGE}`.
 Verify the written report contains all required sections:
 
 - [ ] Executive Summary
+- [ ] Timeline (or explicit note if insufficient data)
 - [ ] Root Cause (primary cause + contributing factors)
 - [ ] UX Impact Analysis
 - [ ] Per-Perspective Analysis Summary
+- [ ] Cross-Perspective Analysis
 - [ ] Action Items (at least 1 item)
 - [ ] Confidence Summary
 
