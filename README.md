@@ -79,7 +79,7 @@ If you already have an `env` section with other keys, just add the new key insid
 
 ### Step 3: Install oh-my-claudecode (agent pack)
 
-Prism does not have its own built-in agents. It currently uses [oh-my-claudecode](https://github.com/anthropics-community/oh-my-claudecode) as a general-purpose agent pack, which provides the specialized agent types needed for team analysis (`architect`, `architect-medium`, `analyst`, `critic`, etc.). Install it if you haven't already:
+Prism does not have its own built-in agents. It currently uses [oh-my-claudecode](https://github.com/anthropics-community/oh-my-claudecode) as a general-purpose agent pack, which provides the specialized agent types needed for team analysis (`architect`, `architect-medium`, `analyst`, etc.). The `critic` role has been replaced by Prism's built-in `devils-advocate` agent. Install oh-my-claudecode if you haven't already:
 
 ```
 /plugin marketplace add Yeachan-Heo/oh-my-claudecode
@@ -362,7 +362,7 @@ Normal Mode: max 2 feedback loops, then forced output. Hell Mode: unlimited loop
 |------|-----------|-------|
 | Analyst (complex) | `oh-my-claudecode:analyst` | opus |
 | Analyst (standard) | `oh-my-claudecode:architect-medium` | sonnet |
-| Devil's Advocate | `oh-my-claudecode:critic` | opus |
+| Devil's Advocate | `prism:devils-advocate` | opus |
 | UX / Engineering Critic | `oh-my-claudecode:architect` / `architect-medium` | opus / sonnet |
 | Planner | `oh-my-claudecode:planner` | opus |
 
@@ -378,7 +378,7 @@ The skill tried to access reference docs but the MCP server isn't set up. See [S
 
 ### Agents not spawning / TeamCreate fails
 
-Make sure `oh-my-claudecode` plugin is installed and enabled. Prism's agents depend on oh-my-claudecode agent types. See [Step 3](#step-3-install-oh-my-claudecode-dependency).
+Make sure `oh-my-claudecode` plugin is installed and enabled. Prism's analyst agents depend on oh-my-claudecode agent types (the `critic` role uses Prism's built-in `devils-advocate` agent instead). See [Step 3](#step-3-install-oh-my-claudecode-agent-pack).
 
 ### Skill not showing in autocomplete
 
