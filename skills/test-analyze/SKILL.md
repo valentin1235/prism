@@ -47,7 +47,7 @@ Spawn a background agent that executes the full `prism:analyze` workflow. The ag
 - Use the test case's `target_codebase` as the code to analyze
 - Use state directory: `~/.prism/state/{test-run-id}/{eval-id}/`
 - Auto-approve Phase 0.6 (skip AskUserQuestion — add instruction: "Auto-approve all perspectives without asking the user")
-- Skip Phase 0.7 ontology if `skip_ontology: true`
+- Skip Phase 0.3 ontology if `skip_ontology: true`
 - Execute Phase 2B verification using real `prism_interview` + `prism_score` MCP calls
 - Write all artifacts (seed-analysis.json, perspectives.json, context.json, findings.json, etc.)
 
@@ -68,7 +68,7 @@ CRITICAL RULES:
 - Follow SKILL.md phases exactly (Phase 0 → 4)
 - Use TeamCreate + Task to spawn real sub-agents for each role
 - Phase 0.6: Auto-approve perspectives (do NOT call AskUserQuestion)
-- Phase 0.7: {ontology_instruction}
+- Phase 0.3: {ontology_instruction}
 - Phase 2B: MUST call prism_interview and prism_score MCP tools for real verification
 - Write ALL JSON artifacts to the state directory
 - After Phase 3, write the final report to the state directory as report.md

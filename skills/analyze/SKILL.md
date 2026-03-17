@@ -1,7 +1,7 @@
 ---
 name: analyze
 description: Runs multi-perspective agent team analysis with ontology-scoped investigation and MCP-based Socratic verification. General-purpose analysis engine — any topic can be seeded for multi-perspective analysis against ontology documents. Supports config-based customization for wrapper skills (e.g., PRD analysis).
-version: 5.0.0
+version: 5.0.1
 user-invocable: true
 allowed-tools: Task, SendMessage, TeamCreate, TeamDelete, TaskCreate, TaskUpdate, TaskList, TaskGet, TaskOutput, Read, Glob, Grep, Bash, Write, WebFetch, WebSearch, ToolSearch, ListMcpResourcesTool, mcp__prism-mcp__prism_docs_roots, mcp__prism-mcp__prism_docs_list, mcp__prism-mcp__prism_docs_read, mcp__prism-mcp__prism_docs_search, mcp__prism-mcp__prism_interview
 ---
@@ -48,7 +48,7 @@ Persist phase outputs to `~/.prism/state/analyze-{short-id}/` (created in Phase 
 | `analyst-findings.md` | Orchestrator (Phase 2 exit) | Phase 3 synthesis |
 | `verification-log.json` | Orchestrator (Phase 2 Step 2B.6) | Phase 3 synthesis (Socratic Verification Summary section) |
 | `prior-iterations.md` | Each re-entry (append) | All agents (cumulative) |
-| `ontology-scope.json` | Orchestrator (Phase 0.7) | Analysts (via `{ONTOLOGY_SCOPE}` injection) |
+| `ontology-scope.json` | Orchestrator (Phase 0.3) | Analysts (via `{ONTOLOGY_SCOPE}` injection) |
 | `perspective_injection.json` | Wrapper skill (optional, before analyze invocation) | Merge script (Step 0.55.5) |
 
 ## Prerequisite: Agent Team Mode (HARD GATE)
@@ -90,6 +90,19 @@ MUST NOT proceed until ALL checked:
 - [ ] Description collected → ERROR: "Phase 0 blocked: description is empty. Re-run Step 0.1."
 - [ ] `{short-id}` generated and state directory created → ERROR: "Phase 0 blocked: run `uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-8` and `mkdir -p ~/.prism/state/analyze-{short-id}`"
 - [ ] Config copied to state directory (if provided) → ERROR: "Copy config to ~/.prism/state/analyze-{short-id}/config.json"
+
+→ **NEXT ACTION: Proceed to Phase 0.3 — Ontology Scope Mapping.**
+
+---
+
+## Phase 0.3: Ontology Scope Mapping
+
+> Read and execute `protocols/ontology-scope-mapping.md` with:
+- `{AVAILABILITY_MODE}` = config's `ontology_mode` if present, otherwise `optional`
+- `{CALLER_CONTEXT}` = `"analysis"`
+- `{STATE_DIR}` = `~/.prism/state/analyze-{short-id}`
+
+If `ONTOLOGY_AVAILABLE=false` → all analysts get `{ONTOLOGY_SCOPE}` = "N/A — ontology scope not available. Analyze using available evidence only."
 
 → **NEXT ACTION: Proceed to Phase 0.5 Step 0.5.1 — Create team.**
 
@@ -272,19 +285,6 @@ MUST NOT proceed until:
 - [ ] User selected "Proceed" → ERROR: "Phase 0.6 blocked: user has not approved perspectives. Re-run Step 0.6.1."
 - [ ] `perspectives.json` updated with `approved: true` → ERROR: "Phase 0.6 blocked: perspectives.json missing 'approved: true'. Run Step 0.6.3."
 
-→ **NEXT ACTION: Proceed to Phase 0.7 — Ontology Scope Mapping.**
-
----
-
-## Phase 0.7: Ontology Scope Mapping
-
-> Read and execute `protocols/ontology-scope-mapping.md` with:
-- `{AVAILABILITY_MODE}` = config's `ontology_mode` if present, otherwise `optional`
-- `{CALLER_CONTEXT}` = `"analysis"`
-- `{STATE_DIR}` = `~/.prism/state/analyze-{short-id}`
-
-If `ONTOLOGY_AVAILABLE=false` → all analysts get `{ONTOLOGY_SCOPE}` = "N/A — ontology scope not available. Analyze using available evidence only."
-
 → **NEXT ACTION: Proceed to Phase 0.8 — Write context file.**
 
 ---
@@ -396,10 +396,10 @@ MUST NOT proceed until:
 
 ```
 Prerequisite → Phase 0 [intake, config, session ID]
+→ Phase 0.3 [ontology]
 → Phase 0.5 [TeamCreate + seed-analyst (research findings → seed-analysis.json) + drain]
 → Phase 0.55 [perspective-generator (seed-analysis.json → perspectives.json with dynamic prompts) + drain]
 → Phase 0.6 [perspective approval (user reviews perspectives.json → update with approved)]
-→ Phase 0.7 [ontology]
 → Phase 0.8 [context + state files]
 → Phase 1 [spawn analysts — finding only, using dynamic prompts]
 → Phase 2 [collect findings → shutdown → spawn verification sessions → collect verified findings] ← docs/later-phases.md
