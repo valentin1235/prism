@@ -29,6 +29,16 @@ func main() {
 	)
 
 	s.AddTool(
+		mcp.NewTool("prism_da_review",
+			mcp.WithDescription("Devil's Advocate review of seed analysis. Reads seed-analysis.json, critiques coverage sufficiency using the 4-phase DA protocol, and returns structured findings with severity levels (CRITICAL/MAJOR/MINOR). Findings are parsed from DA markdown into JSON. Hard-stops after 3 rounds."),
+			mcp.WithString("seed_analysis_path", mcp.Required(), mcp.Description("Absolute path to seed-analysis.json file to review")),
+			mcp.WithNumber("round", mcp.Description("Current loop round (1-based). Defaults to 1. Hard-stops after round 3.")),
+			mcp.WithString("context", mcp.Description("Optional additional context for the DA review (e.g., specific areas of concern)")),
+		),
+		handleDAReview,
+	)
+
+	s.AddTool(
 		mcp.NewTool("prism_score",
 			mcp.WithDescription("Ambiguity scorer. Evaluates clarity of findings + interview Q&A on 3 axes: Assumption (40%), Relevance (40%), Constraints (20%). Pass threshold: weighted_total > 0.8."),
 			mcp.WithString("context_id", mcp.Required(), mcp.Description("Context identifier (e.g., incident-abc123, plan-def456, prd-ghi789)")),

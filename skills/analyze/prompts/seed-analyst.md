@@ -66,6 +66,7 @@ Write the following JSON to `~/.prism/state/analyze-{SHORT_ID}/seed-analysis.jso
 ```json
 {
   "topic": "{DESCRIPTION}",
+  "da_passed": true,
   "research": {
     "summary": "Brief summary of what was investigated and distinct areas discovered",
     "findings": [
@@ -86,11 +87,108 @@ Write the following JSON to `~/.prism/state/analyze-{SHORT_ID}/seed-analysis.jso
 
 ### Field Rules
 - `topic`: Copy the original topic description exactly
+- `da_passed`: Set by Step 3 DA review loop — `true` if DA passed, `false` if max rounds exhausted without passing
 - `research.summary`: High-level summary to orient the perspective generator
 - `research.findings`: Every finding MUST have a concrete `source` — no unsourced claims
 - `research.findings[].area`: A distinct code area, module, or system name
 - `research.findings[].description`: What this area does and how it relates to the topic
 - `research.key_areas`: List the main domains/areas discovered during research (helps perspective generator identify analysis angles)
+
+---
+
+## STEP 3: Devil's Advocate Self-Review Loop
+
+After writing initial `seed-analysis.json`, run a DA review loop to challenge your coverage sufficiency. This is a **self-loop** — you call the DA review tool directly and act on its critique. Max **3 rounds**.
+
+### Tool Discovery
+
+First, discover the DA review MCP tool:
+```
+ToolSearch("prism_da_review")
+```
+
+This returns the `mcp__prism-mcp__prism_da_review` tool. If the tool is not available, skip this step entirely and proceed to output (do not set `da_passed`).
+
+### Loop Protocol
+
+For each round (1 to 3):
+
+**1. Call the DA review tool:**
+```
+mcp__prism-mcp__prism_da_review(
+  seed_analysis_path = "~/.prism/state/analyze-{SHORT_ID}/seed-analysis.json",
+  round = <current round number, 1-based>
+)
+```
+
+The `round` parameter tracks the current iteration (1, 2, or 3). The tool hard-stops after round 3 — if called with round > 3, it returns immediately without calling the LLM. The tool reads the `topic` field directly from the JSON file.
+
+**2. Parse the JSON result.** The tool returns:
+```json
+{
+  "pass": true,
+  "critical_count": 0,
+  "major_count": 0,
+  "findings": [
+    {
+      "section": "Missing Perspectives",
+      "title": "Finding title",
+      "claim": "What was claimed",
+      "concern": "What is missing or wrong",
+      "confidence": "HIGH",
+      "severity": "CRITICAL",
+      "falsification_test": "How to verify"
+    }
+  ],
+  "overall_confidence": "MEDIUM",
+  "top_concerns": "...",
+  "what_holds_up": "...",
+  "raw_output": "..."
+}
+```
+
+**3. Evaluate `pass`:**
+
+- **If `pass` is `true`** (no CRITICAL or MAJOR findings):
+  → Set `"da_passed": true` in `seed-analysis.json`. **Exit loop.** Proceed to output.
+
+- **If `pass` is `false`** AND this is **NOT round 3**:
+  → Process CRITICAL and MAJOR findings for re-research (see below).
+  → Write updated `seed-analysis.json`.
+  → Continue to next round.
+
+- **If `pass` is `false`** AND this is **round 3** (hard stop):
+  → Set `"da_passed": false` in `seed-analysis.json`.
+  → Do **NOT** record unresolved findings in `seed-analysis.json`.
+  → **Exit loop.** Proceed to output with current coverage.
+
+### Re-Research Protocol (on DA failure)
+
+**Filter:** Only act on findings where `severity` is `"CRITICAL"` or `"MAJOR"`. **Ignore all MINOR findings entirely** — they do not warrant re-research.
+
+**For each CRITICAL/MAJOR finding:**
+
+1. Read the `concern` field — it describes the specific coverage gap.
+2. Use the `section` field to guide your re-research strategy:
+   - `"Missing Perspectives"` → Search for the missing area, module, or stakeholder the DA identified as absent.
+   - `"Challenged Framings"` → Gather additional evidence to verify or refute the challenged assumption.
+   - `"Bias Indicators"` → Seek counter-evidence or alternative code paths that balance the bias.
+   - `"Alternative Framings"` → Investigate the alternative angle the DA suggested.
+3. Use the same tools as Step 1 (Grep, Read, Bash, MCP) to investigate.
+
+**Incremental update rules:**
+- **Preserve all existing findings** — do NOT remove, modify, or rewrite any existing `research.findings[]` entry.
+- **Append** new findings with incrementing `id` values (next sequential after the current max).
+- **No round metadata** — do not tag findings with which DA round triggered their discovery.
+- Update `research.summary` to reflect expanded coverage.
+- Append to `research.key_areas` if new areas were discovered.
+- Append to `research.files_examined` for newly examined files.
+
+### Important Constraints
+
+- **DA critique is NOT passed downstream.** The DA review exists solely to improve seed analysis coverage. Do not include DA findings, concerns, or raw output in `seed-analysis.json` or in your SendMessage to team-lead.
+- **No separate topic parameter.** The DA tool reads the `topic` from `seed-analysis.json` directly.
+- **Self-contained loop.** No external orchestrator involvement — you manage the entire loop.
 
 ---
 

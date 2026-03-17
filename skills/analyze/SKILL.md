@@ -3,7 +3,7 @@ name: analyze
 description: Runs multi-perspective agent team analysis with ontology-scoped investigation and MCP-based Socratic verification. General-purpose analysis engine — any topic can be seeded for multi-perspective analysis against ontology documents. Supports config-based customization for wrapper skills (e.g., PRD analysis).
 version: 5.0.1
 user-invocable: true
-allowed-tools: Task, SendMessage, TeamCreate, TeamDelete, TaskCreate, TaskUpdate, TaskList, TaskGet, TaskOutput, Read, Glob, Grep, Bash, Write, WebFetch, WebSearch, ToolSearch, ListMcpResourcesTool, mcp__prism-mcp__prism_docs_roots, mcp__prism-mcp__prism_docs_list, mcp__prism-mcp__prism_docs_read, mcp__prism-mcp__prism_docs_search, mcp__prism-mcp__prism_interview
+allowed-tools: Task, SendMessage, TeamCreate, TeamDelete, TaskCreate, TaskUpdate, TaskList, TaskGet, TaskOutput, Read, Glob, Grep, Bash, Write, WebFetch, WebSearch, ToolSearch, ListMcpResourcesTool, mcp__prism-mcp__prism_docs_roots, mcp__prism-mcp__prism_docs_list, mcp__prism-mcp__prism_docs_read, mcp__prism-mcp__prism_docs_search, mcp__prism-mcp__prism_interview, mcp__prism-mcp__prism_da_review
 ---
 
 # Multi-Perspective Analysis
@@ -40,7 +40,7 @@ Persist phase outputs to `~/.prism/state/analyze-{short-id}/` (created in Phase 
 | File | Written | Read By |
 |------|---------|---------|
 | `config.json` | Orchestrator (Phase 0, if config provided) | Orchestrator (all phases) |
-| `seed-analysis.json` | Seed Analyst (Phase 0.5) | Perspective Generator (Phase 0.55), Orchestrator |
+| `seed-analysis.json` | Seed Analyst (Phase 0.5, with DA self-loop) | Perspective Generator (Phase 0.55), Orchestrator |
 | `perspectives.json` | Perspective Generator (Phase 0.55), updated by Orchestrator (Phase 0.6) | Orchestrator (Phase 0.6, 0.8, 1, 3) |
 | `context.json` | Orchestrator (Phase 0.8) | Orchestrator (Phase 1 `{CONTEXT}` injection, Phase 3 re-entry) |
 | `~/.prism/state/analyze-{short-id}/perspectives/{perspective-id}/findings.json` | Analyst (Phase 1 — Finding Session) | Analyst (Phase 2 — Verification Session), MCP prism_interview |
@@ -149,7 +149,10 @@ Placeholder replacements in seed-analyst prompt:
 
 Wait for seed-analyst to send results via `SendMessage`. The message contains a JSON object with:
 - `topic`: original description
+- `da_passed`: boolean indicating whether DA review passed (no CRITICAL/MAJOR findings)
 - `research`: summary, findings (with area, description, source, and tool_used), key_areas, files_examined, mcp_queries
+
+The seed analyst internally runs a DA review self-loop (up to 3 rounds) using `prism_da_review` before reporting. Findings are incrementally updated — existing findings are preserved, new findings appended. The `da_passed` flag reflects the final DA review outcome. **DA critique details are NOT forwarded to the perspective generator** — only the enriched seed analysis is used downstream.
 
 The seed analyst also writes this JSON to `~/.prism/state/analyze-{short-id}/seed-analysis.json`.
 
@@ -167,7 +170,7 @@ MUST NOT proceed until:
 
 - [ ] Team created → ERROR: "Phase 0.5 blocked: TeamCreate failed. Check team name format 'analyze-{short-id}'."
 - [ ] Seed-analyst results received → ERROR: "Phase 0.5 blocked: no SendMessage from seed-analyst. Run TaskList to check task status."
-- [ ] `seed-analysis.json` written → ERROR: "Phase 0.5 blocked: file missing at ~/.prism/state/analyze-{short-id}/seed-analysis.json"
+- [ ] `seed-analysis.json` written with `da_passed` field → ERROR: "Phase 0.5 blocked: file missing at ~/.prism/state/analyze-{short-id}/seed-analysis.json or missing da_passed field"
 - [ ] Seed-analyst shut down → ERROR: "Send shutdown_request to seed-analyst via SendMessage."
 - [ ] All background task outputs drained → ERROR: "Run TaskList → TaskOutput for each completed task ([#27431])."
 
@@ -397,7 +400,7 @@ MUST NOT proceed until:
 ```
 Prerequisite → Phase 0 [intake, config, session ID]
 → Phase 0.3 [ontology]
-→ Phase 0.5 [TeamCreate + seed-analyst (research findings → seed-analysis.json) + drain]
+→ Phase 0.5 [TeamCreate + seed-analyst (research findings → DA self-loop → seed-analysis.json with da_passed) + drain]
 → Phase 0.55 [perspective-generator (seed-analysis.json → perspectives.json with dynamic prompts) + drain]
 → Phase 0.6 [perspective approval (user reviews perspectives.json → update with approved)]
 → Phase 0.8 [context + state files]
