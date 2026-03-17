@@ -11,11 +11,10 @@ ARCH="$(uname -m)"
 
 # Normalize architecture names to Go-style identifiers
 # - x86_64 (Linux/macOS Intel) → amd64
-# - i686/i386 (32-bit x86, best-effort) → amd64
 # - aarch64 (Linux ARM64) → arm64
 # - arm64 (macOS Apple Silicon) → arm64
 case "$ARCH" in
-  x86_64|i686|i386) ARCH="amd64" ;;
+  x86_64) ARCH="amd64" ;;
   aarch64|arm64)    ARCH="arm64" ;;
   *)
     echo "ERROR: Unsupported architecture: $ARCH" >&2

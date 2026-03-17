@@ -20,4 +20,4 @@ release: clean
 	@echo "Done. Binaries in bin/"
 
 clean:
-	rm -rf bin
+	find bin -type f -name '$(BINARY_NAME)-*' -delete 2>/dev/null || true

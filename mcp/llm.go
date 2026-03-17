@@ -33,7 +33,7 @@ func queryLLM(ctx context.Context, prompt string) (string, error) {
 		"--print",
 		"--model", "claude-sonnet-4-6",
 		"--max-turns", "1",
-		prompt,
+		"--", prompt,
 	)
 	cmd.Env = filterEnv("CLAUDECODE")
 

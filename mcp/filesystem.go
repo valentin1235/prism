@@ -30,7 +30,11 @@ func initFilesystem() error {
 
 	// Resolve and validate paths
 	for _, dir := range config.Directories {
-		abs, err := filepath.Abs(expandHome(dir))
+		expanded, err := expandHome(dir)
+		if err != nil {
+			continue
+		}
+		abs, err := filepath.Abs(expanded)
 		if err != nil {
 			continue
 		}
@@ -43,16 +47,23 @@ func initFilesystem() error {
 	return nil
 }
 
-func expandHome(p string) string {
+func expandHome(p string) (string, error) {
 	if strings.HasPrefix(p, "~/") {
-		home, _ := os.UserHomeDir()
-		return filepath.Join(home, p[2:])
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("cannot resolve home directory: %w", err)
+		}
+		return filepath.Join(home, p[2:]), nil
 	}
-	return p
+	return p, nil
 }
 
 func isAllowed(path string) error {
 	abs, err := filepath.Abs(path)
+	if err != nil {
+		return fmt.Errorf("invalid path: %w", err)
+	}
+	abs, err = filepath.EvalSymlinks(abs)
 	if err != nil {
 		return fmt.Errorf("invalid path: %w", err)
 	}
@@ -107,6 +118,15 @@ func handleReadFile(_ context.Context, request mcp.CallToolRequest) (*mcp.CallTo
 
 	if err := isAllowed(path); err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to stat file: %v", err)), nil
+	}
+	const maxFileSize = 10 * 1024 * 1024 // 10MB
+	if info.Size() > maxFileSize {
+		return mcp.NewToolResultError(fmt.Sprintf("file too large: %d bytes (max %d bytes) — use head/tail to read portions", info.Size(), maxFileSize)), nil
 	}
 
 	data, err := os.ReadFile(path)

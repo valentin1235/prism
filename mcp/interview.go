@@ -21,6 +21,21 @@ type QA struct {
 	Timestamp string `json:"timestamp"`
 }
 
+type InterviewResponse struct {
+	ContextID     string `json:"context_id"`
+	PerspectiveID string `json:"perspective_id"`
+	Round         int    `json:"round"`
+	Continue      *bool  `json:"continue,omitempty"`
+	Question      string `json:"question,omitempty"`
+	Score         string `json:"score,omitempty"`
+	Reason        string `json:"reason,omitempty"`
+}
+
+func jsonResponse(resp InterviewResponse) string {
+	data, _ := json.Marshal(resp)
+	return string(data)
+}
+
 type InterviewSession struct {
 	ContextID    string `json:"context_id"`
 	PerspectiveID string `json:"perspective_id"`
@@ -35,7 +50,10 @@ var sessionsMu sync.Mutex
 
 // perspectiveDir returns ~/.prism/state/{context_id}/perspectives/{perspective_id}/ and creates it.
 func perspectiveDir(contextID, perspectiveID string) string {
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = "/tmp"
+	}
 	dir := filepath.Join(home, ".prism", "state", contextID, "perspectives", perspectiveID)
 	os.MkdirAll(dir, 0755)
 	return dir
@@ -119,7 +137,7 @@ func handleInterview(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 			return mcp.NewToolResultError(fmt.Sprintf("failed to save session: %v", err)), nil
 		}
 
-		return mcp.NewToolResultText(fmt.Sprintf(`{"context_id": %q, "perspective_id": %q, "round": 1, "question": %q}`, contextID, perspectiveID, question)), nil
+		return mcp.NewToolResultText(jsonResponse(InterviewResponse{ContextID: contextID, PerspectiveID: perspectiveID, Round: 1, Question: question})), nil
 	}
 
 	// Continue existing session
@@ -148,7 +166,8 @@ func handleInterview(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 			return mcp.NewToolResultError(fmt.Sprintf("failed to save session: %v", err)), nil
 		}
 		scoreResult, _ := scoreSession(ctx, session)
-		return mcp.NewToolResultText(fmt.Sprintf(`{"context_id": %q, "perspective_id": %q, "round": %d, "continue": false, "reason": "max_rounds", "score": %q}`, contextID, perspectiveID, round, scoreResult)), nil
+		cont := false
+		return mcp.NewToolResultText(jsonResponse(InterviewResponse{ContextID: contextID, PerspectiveID: perspectiveID, Round: round, Continue: &cont, Reason: "max_rounds", Score: scoreResult})), nil
 	}
 
 	// Score FIRST (all Q&A complete, no pending question)
@@ -164,7 +183,8 @@ func handleInterview(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 		if err := saveSession(session); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("failed to save session: %v", err)), nil
 		}
-		return mcp.NewToolResultText(fmt.Sprintf(`{"context_id": %q, "perspective_id": %q, "round": %d, "continue": false, "reason": "pass", "score": %q}`, contextID, perspectiveID, round, scoreResult)), nil
+		cont := false
+		return mcp.NewToolResultText(jsonResponse(InterviewResponse{ContextID: contextID, PerspectiveID: perspectiveID, Round: round, Continue: &cont, Reason: "pass", Score: scoreResult})), nil
 	}
 
 	// Score <= 0.8 — generate next question
@@ -178,7 +198,8 @@ func handleInterview(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 		if err := saveSession(session); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("failed to save session: %v", err)), nil
 		}
-		return mcp.NewToolResultText(fmt.Sprintf(`{"context_id": %q, "perspective_id": %q, "round": %d, "continue": false, "reason": "interview_complete", "score": %q}`, contextID, perspectiveID, round, scoreResult)), nil
+		cont := false
+		return mcp.NewToolResultText(jsonResponse(InterviewResponse{ContextID: contextID, PerspectiveID: perspectiveID, Round: round, Continue: &cont, Reason: "interview_complete", Score: scoreResult})), nil
 	}
 
 	session.Pending = question
@@ -186,7 +207,8 @@ func handleInterview(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 		return mcp.NewToolResultError(fmt.Sprintf("failed to save session: %v", err)), nil
 	}
 
-	return mcp.NewToolResultText(fmt.Sprintf(`{"context_id": %q, "perspective_id": %q, "round": %d, "continue": true, "score": %q, "question": %q}`, contextID, perspectiveID, round, scoreResult, question)), nil
+	cont := true
+	return mcp.NewToolResultText(jsonResponse(InterviewResponse{ContextID: contextID, PerspectiveID: perspectiveID, Round: round, Continue: &cont, Score: scoreResult, Question: question})), nil
 }
 
 func findingsBlock(session *InterviewSession) string {
