@@ -1,7 +1,7 @@
 ---
 name: analyze
 description: Runs multi-perspective agent team analysis with ontology-scoped investigation and MCP-based Socratic verification. General-purpose analysis engine — any topic can be seeded for multi-perspective analysis against ontology documents. Supports config-based customization for wrapper skills (e.g., PRD analysis).
-version: 5.0.0
+version: 5.0.1
 user-invocable: true
 allowed-tools: Task, SendMessage, TeamCreate, TeamDelete, TaskCreate, TaskUpdate, TaskList, TaskGet, TaskOutput, Read, Glob, Grep, Bash, Write, WebFetch, WebSearch, ToolSearch, ListMcpResourcesTool, mcp__prism-mcp__prism_docs_roots, mcp__prism-mcp__prism_docs_list, mcp__prism-mcp__prism_docs_read, mcp__prism-mcp__prism_docs_search, mcp__prism-mcp__prism_interview
 ---
