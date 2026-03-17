@@ -6,12 +6,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 )
+
+var safeID = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 const maxRounds = 20
 
@@ -49,22 +52,32 @@ type InterviewSession struct {
 var sessionsMu sync.Mutex
 
 // perspectiveDir returns ~/.prism/state/{context_id}/perspectives/{perspective_id}/ and creates it.
-func perspectiveDir(contextID, perspectiveID string) string {
+func perspectiveDir(contextID, perspectiveID string) (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		home = "/tmp"
+		return "", fmt.Errorf("cannot resolve home directory: %w", err)
 	}
 	dir := filepath.Join(home, ".prism", "state", contextID, "perspectives", perspectiveID)
-	os.MkdirAll(dir, 0755)
-	return dir
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", fmt.Errorf("cannot create directory %s: %w", dir, err)
+	}
+	return dir, nil
 }
 
-func interviewPath(contextID, perspectiveID string) string {
-	return filepath.Join(perspectiveDir(contextID, perspectiveID), "interview.json")
+func interviewPath(contextID, perspectiveID string) (string, error) {
+	dir, err := perspectiveDir(contextID, perspectiveID)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "interview.json"), nil
 }
 
-func findingsPath(contextID, perspectiveID string) string {
-	return filepath.Join(perspectiveDir(contextID, perspectiveID), "findings.json")
+func findingsPath(contextID, perspectiveID string) (string, error) {
+	dir, err := perspectiveDir(contextID, perspectiveID)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "findings.json"), nil
 }
 
 func saveSession(session *InterviewSession) error {
@@ -73,11 +86,19 @@ func saveSession(session *InterviewSession) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(interviewPath(session.ContextID, session.PerspectiveID), data, 0644)
+	path, err := interviewPath(session.ContextID, session.PerspectiveID)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0644)
 }
 
 func loadSession(contextID, perspectiveID string) (*InterviewSession, error) {
-	data, err := os.ReadFile(interviewPath(contextID, perspectiveID))
+	path, err := interviewPath(contextID, perspectiveID)
+	if err != nil {
+		return nil, err
+	}
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("session not found for context=%q perspective=%q", contextID, perspectiveID)
 	}
@@ -90,7 +111,11 @@ func loadSession(contextID, perspectiveID string) (*InterviewSession, error) {
 
 // loadFindings reads the findings from the perspective directory.
 func loadFindings(contextID, perspectiveID string) string {
-	data, err := os.ReadFile(findingsPath(contextID, perspectiveID))
+	path, err := findingsPath(contextID, perspectiveID)
+	if err != nil {
+		return ""
+	}
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return ""
 	}
@@ -107,13 +132,18 @@ func handleInterview(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 	if contextID == "" || perspectiveID == "" {
 		return mcp.NewToolResultError("context_id and perspective_id are required"), nil
 	}
+	if !safeID.MatchString(contextID) || !safeID.MatchString(perspectiveID) {
+		return mcp.NewToolResultError("context_id and perspective_id must contain only alphanumeric characters, hyphens, and underscores"), nil
+	}
 
 	sessionsMu.Lock()
 	defer sessionsMu.Unlock()
 
 	// New session — start interview
 	if topic != "" {
-		perspectiveDir(contextID, perspectiveID)
+		if _, err := perspectiveDir(contextID, perspectiveID); err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to create session directory: %v", err)), nil
+		}
 
 		session := &InterviewSession{
 			ContextID:    contextID,
