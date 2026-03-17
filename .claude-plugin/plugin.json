@@ -6,5 +6,6 @@
     "name": "valentin1235",
     "email": "valentin930316@gmail.com"
   },
-  "skills": "./skills/"
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json"
 }
