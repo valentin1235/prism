@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -36,11 +37,15 @@ type DAReviewResult struct {
 	Round            int         `json:"round"`
 	MaxRounds        int         `json:"max_rounds"`
 	HardStop         bool        `json:"hard_stop"`
+	ParseWarning     string      `json:"parse_warning,omitempty"`
 	OverallConfidence string     `json:"overall_confidence"`
 	TopConcerns      string     `json:"top_concerns"`
 	WhatHoldsUp      string     `json:"what_holds_up"`
 	RawOutput        string     `json:"raw_output"`
 }
+
+// severityKeywordRe detects severity keywords in raw output for parse failure detection.
+var severityKeywordRe = regexp.MustCompile(`(?i)\b(CRITICAL|MAJOR)\b`)
 
 // loadDASystemPrompt reads the devils-advocate.md from the agents directory.
 func loadDASystemPrompt() (string, error) {
@@ -62,33 +67,48 @@ func loadDASystemPrompt() (string, error) {
 
 // getRepoRoot determines the repository root from the executable path or known markers.
 func getRepoRoot() string {
-	// Try from executable path (binary is in mcp/bin/)
+	marker := filepath.Join("agents", "devils-advocate.md")
+	var tried []string
+
+	// First priority: PRISM_ROOT environment variable
+	if root := os.Getenv("PRISM_ROOT"); root != "" {
+		if _, err := os.Stat(filepath.Join(root, marker)); err == nil {
+			return root
+		}
+		tried = append(tried, "PRISM_ROOT="+root)
+	}
+
+	// Try from executable path (binary is in mcp/bin/ or mcp/)
 	exe, err := os.Executable()
 	if err == nil {
 		exeDir := filepath.Dir(exe)
-		// If running from mcp/bin/, repo root is two levels up
-		candidate := filepath.Join(exeDir, "..", "..")
-		if _, err := os.Stat(filepath.Join(candidate, "agents", "devils-advocate.md")); err == nil {
-			abs, _ := filepath.Abs(candidate)
-			return abs
-		}
-		// If running from mcp/, repo root is one level up
-		candidate = filepath.Join(exeDir, "..")
-		if _, err := os.Stat(filepath.Join(candidate, "agents", "devils-advocate.md")); err == nil {
-			abs, _ := filepath.Abs(candidate)
-			return abs
+		for _, rel := range []string{filepath.Join("..", ".."), ".."} {
+			candidate := filepath.Join(exeDir, rel)
+			abs, absErr := filepath.Abs(candidate)
+			if absErr != nil {
+				continue
+			}
+			if _, err := os.Stat(filepath.Join(abs, marker)); err == nil {
+				return abs
+			}
+			tried = append(tried, abs)
 		}
 	}
 
 	// Fallback: check working directory patterns
 	cwd, _ := os.Getwd()
 	for _, dir := range []string{cwd, filepath.Join(cwd, ".."), filepath.Join(cwd, "..", "..")} {
-		if _, err := os.Stat(filepath.Join(dir, "agents", "devils-advocate.md")); err == nil {
-			abs, _ := filepath.Abs(dir)
+		abs, absErr := filepath.Abs(dir)
+		if absErr != nil {
+			continue
+		}
+		if _, err := os.Stat(filepath.Join(abs, marker)); err == nil {
 			return abs
 		}
+		tried = append(tried, abs)
 	}
 
+	log.Printf("WARNING: could not locate %s. Tried paths: %v. Set PRISM_ROOT to override.", marker, tried)
 	return cwd
 }
 
@@ -250,6 +270,14 @@ func handleDAReview(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 		return mcp.NewToolResultError("seed_analysis_path is required"), nil
 	}
 
+	// Path validation: restrict to ~/.prism/state/ or /tmp/ to prevent arbitrary file reads
+	cleanPath := filepath.Clean(seedAnalysisPath)
+	homeDir, _ := os.UserHomeDir()
+	prismStateDir := filepath.Join(homeDir, ".prism", "state")
+	if !strings.HasPrefix(cleanPath, prismStateDir) && !strings.HasPrefix(cleanPath, "/tmp/") {
+		return mcp.NewToolResultError(fmt.Sprintf("seed_analysis_path must be within %s or /tmp/, got: %s", prismStateDir, cleanPath)), nil
+	}
+
 	// Hard-stop: if round exceeds maxDARounds, return immediately without calling LLM
 	if round > maxDARounds {
 		hardStopResult := DAReviewResult{
@@ -310,6 +338,13 @@ func handleDAReview(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 	findings := parseDAFindings(rawOutput)
 	overallConfidence, topConcerns, whatHoldsUp := parseDASummary(rawOutput)
 
+	// Detect parse failure: if no findings extracted but raw output contains severity keywords,
+	// the LLM likely produced slightly non-standard markdown that our regex missed.
+	var parseWarning string
+	if len(findings) == 0 && severityKeywordRe.MatchString(rawOutput) {
+		parseWarning = "WARNING: No findings were parsed from DA output, but severity keywords (CRITICAL/MAJOR) were detected in the raw output. The DA likely produced findings in a non-standard format. Check raw_output for details."
+	}
+
 	// Filter to only actionable (CRITICAL/MAJOR) findings, discard MINOR/INFO
 	actionable := filterActionableFindings(findings)
 
@@ -330,6 +365,7 @@ func handleDAReview(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 		Round:            round,
 		MaxRounds:        maxDARounds,
 		HardStop:         hardStop,
+		ParseWarning:     parseWarning,
 		OverallConfidence: overallConfidence,
 		TopConcerns:      topConcerns,
 		WhatHoldsUp:      whatHoldsUp,

@@ -157,6 +157,8 @@ func WriteSeedAnalysis(path string, sa SeedAnalysis) error {
 
 // PatchSeedAnalysisFile reads seed-analysis.json, applies a patch, and writes it back.
 // This is the primary entry point for incremental updates.
+// Currently used as library code for potential future prism_seed_merge MCP tool.
+// The seed analyst agent performs incremental updates via direct JSON Write for now.
 func PatchSeedAnalysisFile(path string, patch SeedPatch) (SeedAnalysis, error) {
 	existing, err := ReadSeedAnalysis(path)
 	if err != nil {
