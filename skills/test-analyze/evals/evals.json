@@ -24,7 +24,7 @@
         {"text": "Phase 0.55: perspective에 prompt 객체(role, tasks, output_format) 포함", "type": "field_contract"},
         {"text": "Phase 0.55: quality_gate 필드 모두 존재 (all_orthogonal, all_evidence_backed, all_specific, all_actionable, min_perspectives_met)", "type": "field_contract"},
         {"text": "Phase 0.6: perspectives.json에 approved=true 추가", "type": "data_flow"},
-        {"text": "Phase 0.7: ontology scope (skip or N/A)", "type": "workflow_gate"},
+        {"text": "Phase 0.3: ontology scope (skip or N/A)", "type": "workflow_gate"},
         {"text": "Phase 0.8: context.json에 investigation_loops:0 + report_language 포함", "type": "field_contract"},
         {"text": "Phase 1: Security Lens + finding-protocol + {KEY_QUESTIONS} 주입", "type": "data_flow"},
         {"text": "Phase 1: findings.json에 analyst, findings[] 필드 존재", "type": "field_contract"},
