@@ -20,8 +20,8 @@ First load the deferred tool: `ToolSearch(query="select:mcp__prism-mcp__prism_do
 
 | Result | optional | required |
 |--------|----------|----------|
-| 1+ paths | Record as `ONTOLOGY_DIRS[]`. | Record as `ONTOLOGY_DIRS[]`. |
-| 0 paths / error | Warn, continue. | **STOP.** |
+| 1+ paths | `ONTOLOGY_AVAILABLE=true`. Record as `ONTOLOGY_DIRS[]`. | `ONTOLOGY_AVAILABLE=true`. Record as `ONTOLOGY_DIRS[]`. |
+| 0 paths / error | `ONTOLOGY_AVAILABLE=false`. Warn, continue. | **STOP.** |
 
 → **NOW do Step 2a. Nothing else.**
 
