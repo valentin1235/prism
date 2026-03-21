@@ -447,9 +447,9 @@ type AnalysisConfig struct {
 	InputContext   string `json:"input_context,omitempty"`
 	OntologyScope  string `json:"ontology_scope,omitempty"`
 	SeedHints      string `json:"seed_hints,omitempty"`
-	ReportTemplate         string `json:"report_template,omitempty"`
-	Language               string `json:"language,omitempty"`
-	PerspectiveInjection   string `json:"perspective_injection,omitempty"`
+	ReportTemplate       string `json:"report_template,omitempty"`
+	Language             string `json:"language,omitempty"`
+	PerspectiveInjection string `json:"perspective_injection,omitempty"`
 }
 
 // readAnalysisConfig reads config.json from the task's state directory.

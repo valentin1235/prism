@@ -452,7 +452,7 @@ func extractTemplateSections(template string) []string {
 	for _, line := range strings.Split(template, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "## ") && !strings.HasPrefix(trimmed, "### ") {
-			section := strings.TrimSpace(strings.TrimLeft(trimmed, "#"))
+			section := strings.TrimSpace(strings.TrimPrefix(trimmed, "## "))
 			if section != "" {
 				sections = append(sections, section)
 			}
