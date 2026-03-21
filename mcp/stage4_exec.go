@@ -385,8 +385,14 @@ func runSynthesisSession(ctx context.Context, task *AnalysisTask, cfg AnalysisCo
 	// Update progress
 	task.UpdateStageDetail(StageSynthesis, "validating report sections")
 
-	// Validate that the report contains required sections
-	missing := validateReportSections(rawReport)
+	// Validate that the report contains required sections.
+	// Derive expected sections from the template when available;
+	// fall back to defaultReportSections for the standard analyze template.
+	expectedSections := extractTemplateSections(sctx.ReportTemplate)
+	if len(expectedSections) == 0 {
+		expectedSections = defaultReportSections
+	}
+	missing := validateReportSections(rawReport, expectedSections)
 	if len(missing) > 0 {
 		log.Printf("[%s] Synthesis: WARNING — report missing sections: %v", task.ID, missing)
 		// Non-fatal: still write the report but log the warning
@@ -409,8 +415,10 @@ func runSynthesisSession(ctx context.Context, task *AnalysisTask, cfg AnalysisCo
 	return nil
 }
 
-// requiredReportSections lists the section headers that must appear in a valid report.
-var requiredReportSections = []string{
+// defaultReportSections lists the section headers that must appear in a valid default report.
+// Custom report templates (e.g., incident RCA) may use different section names,
+// so validation extracts required sections from the template when available.
+var defaultReportSections = []string{
 	"Executive Summary",
 	"Analysis Overview",
 	"Perspective Findings",
@@ -420,16 +428,36 @@ var requiredReportSections = []string{
 	"Appendix",
 }
 
-// validateReportSections checks that the report contains all required section headers.
+// validateReportSections checks that the report contains all expected section headers.
 // Returns a list of missing section names. Empty list means all sections present.
-func validateReportSections(report string) []string {
+func validateReportSections(report string, expectedSections []string) []string {
 	lower := strings.ToLower(report)
 	var missing []string
-	for _, section := range requiredReportSections {
+	for _, section := range expectedSections {
 		if !strings.Contains(lower, strings.ToLower(section)) {
 			missing = append(missing, section)
 		}
 	}
 	return missing
+}
+
+// extractTemplateSections parses a report template and extracts H2 section
+// headers (## lines) as the expected sections for validation. Returns nil
+// if no H2 headers are found (caller should fall back to defaults).
+func extractTemplateSections(template string) []string {
+	if template == "" {
+		return nil
+	}
+	var sections []string
+	for _, line := range strings.Split(template, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "## ") && !strings.HasPrefix(trimmed, "### ") {
+			section := strings.TrimSpace(strings.TrimLeft(trimmed, "#"))
+			if section != "" {
+				sections = append(sections, section)
+			}
+		}
+	}
+	return sections
 }
 

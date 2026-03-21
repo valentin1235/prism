@@ -91,19 +91,11 @@ func handleAnalyze(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallT
 		}
 	}
 
-	// Validate perspective_injection file exists and contains valid JSON if provided
+	// Validate perspective_injection file exists if provided
+	// Full JSON parsing is deferred to runScopeStage to avoid double I/O.
 	if perspectiveInjection != "" {
-		data, err := os.ReadFile(perspectiveInjection)
-		if err != nil {
+		if _, err := os.Stat(perspectiveInjection); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("perspective_injection file not found: %s", perspectiveInjection)), nil
-		}
-		// Validate it's a valid JSON array of perspective objects
-		var injectedPerspectives []Perspective
-		if err := json.Unmarshal(data, &injectedPerspectives); err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("perspective_injection file must contain a valid JSON array of perspective objects: %v", err)), nil
-		}
-		if len(injectedPerspectives) == 0 {
-			return mcp.NewToolResultError("perspective_injection file contains an empty array"), nil
 		}
 	}
 
@@ -672,13 +664,15 @@ func runScopeStage(task *AnalysisTask, cfg AnalysisConfig) ([]Perspective, error
 			log.Printf("[%s] Warning: failed to load injected perspectives from %s: %v — continuing without injection",
 				task.ID, cfg.PerspectiveInjection, err)
 		} else if len(injected) > 0 {
+			originalLen := len(pf.Perspectives)
 			pf.Perspectives = mergeInjectedPerspectives(pf.Perspectives, injected)
+			actuallyAdded := len(pf.Perspectives) - originalLen
 			// Persist the merged perspective set back to disk
 			if err := WritePerspectives(perspPath, pf); err != nil {
 				return nil, fmt.Errorf("write merged perspectives: %w", err)
 			}
-			log.Printf("[%s] Merged %d injected perspectives — total: %d",
-				task.ID, len(injected), len(pf.Perspectives))
+			log.Printf("[%s] Merged %d/%d injected perspectives (skipped %d duplicates) — total: %d",
+				task.ID, actuallyAdded, len(injected), len(injected)-actuallyAdded, len(pf.Perspectives))
 		}
 	}
 

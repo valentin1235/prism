@@ -266,7 +266,7 @@ Recs here.
 ## Appendix
 Appendix here.`
 
-		missing := validateReportSections(report)
+		missing := validateReportSections(report, defaultReportSections)
 		if len(missing) != 0 {
 			t.Errorf("expected no missing sections, got %v", missing)
 		}
@@ -279,7 +279,7 @@ Summary here.
 ## Analysis Overview
 Overview here.`
 
-		missing := validateReportSections(report)
+		missing := validateReportSections(report, defaultReportSections)
 		if len(missing) != 5 {
 			t.Errorf("expected 5 missing sections, got %d: %v", len(missing), missing)
 		}
@@ -307,14 +307,14 @@ Overview here.`
 ## recommendations
 ## appendix`
 
-		missing := validateReportSections(report)
+		missing := validateReportSections(report, defaultReportSections)
 		if len(missing) != 0 {
 			t.Errorf("expected case-insensitive match, got missing: %v", missing)
 		}
 	})
 
 	t.Run("empty report", func(t *testing.T) {
-		missing := validateReportSections("")
+		missing := validateReportSections("", defaultReportSections)
 		if len(missing) != 7 {
 			t.Errorf("expected all 7 sections missing for empty report, got %d", len(missing))
 		}

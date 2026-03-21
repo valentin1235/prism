@@ -62,12 +62,15 @@ If no screenshots are referenced, skip this step.
 
 Determine the absolute path of the directory containing this SKILL.md:
 
-```bash
-# Find this skill's directory
-dirname $(find ~/.claude -path "*/skills/incident/SKILL.md" -o -path "*/incident/SKILL.md" 2>/dev/null | head -1) 2>/dev/null || echo ""
+Use `Glob` to find the skill directory:
+
+```
+Glob(pattern="**/skills/incident/SKILL.md")
 ```
 
-If the above fails, use `Glob` to find `**/skills/incident/SKILL.md` and extract the directory. Store as `{SKILL_DIR}`.
+Extract the directory path from the first match (remove `/SKILL.md` suffix). Store as `{SKILL_DIR}`.
+
+If Glob returns no results, fall back to `~/prism/skills/incident` as default path and verify it exists via `Bash(ls {path}/SKILL.md)`.
 
 ### Step 1.2: Ontology Scope Mapping
 
