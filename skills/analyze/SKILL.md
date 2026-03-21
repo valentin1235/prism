@@ -3,7 +3,7 @@ name: analyze
 description: Runs multi-perspective analysis via MCP server orchestration. Thin wrapper that handles user interaction (ontology scope mapping) then delegates all processing to prism_analyze MCP tool. General-purpose analysis engine — any topic can be analyzed against ontology documents.
 version: 6.0.0
 user-invocable: true
-allowed-tools: Read, Glob, Grep, Bash, Write, ToolSearch, AskUserQuestion, WebFetch, WebSearch, mcp__prism-mcp__prism_analyze, mcp__prism-mcp__prism_task_status, mcp__prism-mcp__prism_analyze_result, mcp__prism-mcp__prism_docs_roots, mcp__prism-mcp__prism_docs_list, mcp__prism-mcp__prism_docs_read, mcp__prism-mcp__prism_docs_search
+allowed-tools: Read, Glob, Grep, Bash, Write, ToolSearch, AskUserQuestion, WebFetch, WebSearch, mcp__prism-mcp__prism_analyze, mcp__prism-mcp__prism_task_status, mcp__prism-mcp__prism_analyze_result, mcp__prism-mcp__prism_cancel_task, mcp__prism-mcp__prism_docs_roots, mcp__prism-mcp__prism_docs_list, mcp__prism-mcp__prism_docs_read, mcp__prism-mcp__prism_docs_search
 ---
 
 # Multi-Perspective Analysis
@@ -29,7 +29,9 @@ Wrapper skills (e.g., `/prd`) can customize analyze behavior by providing a conf
   "input_context": "Path to input file (e.g., PRD file path)",
   "report_template": "Path to custom report template (overrides default)",
   "seed_hints": "Additional guidance for seed analyst (e.g., 'Focus on policy domain extraction')",
-  "ontology_mode": "required|optional (default: optional)"
+  "ontology_mode": "required|optional (default: optional)",
+  "session_id": "Pre-generated session ID (optional — task_id becomes analyze-{session_id})",
+  "model": "Claude model override (default: claude-sonnet-4-6)"
 }
 ```
 
@@ -54,7 +56,7 @@ Store the resolved description and config values.
 > Read and execute `protocols/ontology-scope-mapping.md` with:
 - `{AVAILABILITY_MODE}` = config's `ontology_mode` if present, otherwise `optional`
 - `{CALLER_CONTEXT}` = `"analysis"`
-- `{STATE_DIR}` = `~/.prism/state/{task_id}/` (ontology-scope.json is written here for the MCP server to read)
+- `{STATE_DIR}` = Generate a short-id via `Bash(uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-8)`, then `mkdir -p ~/.prism/state/analyze-{short-id}` and use that path. Pass this `{short-id}` as `session_id` to `prism_analyze` so directories align. If `config.session_id` is provided, use it instead of generating a new one.
 
 Resolve ontology scope to a JSON string in canonical `{"sources": [...]}` format. If `ONTOLOGY_AVAILABLE=false` → pass `null` as `ontology_scope`.
 
@@ -74,7 +76,8 @@ Resolve ontology scope to a JSON string in canonical `{"sources": [...]}` format
 ```
 mcp__prism-mcp__prism_analyze(
   topic: "{resolved description}",
-  model: "{model from config or default}",
+  session_id: "{short-id from Step 1.2, or config.session_id if provided}",
+  model: "{config.model if provided, otherwise omit to use server default}",
   input_context: "{config.input_context if provided}",
   ontology_scope: "{ontology scope JSON string or omit if null}",
   seed_hints: "{config.seed_hints if provided}",
@@ -132,7 +135,11 @@ If status changes to a new stage, announce it:
 🔍 Starting {new_stage}...
 ```
 
-### Step 3.3: Handle Failure
+### Step 3.3: Handle Cancellation
+
+If the user requests cancellation during polling, call `prism_cancel_task(task_id)` and report the result.
+
+### Step 3.4: Handle Failure
 
 If status is `failed`:
 - Display the error message to the user

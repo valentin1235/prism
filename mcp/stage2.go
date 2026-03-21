@@ -492,6 +492,12 @@ func BuildAllSpecialistCommands(cfg AnalysisConfig, perspectives []Perspective) 
 // truncateForPrompt truncates a string to maxLen runes for prompt inclusion,
 // appending "..." if truncated. Uses []rune conversion for UTF-8 safe truncation.
 func truncateForPrompt(s string, maxLen int) string {
+	if maxLen <= 3 {
+		if maxLen <= 0 {
+			return ""
+		}
+		return "..."[:maxLen]
+	}
 	runes := []rune(s)
 	if len(runes) <= maxLen {
 		return s

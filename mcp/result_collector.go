@@ -243,12 +243,11 @@ func classifyErrorMessage(msg string) (errorCategory, string) {
 
 	// Context cancellation / timeout
 	if strings.Contains(msg, "context deadline exceeded") ||
-		strings.Contains(msg, "context canceled") ||
 		strings.Contains(msg, "timed out") ||
 		strings.Contains(msg, "timeout") {
-		if strings.Contains(msg, "deadline exceeded") || strings.Contains(msg, "timed out") || strings.Contains(msg, "timeout") {
-			return categoryTimeout, "subprocess_timeout"
-		}
+		return categoryTimeout, "subprocess_timeout"
+	}
+	if strings.Contains(msg, "context canceled") {
 		return categoryCancelled, "context_cancelled"
 	}
 

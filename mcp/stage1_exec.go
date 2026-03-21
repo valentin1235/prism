@@ -42,7 +42,7 @@ func runSeedAnalysis(task *AnalysisTask, cfg AnalysisConfig) error {
 
 	// Run claude CLI with tool access and structured output
 	// 10-minute timeout for multi-turn tool-using research
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	ctx, cancel := context.WithTimeout(task.Ctx, 10*time.Minute)
 	defer cancel()
 
 	rawOutput, err := queryLLMScopedWithToolsAndSchema(
@@ -128,7 +128,7 @@ func runDAReviewLoop(task *AnalysisTask, cfg AnalysisConfig) error {
 		)
 
 		// Call LLM for DA review (5-minute timeout per round)
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		ctx, cancel := context.WithTimeout(task.Ctx, 5*time.Minute)
 		rawOutput, err := queryLLMScopedWithSystemPrompt(ctx, stateDir, cfg.Model, daPrompt, userPrompt)
 		cancel()
 		if err != nil {
@@ -222,7 +222,7 @@ func runSupplementaryResearch(task *AnalysisTask, cfg AnalysisConfig, findings [
 	}
 
 	// Run focused research subprocess (5-minute timeout, 8 max turns)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(task.Ctx, 5*time.Minute)
 	defer cancel()
 
 	rawOutput, err := queryLLMScopedWithToolsAndSchema(
@@ -295,7 +295,7 @@ func runPerspectiveGeneration(task *AnalysisTask, cfg AnalysisConfig) error {
 
 	// Run claude CLI with structured output (single-turn, no tools)
 	// 5-minute timeout for perspective generation
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(task.Ctx, 5*time.Minute)
 	defer cancel()
 
 	rawOutput, err := queryLLMScopedWithSchema(

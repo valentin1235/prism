@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -27,6 +28,11 @@ func createTestTask(t *testing.T, topic, model string) (*AnalysisTask, string) {
 	store := NewTaskStore()
 	task := store.Create("", model, stateDir, reportDir, "")
 	task.UpdateDirs(task.ID, stateDir, reportDir)
+
+	// Set up cancellable context (normally done by handleAnalyze)
+	ctx, cancel := context.WithCancel(context.Background())
+	task.Ctx = ctx
+	task.Cancel = cancel
 
 	// Write config.json
 	cfg := AnalysisConfig{

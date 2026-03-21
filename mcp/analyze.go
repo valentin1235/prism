@@ -391,7 +391,10 @@ func handleCancelTask(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 			"status":  string(snapshot.Status),
 			"message": fmt.Sprintf("task already %s — nothing to cancel", snapshot.Status),
 		}
-		resultBytes, _ := json.Marshal(resp)
+		resultBytes, err := json.Marshal(resp)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to marshal response: %v", err)), nil
+		}
 		return mcp.NewToolResultText(string(resultBytes)), nil
 	}
 
@@ -760,7 +763,7 @@ func runSynthesisStage(task *AnalysisTask, cfg AnalysisConfig, perspectives []Pe
 
 	reportPath := filepath.Join(reportDir, "report.md")
 
-	if err := runReportGeneration(task, cfg, perspectives, interviewResults, reportPath); err != nil {
+	if err := runReportGeneration(task, cfg, perspectives, reportPath); err != nil {
 		return "", fmt.Errorf("report generation: %w", err)
 	}
 
@@ -841,7 +844,7 @@ func runInterviewSession(ctx context.Context, task *AnalysisTask, cmd InterviewC
 // synthesis prompt with the report template, and invokes a single claude CLI to produce
 // the final analysis report. The report is validated for required sections and written to disk.
 // Implemented in stage4_exec.go via runSynthesisSession.
-func runReportGeneration(task *AnalysisTask, cfg AnalysisConfig, perspectives []Perspective, results []StageResult, reportPath string) error {
+func runReportGeneration(task *AnalysisTask, cfg AnalysisConfig, perspectives []Perspective, reportPath string) error {
 	// Synthesis timeout: 30 minutes
 	ctx, cancel := context.WithTimeout(task.Ctx, 30*time.Minute)
 	defer cancel()
