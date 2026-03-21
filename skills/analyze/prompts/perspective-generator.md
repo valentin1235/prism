@@ -1,3 +1,6 @@
+> **DEPRECATED (v6.0):** This prompt is no longer used at runtime. Perspective generation logic has been
+> reimplemented in the Go MCP server (`mcp/stage1.go`). Retained as design reference only.
+
 # Perspective Generator Prompt
 
 Spawn as:

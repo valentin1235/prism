@@ -1,3 +1,6 @@
+> **DEPRECATED (v6.0):** This protocol is no longer used at runtime. Finding phase logic has been
+> reimplemented in the Go MCP server (`mcp/stage2_exec.go`). Retained as design reference only.
+
 # Analyst Protocol — Finding Phase
 
 ## Perspective-Specific Questions

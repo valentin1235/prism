@@ -1,3 +1,6 @@
+> **DEPRECATED (v6.0):** This gate is no longer needed. Analysis orchestration moved from agent teams
+> to Go MCP server internal orchestration via CLI subprocess pattern. Retained as design reference only.
+
 # Prerequisite: Agent Team Mode (HARD GATE)
 
 **This gate MUST be checked before ALL other phases. Do NOT skip.**

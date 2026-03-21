@@ -1,3 +1,6 @@
+> **DEPRECATED (v6.0):** This protocol is no longer needed. Agent teams replaced by Go MCP server
+> internal orchestration. No team cleanup required. Retained as design reference only.
+
 # Team Teardown
 
 Cleanup procedure after team work is complete.

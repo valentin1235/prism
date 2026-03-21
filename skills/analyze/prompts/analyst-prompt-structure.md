@@ -1,3 +1,6 @@
+> **DEPRECATED (v6.0):** This structure document is no longer used at runtime. Prompt construction logic
+> has been reimplemented in the Go MCP server (`mcp/stage1.go`, `mcp/stage2_exec.go`). Retained as design reference only.
+
 # Analyst Prompt Structure
 
 This document defines the required structure for dynamically generated analyst prompts. The perspective generator MUST follow this structure when creating prompts for each analyst.

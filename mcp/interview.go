@@ -49,7 +49,31 @@ type InterviewSession struct {
 	UpdatedAt     string `json:"updated_at"`
 }
 
-var sessionsMu sync.Mutex
+// sessionLocks provides per-session mutex granularity to enable parallel
+// interview execution across different perspective sessions. Each session
+// (identified by contextID + perspectiveID) gets its own lock, so concurrent
+// interviews for different specialists within the same or different analysis
+// tasks do not block each other.
+var sessionLocks = &sessionLockMap{locks: make(map[string]*sync.Mutex)}
+
+type sessionLockMap struct {
+	mu    sync.Mutex
+	locks map[string]*sync.Mutex
+}
+
+// get returns the mutex for a specific session, creating one if needed.
+// The meta-lock (mu) is only held briefly to look up or create the per-session lock.
+func (m *sessionLockMap) get(contextID, perspectiveID string) *sync.Mutex {
+	key := contextID + "/" + perspectiveID
+	m.mu.Lock()
+	lk, ok := m.locks[key]
+	if !ok {
+		lk = &sync.Mutex{}
+		m.locks[key] = lk
+	}
+	m.mu.Unlock()
+	return lk
+}
 
 // perspectiveDir returns ~/.prism/state/{context_id}/perspectives/{perspective_id}/ and creates it.
 func perspectiveDir(contextID, perspectiveID string) (string, error) {
@@ -136,8 +160,11 @@ func handleInterview(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 		return mcp.NewToolResultError("context_id and perspective_id must contain only alphanumeric characters, hyphens, and underscores"), nil
 	}
 
-	sessionsMu.Lock()
-	defer sessionsMu.Unlock()
+	// Per-session lock: only serializes concurrent calls to the SAME session,
+	// allowing parallel interviews across different perspectives/tasks.
+	sessionMu := sessionLocks.get(contextID, perspectiveID)
+	sessionMu.Lock()
+	defer sessionMu.Unlock()
 
 	// New session — start interview
 	if topic != "" {

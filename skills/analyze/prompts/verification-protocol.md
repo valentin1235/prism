@@ -1,3 +1,6 @@
+> **DEPRECATED (v6.0):** This protocol is no longer used at runtime. Verification phase logic has been
+> reimplemented in the Go MCP server (interview/stage3 execution). Retained as design reference only.
+
 # Analyst Protocol — Verification Phase
 
 ## Role Clarification — READ THIS FIRST

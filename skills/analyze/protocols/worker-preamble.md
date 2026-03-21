@@ -1,3 +1,6 @@
+> **DEPRECATED (v6.0):** This preamble is no longer needed. Agent team workers replaced by Go MCP
+> server internal orchestration via CLI subprocess pattern. Retained as design reference only.
+
 # Worker Preamble Template
 
 Common preamble included in all team worker agent prompts.

@@ -1,4 +1,7 @@
 #!/bin/bash
+# DEPRECATED (v6.0): This script is no longer used. Perspective injection is handled
+# internally by the Go MCP server. Retained as design reference only.
+#
 # Merges perspective_injection.json into perspectives.json
 # Usage: merge-perspective-injection.sh <state-dir>
 # Example: merge-perspective-injection.sh ~/.prism/state/analyze-abc12345

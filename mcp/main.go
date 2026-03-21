@@ -12,6 +12,9 @@ func main() {
 		log.Printf("Warning: filesystem init failed: %v", err)
 	}
 
+	// Initialize the task store for analysis orchestration
+	taskStore = NewTaskStore()
+
 	s := server.NewMCPServer(
 		"prism-mcp",
 		"1.0.0",
@@ -45,6 +48,36 @@ func main() {
 			mcp.WithString("perspective_id", mcp.Required(), mcp.Description("Perspective identifier")),
 		),
 		handleScore,
+	)
+
+	// Analysis orchestration tools
+	s.AddTool(
+		mcp.NewTool("prism_analyze",
+			mcp.WithDescription("Start a new multi-perspective analysis. Launches a 4-stage pipeline (Scope → Specialists → Interview → Synthesis) as a background task. Returns immediately with a task_id for status polling via prism_task_status."),
+			mcp.WithString("topic", mcp.Required(), mcp.Description("What to analyze — the central question or subject")),
+			mcp.WithString("model", mcp.Description("Claude model to use for all stages. Default: claude-sonnet-4-6")),
+			mcp.WithString("input_context", mcp.Description("Absolute path to input file providing additional context for the analysis")),
+			mcp.WithString("ontology_scope", mcp.Description("JSON string of ontology scope mapping (pre-resolved by caller). Keys are perspective IDs, values are arrays of document paths.")),
+			mcp.WithString("seed_hints", mcp.Description("Additional guidance for the seed analyst stage")),
+			mcp.WithString("report_template", mcp.Description("Absolute path to a custom report template file")),
+		),
+		handleAnalyze,
+	)
+
+	s.AddTool(
+		mcp.NewTool("prism_task_status",
+			mcp.WithDescription("Query the status and progress of an analysis task by task_id. Returns current stage progress for running tasks, report_path for completed tasks, or error details for failed tasks. Use this to poll after prism_analyze returns a task_id."),
+			mcp.WithString("task_id", mcp.Required(), mcp.Description("The task identifier returned by prism_analyze")),
+		),
+		handleTaskStatus,
+	)
+
+	s.AddTool(
+		mcp.NewTool("prism_analyze_result",
+			mcp.WithDescription("Retrieve the final result of a completed analysis task. Returns the report file path and an executive summary extracted from the report. Only works for completed tasks — returns an error for running, queued, or failed tasks."),
+			mcp.WithString("task_id", mcp.Required(), mcp.Description("The task identifier returned by prism_analyze")),
+		),
+		handleAnalyzeResult,
 	)
 
 	// Filesystem tools (configured via ~/.prism/ontology-docs.json)

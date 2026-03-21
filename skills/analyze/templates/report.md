@@ -19,6 +19,12 @@ Fill all sections. Write "N/A" if truly irrelevant — do NOT leave sections emp
 ### {Perspective Name}
 {Full findings per analyst output format}
 
+## Missing Perspectives
+{If any specialists failed or interviews could not be completed, list them here. Omit this section if all perspectives completed successfully.}
+
+| Perspective | Failed Stage | Reason | Impact |
+|-------------|-------------|--------|--------|
+
 ## Integrated Analysis
 - **Convergence**: Where perspectives independently agreed
 - **Divergence**: Where they disagreed + resolution
