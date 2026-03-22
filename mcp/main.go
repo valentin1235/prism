@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 
+	"github.com/heechul/prism-mcp/internal/brownfield"
 	"github.com/heechul/prism-mcp/internal/handler"
 	taskpkg "github.com/heechul/prism-mcp/internal/task"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -19,7 +20,7 @@ func main() {
 
 	s := server.NewMCPServer(
 		"prism",
-		"1.0.0",
+		"1.0.1",
 	)
 
 	s.AddTool(
@@ -130,6 +131,29 @@ func main() {
 		)
 
 		log.Printf("Filesystem tools enabled: %d directories", len(handler.AllowedDirs))
+	}
+
+	// Brownfield repository registry
+	if err := brownfield.InitStore(); err != nil {
+		log.Printf("Warning: brownfield store init failed: %v", err)
+	} else {
+		s.AddTool(
+			mcp.NewTool("prism_brownfield",
+				mcp.WithDescription("Brownfield repository registry. Scans home directory for GitHub repos, registers them in SQLite, manages default selections, and generates README-based descriptions. Actions: scan, register, query, set_default, set_defaults, generate_desc."),
+				mcp.WithString("action", mcp.Description("Action to perform: scan, register, query, set_default, set_defaults, generate_desc. Auto-detected from parameters when omitted.")),
+				mcp.WithString("path", mcp.Description("Absolute filesystem path of the repository (for register, set_default, generate_desc)")),
+				mcp.WithString("name", mcp.Description("Human-readable name. Defaults to directory name (for register)")),
+				mcp.WithString("desc", mcp.Description("One-line description. If omitted, auto-generated from README (for register)")),
+				mcp.WithBoolean("is_default", mcp.Description("For set_default: true to mark as default, false to unmark")),
+				mcp.WithBoolean("default_only", mcp.Description("For query: return only repos marked as default")),
+				mcp.WithString("scan_root", mcp.Description("Root directory for scan. Defaults to home directory")),
+				mcp.WithString("indices", mcp.Description("Comma-separated rowid list for set_defaults (e.g., '6,18,19')")),
+				mcp.WithNumber("offset", mcp.Description("Number of rows to skip for pagination (for query)")),
+				mcp.WithNumber("limit", mcp.Description("Maximum rows to return (for query). 0 = no limit")),
+			),
+			brownfield.HandleBrownfield,
+		)
+		log.Println("Brownfield tool enabled")
 	}
 
 	log.Println("Prism MCP server starting on stdio...")
