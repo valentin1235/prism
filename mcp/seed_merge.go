@@ -19,9 +19,8 @@ type SeedFinding struct {
 type SeedResearch struct {
 	Summary       string        `json:"summary"`
 	Findings      []SeedFinding `json:"findings"`
-	KeyAreas      []string      `json:"key_areas"`
-	FilesExamined []string      `json:"files_examined"`
-	MCPQueries    []string      `json:"mcp_queries"`
+	KeyAreas   []string `json:"key_areas"`
+	MCPQueries []string `json:"mcp_queries"`
 }
 
 // SeedAnalysis represents the full seed-analysis.json structure.
@@ -40,8 +39,6 @@ type SeedPatch struct {
 	Summary string `json:"summary,omitempty"`
 	// NewKeyAreas are appended (deduplicated) to research.key_areas.
 	NewKeyAreas []string `json:"new_key_areas,omitempty"`
-	// NewFilesExamined are appended to research.files_examined.
-	NewFilesExamined []string `json:"new_files_examined,omitempty"`
 	// NewMCPQueries are appended to research.mcp_queries.
 	NewMCPQueries []string `json:"new_mcp_queries,omitempty"`
 	// DAPassed sets the da_passed flag. Use SetDAPassed to control whether it's applied.
@@ -104,14 +101,6 @@ func MergeSeedAnalysis(existing SeedAnalysis, patch SeedPatch) SeedAnalysis {
 	// Deduplicate and append key_areas
 	if len(patch.NewKeyAreas) > 0 {
 		merged.Research.KeyAreas = deduplicateStrings(existing.Research.KeyAreas, patch.NewKeyAreas)
-	}
-
-	// Append files_examined (no dedup — same file can be examined for different reasons)
-	if len(patch.NewFilesExamined) > 0 {
-		merged.Research.FilesExamined = append(
-			append([]string{}, existing.Research.FilesExamined...),
-			patch.NewFilesExamined...,
-		)
 	}
 
 	// Append mcp_queries

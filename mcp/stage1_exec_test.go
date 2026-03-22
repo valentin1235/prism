@@ -10,7 +10,7 @@ import (
 // --- Tests for extractJSON ---
 
 func TestExtractJSON_CleanJSON(t *testing.T) {
-	input := `{"topic":"test","da_passed":true,"research":{"summary":"s","findings":[],"key_areas":[],"files_examined":[],"mcp_queries":[]}}`
+	input := `{"topic":"test","da_passed":true,"research":{"summary":"s","findings":[],"key_areas":[],"mcp_queries":[]}}`
 	got, err := extractJSON(input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -49,7 +49,7 @@ func TestExtractJSON_MarkdownFences(t *testing.T) {
 func TestExtractJSON_SurroundingText(t *testing.T) {
 	input := `Here is the result:
 
-{"topic":"test","da_passed":true,"research":{"summary":"s","findings":[],"key_areas":[],"files_examined":[],"mcp_queries":[]}}
+{"topic":"test","da_passed":true,"research":{"summary":"s","findings":[],"key_areas":[],"mcp_queries":[]}}
 
 That completes the analysis.`
 	got, err := extractJSON(input)
@@ -178,9 +178,8 @@ func TestRunSeedAnalysis_WritesOutputFile(t *testing.T) {
 				{ID: 1, Area: "auth", Description: "Auth module", Source: "auth.go:10", ToolUsed: "Grep"},
 				{ID: 2, Area: "db", Description: "Database layer", Source: "db.go:20", ToolUsed: "Read"},
 			},
-			KeyAreas:      []string{"auth", "db"},
-			FilesExamined: []string{"auth.go:10 — auth module", "db.go:20 — db layer"},
-			MCPQueries:    []string{},
+			KeyAreas:   []string{"auth", "db"},
+			MCPQueries: []string{},
 		},
 	}
 
@@ -308,9 +307,8 @@ func TestSupplementaryResearchMerge(t *testing.T) {
 		Research: SeedResearch{
 			Summary:       "Initial summary",
 			Findings:      []SeedFinding{{ID: 1, Area: "area1", Description: "desc1", Source: "file1:10", ToolUsed: "Grep"}},
-			KeyAreas:      []string{"area1"},
-			FilesExamined: []string{"file1:10 — found area1"},
-			MCPQueries:    []string{},
+			KeyAreas:   []string{"area1"},
+			MCPQueries: []string{},
 		},
 	}
 	if err := WriteSeedAnalysis(seedPath, initial); err != nil {
@@ -322,8 +320,7 @@ func TestSupplementaryResearchMerge(t *testing.T) {
 		NewFindings: []SeedFinding{
 			{ID: 99, Area: "area2", Description: "desc2", Source: "file2:20", ToolUsed: "Read"},
 		},
-		NewKeyAreas:      []string{"area2"},
-		NewFilesExamined: []string{"file2:20 — found area2"},
+		NewKeyAreas: []string{"area2"},
 		Summary:          "Updated summary with area2",
 	}
 
@@ -436,10 +433,6 @@ func TestExtractJSON_SeedAnalysisOutput(t *testing.T) {
       }
     ],
     "key_areas": ["payment-gateway", "transaction-logging"],
-    "files_examined": [
-      "payment_gateway.go:45 — Stripe API calls",
-      "tx_log.go:22 — audit trail"
-    ],
     "mcp_queries": []
   }
 }`
@@ -500,9 +493,8 @@ func TestStage1FileFlow_SeedToPerspectives(t *testing.T) {
 				{ID: 1, Area: "auth", Description: "Authentication module", Source: "auth.go:10", ToolUsed: "Grep"},
 				{ID: 2, Area: "db", Description: "Database layer", Source: "db.go:20", ToolUsed: "Read"},
 			},
-			KeyAreas:      []string{"auth", "db"},
-			FilesExamined: []string{"auth.go:10", "db.go:20"},
-			MCPQueries:    []string{},
+			KeyAreas:   []string{"auth", "db"},
+			MCPQueries: []string{},
 		},
 	}
 	seedPath := SeedAnalysisPath(tmpDir)

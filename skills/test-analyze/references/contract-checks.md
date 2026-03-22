@@ -86,15 +86,13 @@ For each arrow (→) in the map above:
 ```json
 {
   "research": {
-    "findings": [{"area": "...", "description": "..."}],
-    "files_examined": ["path1", "path2"]
+    "findings": [{"area": "...", "description": "..."}]
   }
 }
 ```
 
 **Consumer expectations:**
 - `context.json.research_summary.key_findings` derived from `research.findings[].area` and `research.findings[].description`
-- `context.json.research_summary.files_examined` derived from `research.files_examined`
 - `context.json.research_summary.key_areas` reflects seed key_areas
 
 #### 4. context.json → report.md

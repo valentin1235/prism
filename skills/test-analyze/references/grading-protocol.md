@@ -40,7 +40,7 @@ For each `field_contract` assertion, read the relevant JSON and verify fields:
 Required: topic,
           research.summary, research.findings[], research.findings[].area,
           research.findings[].description, research.findings[].source,
-          research.key_areas, research.files_examined
+          research.key_areas
 ```
 
 ### perspectives.json
@@ -60,7 +60,7 @@ Required: perspectives[].id, perspectives[].name, perspectives[].scope,
 
 ### context.json
 ```
-Required: summary, research_summary.key_findings, research_summary.files_examined,
+Required: summary, research_summary.key_findings,
           research_summary.key_areas, report_language, investigation_loops
 ```
 
@@ -90,7 +90,6 @@ For each `data_flow` assertion and each `contract_check`:
 
 ### seed-analysis → context
 - context.json `research_summary.key_findings` should contain content from seed-analysis.json `research.findings`
-- context.json `research_summary.files_examined` should match seed-analysis.json `research.files_examined`
 
 ### context → report
 - If `report_language` is "ko" or "Korean", report.md should be primarily in Korean

@@ -52,7 +52,7 @@
           "name": "seed → context: research_summary",
           "producer": "seed-analysis.json",
           "consumer": "context.json",
-          "fields": ["research.findings", "research.files_examined"],
+          "fields": ["research.findings"],
           "rule": "context.json.research_summary.key_findings가 seed-analysis.json.research.findings에서 파생"
         },
         {

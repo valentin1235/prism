@@ -151,7 +151,7 @@ func TestBuildSeedAnalystPrompt_WithoutDocPaths(t *testing.T) {
 }
 
 func TestBuildPerspectiveGeneratorPrompt_BasicStructure(t *testing.T) {
-	seedJSON := `{"topic":"test","da_passed":true,"research":{"summary":"test summary","findings":[],"key_areas":[],"files_examined":[],"mcp_queries":[]}}`
+	seedJSON := `{"topic":"test","da_passed":true,"research":{"summary":"test summary","findings":[],"key_areas":[],"mcp_queries":[]}}`
 
 	prompt := BuildPerspectiveGeneratorPrompt("Test topic", seedJSON)
 
@@ -277,7 +277,7 @@ func TestSeedAnalysisSchema_ResearchFields(t *testing.T) {
 	research := props["research"].(map[string]interface{})
 	researchProps := research["properties"].(map[string]interface{})
 
-	expectedFields := []string{"summary", "findings", "key_areas", "files_examined", "mcp_queries"}
+	expectedFields := []string{"summary", "findings", "key_areas", "mcp_queries"}
 	for _, field := range expectedFields {
 		if _, ok := researchProps[field]; !ok {
 			t.Errorf("research schema must include field %q", field)
@@ -416,7 +416,6 @@ func TestBuildSeedAnalystPrompt_OutputInstructsJSONFormat(t *testing.T) {
 		"research.summary",
 		"research.findings",
 		"research.key_areas",
-		"research.files_examined",
 	}
 	for _, field := range expectedFields {
 		if !strings.Contains(prompt, field) {

@@ -18,9 +18,8 @@ func baseSeedAnalysis() SeedAnalysis {
 				{ID: 2, Area: "db-pool", Description: "Connection pooling", Source: "src/db/pool.go:15", ToolUsed: "Read"},
 				{ID: 3, Area: "cache-layer", Description: "Redis caching", Source: "src/cache/redis.go:88", ToolUsed: "Grep"},
 			},
-			KeyAreas:      []string{"api-gateway", "database", "caching"},
-			FilesExamined: []string{"src/gateway/main.go:42 — route handling", "src/db/pool.go:15 — pool config"},
-			MCPQueries:    []string{"prism_docs: API gateway architecture → found routing layer docs"},
+			KeyAreas:   []string{"api-gateway", "database", "caching"},
+			MCPQueries: []string{"prism_docs: API gateway architecture → found routing layer docs"},
 		},
 	}
 }
@@ -162,22 +161,6 @@ func TestMergeSeedAnalysis_DeduplicateKeyAreas(t *testing.T) {
 		if merged.Research.KeyAreas[i] != v {
 			t.Errorf("key_areas[%d] = %q, want %q", i, merged.Research.KeyAreas[i], v)
 		}
-	}
-}
-
-func TestMergeSeedAnalysis_AppendFilesExamined(t *testing.T) {
-	existing := baseSeedAnalysis()
-	patch := SeedPatch{
-		NewFilesExamined: []string{"src/middleware/ratelimit.go:10 — rate limiting logic"},
-	}
-
-	merged := MergeSeedAnalysis(existing, patch)
-
-	if len(merged.Research.FilesExamined) != 3 {
-		t.Fatalf("files_examined length = %d, want 3", len(merged.Research.FilesExamined))
-	}
-	if merged.Research.FilesExamined[2] != "src/middleware/ratelimit.go:10 — rate limiting logic" {
-		t.Errorf("new file not appended correctly")
 	}
 }
 
@@ -334,8 +317,7 @@ func TestPatchSeedAnalysisFile_RoundTrip(t *testing.T) {
 			{Area: "rate-limiter", Description: "Rate limiting", Source: "src/ratelimit.go:1", ToolUsed: "Grep"},
 		},
 		Summary:          "Expanded to 4 areas including rate limiting",
-		NewKeyAreas:      []string{"rate-limiting"},
-		NewFilesExamined: []string{"src/ratelimit.go:1 — rate limiter"},
+		NewKeyAreas: []string{"rate-limiting"},
 		DAPassed:         true,
 		SetDAPassed:      true,
 	}
@@ -385,8 +367,7 @@ func TestPatchSeedAnalysisFile_MultipleRounds(t *testing.T) {
 			Findings: []SeedFinding{
 				{ID: 1, Area: "payment-processor", Description: "Handles payments", Source: "src/pay.go:1", ToolUsed: "Grep"},
 			},
-			KeyAreas:      []string{"payments"},
-			FilesExamined: []string{"src/pay.go:1 — payment handler"},
+			KeyAreas: []string{"payments"},
 		},
 	}
 	data, _ := json.MarshalIndent(initial, "", "  ")
@@ -398,8 +379,7 @@ func TestPatchSeedAnalysisFile_MultipleRounds(t *testing.T) {
 			{Area: "error-handling", Description: "Error recovery logic", Source: "src/errors.go:10", ToolUsed: "Read"},
 		},
 		Summary:          "Found payment processing and error handling",
-		NewKeyAreas:      []string{"error-handling"},
-		NewFilesExamined: []string{"src/errors.go:10 — error recovery"},
+		NewKeyAreas: []string{"error-handling"},
 	}
 	r1, err := PatchSeedAnalysisFile(path, patch1)
 	if err != nil {

@@ -29,8 +29,12 @@ func createTestTask(t *testing.T, topic, model string) (*AnalysisTask, string) {
 	task := store.Create("", model, stateDir, reportDir, "")
 	task.UpdateDirs(task.ID, stateDir, reportDir)
 
-	// Set up cancellable context (normally done by handleAnalyze)
-	ctx, cancel := context.WithCancel(context.Background())
+	// Set up a context with a short timeout so that any LLM subprocess calls
+	// (e.g. Claude CLI via QuerySync) fail fast instead of hanging until the
+	// Go test timeout. Tests using createTestTask verify state transitions,
+	// not actual LLM output, so a quick failure at the CLI call is expected.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	t.Cleanup(cancel)
 	task.Ctx = ctx
 	task.Cancel = cancel
 

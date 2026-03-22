@@ -27,7 +27,7 @@ const seedAnalysisJSONSchema = `{
     },
     "research": {
       "type": "object",
-      "required": ["summary", "findings", "key_areas", "files_examined"],
+      "required": ["summary", "findings", "key_areas"],
       "additionalProperties": false,
       "properties": {
         "summary": {
@@ -68,11 +68,6 @@ const seedAnalysisJSONSchema = `{
           "type": "array",
           "items": { "type": "string" },
           "description": "Main domains/areas discovered during research"
-        },
-        "files_examined": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "Files examined with what was found: file:line — detail"
         },
         "mcp_queries": {
           "type": "array",
@@ -182,7 +177,6 @@ After completing your research, output a JSON object with EXACTLY this structure
   - source: Evidence source (file:function:line or tool:query)
   - tool_used: Which tool found this (Grep, Read, Bash, or Glob)
 - research.key_areas: List the main domains/areas discovered during research
-- research.files_examined: Files examined with what was found (file:line — detail)
 - research.mcp_queries: Empty array (no MCP tools in this context)
 
 Every finding MUST have a concrete source — no unsourced claims.

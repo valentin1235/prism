@@ -911,8 +911,7 @@ func TestFreshReadEachRound_FileContentChanges(t *testing.T) {
       {"id": 1, "area": "database", "description": "Slow queries in user table", "source": "db/queries.go:42", "tool_used": "Grep"},
       {"id": 2, "area": "cache", "description": "Cache miss rate is high", "source": "cache/redis.go:15", "tool_used": "Read"}
     ],
-    "key_areas": ["database", "cache"],
-    "files_examined": ["db/queries.go:42", "cache/redis.go:15"]
+    "key_areas": ["database", "cache"]
   }
 }`
 	if err := os.WriteFile(seedPath, []byte(initialContent), 0644); err != nil {
@@ -946,8 +945,7 @@ func TestFreshReadEachRound_FileContentChanges(t *testing.T) {
       {"id": 3, "area": "network", "description": "Connection pooling not configured", "source": "net/pool.go:8", "tool_used": "Grep"},
       {"id": 4, "area": "auth", "description": "Token validation adds 50ms per request", "source": "auth/jwt.go:23", "tool_used": "Read"}
     ],
-    "key_areas": ["database", "cache", "network", "auth"],
-    "files_examined": ["db/queries.go:42", "cache/redis.go:15", "net/pool.go:8", "auth/jwt.go:23"]
+    "key_areas": ["database", "cache", "network", "auth"]
   }
 }`
 	if err := os.WriteFile(seedPath, []byte(updatedContent), 0644); err != nil {
@@ -1002,8 +1000,7 @@ func TestFreshReadEachRound_EntireContentSentToLLM(t *testing.T) {
       {"id": 2, "area": "retry-logic", "description": "No exponential backoff", "source": "pay/retry.go:45", "tool_used": "Grep"},
       {"id": 3, "area": "idempotency", "description": "Missing idempotency keys", "source": "pay/handler.go:78", "tool_used": "Read"}
     ],
-    "key_areas": ["payment-gateway", "retry-logic", "idempotency"],
-    "files_examined": ["pay/gateway.go:100", "pay/retry.go:45", "pay/handler.go:78"]
+    "key_areas": ["payment-gateway", "retry-logic", "idempotency"]
   }
 }`
 
@@ -1094,8 +1091,7 @@ func TestThreeRoundFailure_DAPassedFalse(t *testing.T) {
 			Findings: []SeedFinding{
 				{ID: 1, Area: "payment-processor", Description: "Handles payments", Source: "src/pay.go:1", ToolUsed: "Grep"},
 			},
-			KeyAreas:      []string{"payments"},
-			FilesExamined: []string{"src/pay.go:1"},
+			KeyAreas: []string{"payments"},
 		},
 	}
 	data, _ := json.MarshalIndent(initial, "", "  ")
@@ -1222,8 +1218,7 @@ func TestThreeRoundFailure_WorkflowProceeds(t *testing.T) {
 				{ID: 2, Area: "circuit-breaker", Description: "CB thresholds", Source: "cb/breaker.go:45", ToolUsed: "Grep"},
 				{ID: 3, Area: "health-checks", Description: "HC intervals", Source: "hc/check.go:12", ToolUsed: "Grep"},
 			},
-			KeyAreas:      []string{"load-balancing", "circuit-breaking", "health-monitoring"},
-			FilesExamined: []string{"lb/config.go:20", "cb/breaker.go:45", "hc/check.go:12"},
+			KeyAreas: []string{"load-balancing", "circuit-breaking", "health-monitoring"},
 		},
 	}
 	if err := WriteSeedAnalysis(seedPath, sa); err != nil {

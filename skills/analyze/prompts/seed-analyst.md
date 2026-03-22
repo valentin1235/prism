@@ -82,7 +82,6 @@ Write the following JSON to `~/.prism/state/analyze-{SHORT_ID}/seed-analysis.jso
       }
     ],
     "key_areas": ["area or domain identified as relevant"],
-    "files_examined": ["file:line — what was found"],
     "mcp_queries": ["tool: query → result summary"]
   }
 }
@@ -185,7 +184,6 @@ The `round` parameter tracks the current iteration (1, 2, or 3). The tool hard-s
 - **No round metadata** — do not tag findings with which DA round triggered their discovery.
 - Update `research.summary` to reflect expanded coverage.
 - Append to `research.key_areas` if new areas were discovered.
-- Append to `research.files_examined` for newly examined files.
 
 ### Important Constraints
 

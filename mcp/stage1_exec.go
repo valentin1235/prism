@@ -252,9 +252,8 @@ func runSupplementaryResearch(task *AnalysisTask, cfg AnalysisConfig, findings [
 	// Merge supplementary findings into existing seed analysis
 	seedPath := SeedAnalysisPath(stateDir)
 	patch := SeedPatch{
-		NewFindings:      supplementary.Research.Findings,
-		NewKeyAreas:      supplementary.Research.KeyAreas,
-		NewFilesExamined: supplementary.Research.FilesExamined,
+		NewFindings: supplementary.Research.Findings,
+		NewKeyAreas: supplementary.Research.KeyAreas,
 	}
 	if supplementary.Research.Summary != "" {
 		patch.Summary = supplementary.Research.Summary

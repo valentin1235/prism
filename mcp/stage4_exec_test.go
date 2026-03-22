@@ -843,7 +843,12 @@ func TestReportDirCreatedByHandleAnalyze(t *testing.T) {
 		},
 	}
 
-	result, err := handleAnalyze(context.Background(), req)
+	// Use a cancellable context so the background pipeline goroutine
+	// (which spawns Claude CLI subprocesses) is cleaned up after verification.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	result, err := handleAnalyze(ctx, req)
 	if err != nil {
 		t.Fatalf("handleAnalyze error: %v", err)
 	}
