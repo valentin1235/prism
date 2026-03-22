@@ -17,10 +17,10 @@ type SeedFinding struct {
 
 // SeedResearch represents the research section of seed-analysis.json.
 type SeedResearch struct {
-	Summary       string        `json:"summary"`
-	Findings      []SeedFinding `json:"findings"`
-	KeyAreas   []string `json:"key_areas"`
-	MCPQueries []string `json:"mcp_queries"`
+	Summary    string        `json:"summary"`
+	Findings   []SeedFinding `json:"findings"`
+	KeyAreas   []string      `json:"key_areas"`
+	MCPQueries []string      `json:"mcp_queries"`
 }
 
 // SeedAnalysis represents the full seed-analysis.json structure.
