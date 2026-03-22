@@ -238,6 +238,10 @@ func handleSetDefaults(args map[string]interface{}) (*mcp.CallToolResult, error)
 		ids = append(ids, id)
 	}
 
+	if len(ids) == 0 {
+		return mcp.NewToolResultError("at least one valid index is required"), nil
+	}
+
 	if err := store.SetDefaultsByRowIDs(ids); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("set_defaults failed: %v", err)), nil
 	}

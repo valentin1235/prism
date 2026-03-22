@@ -98,6 +98,8 @@ func (s *Store) BulkRegister(repos []Repo) (int, error) {
 	}
 	defer stmt.Close()
 
+	// Partial success by design: UPSERT means most failures are unusual (I/O, corruption).
+	// Individual row errors are collected but don't abort the batch.
 	count := 0
 	var errs []string
 	for _, r := range repos {
