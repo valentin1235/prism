@@ -32,14 +32,14 @@ Inside Claude Code, register the Prism marketplace and install the plugin:
 
 ```
 /plugin marketplace add valentin1235/prism
-/plugin install prism@prism-plugins
+/plugin install prism@prism
 ```
 
 Or from the terminal CLI:
 
 ```bash
 claude plugin marketplace add valentin1235/prism
-claude plugin install prism@prism-plugins
+claude plugin install prism@prism
 ```
 
 The plugin will be automatically enabled after installation. You can verify with `/plugin` (Installed tab) or:
@@ -95,7 +95,7 @@ claude plugin install oh-my-claudecode@omc
 
 ### Step 4: Run setup
 
-Prism includes a setup skill that automatically downloads the `prism-mcp` binary and registers it as a user-scope MCP server:
+Prism includes a setup skill that automatically downloads the `prism` binary and registers it as a user-scope MCP server:
 
 ```
 /prism:setup
@@ -124,7 +124,7 @@ After completing all installation steps, your `~/.claude/settings.json` should c
   },
   "enabledPlugins": {
     "oh-my-claudecode@omc": true,
-    "prism@prism-plugins": true
+    "prism@prism": true
   }
 }
 ```
@@ -382,7 +382,7 @@ Make sure `oh-my-claudecode` plugin is installed and enabled. Prism's analyst ag
 
 ### Skill not showing in autocomplete
 
-Make sure `"prism@prism-plugins": true` is in your `enabledPlugins` and restart Claude Code.
+Make sure `"prism@prism": true` is in your `enabledPlugins` and restart Claude Code.
 
 ## License
 

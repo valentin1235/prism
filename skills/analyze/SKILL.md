@@ -3,7 +3,7 @@ name: analyze
 description: Runs multi-perspective analysis via MCP server orchestration. Thin wrapper that handles user interaction (ontology scope mapping) then delegates all processing to prism_analyze MCP tool. General-purpose analysis engine — any topic can be analyzed against ontology documents.
 version: 6.0.0
 user-invocable: true
-allowed-tools: Read, Glob, Grep, Bash, Write, ToolSearch, AskUserQuestion, WebFetch, WebSearch, mcp__prism-mcp__prism_analyze, mcp__prism-mcp__prism_task_status, mcp__prism-mcp__prism_analyze_result, mcp__prism-mcp__prism_cancel_task, mcp__prism-mcp__prism_docs_roots, mcp__prism-mcp__prism_docs_list, mcp__prism-mcp__prism_docs_read, mcp__prism-mcp__prism_docs_search
+allowed-tools: Read, Glob, Grep, Bash, Write, ToolSearch, AskUserQuestion, WebFetch, WebSearch, mcp__prism__prism_analyze, mcp__prism__prism_task_status, mcp__prism__prism_analyze_result, mcp__prism__prism_cancel_task, mcp__prism__prism_docs_roots, mcp__prism__prism_docs_list, mcp__prism__prism_docs_read, mcp__prism__prism_docs_search
 ---
 
 # Multi-Perspective Analysis
@@ -74,7 +74,7 @@ Resolve ontology scope to a JSON string in canonical `{"sources": [...]}` format
 ### Step 2.1: Call prism_analyze
 
 ```
-mcp__prism-mcp__prism_analyze(
+mcp__prism__prism_analyze(
   topic: "{resolved description}",
   session_id: "{short-id from Step 1.2, or config.session_id if provided}",
   model: "{config.model if provided, otherwise omit to use server default}",
@@ -111,7 +111,7 @@ Store the `task_id` for polling.
 Poll `prism_task_status` every 30 seconds until status is `completed` or `failed`:
 
 ```
-mcp__prism-mcp__prism_task_status(task_id: "{task_id}")
+mcp__prism__prism_task_status(task_id: "{task_id}")
 ```
 
 Response includes:
@@ -159,7 +159,7 @@ If status is `failed`:
 ### Step 4.1: Get Analysis Result
 
 ```
-mcp__prism-mcp__prism_analyze_result(task_id: "{task_id}")
+mcp__prism__prism_analyze_result(task_id: "{task_id}")
 ```
 
 Response includes:

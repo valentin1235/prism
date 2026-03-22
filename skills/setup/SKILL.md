@@ -10,7 +10,7 @@ allowed-tools: Bash, Write, AskUserQuestion
 
 Configure documentation directories that prism skills (incident, prd, plan) reference during analysis.
 
-> **Note**: prism-mcp is now a built-in MCP server bundled with this plugin. No separate binary installation or MCP registration is needed.
+> **Note**: prism is now a built-in MCP server bundled with this plugin. No separate binary installation or MCP registration is needed.
 
 ## Step 1: Configure Documentation Directories
 
@@ -45,4 +45,4 @@ Write config:
 
 Confirm to the user:
 - Documentation directories configured (if any) at `~/.prism/ontology-docs.json`
-- prism-mcp is bundled as a built-in MCP server — no restart needed
+- prism is bundled as a built-in MCP server — no restart needed

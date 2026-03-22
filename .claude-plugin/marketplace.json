@@ -1,6 +1,6 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "prism-plugins",
+  "name": "prism",
   "description": "Multi-perspective agent team analysis — general-purpose analysis engine with dynamic perspective generation, incident postmortem, strategic planning, and PRD policy review",
   "owner": {
     "name": "prism-team",

@@ -16,7 +16,7 @@
 
 ## Step 1: Check Document Source Availability
 
-First load the deferred tool: `ToolSearch(query="select:mcp__prism-mcp__prism_docs_roots")`. Then call `mcp__prism-mcp__prism_docs_roots`.
+First load the deferred tool: `ToolSearch(query="select:mcp__prism__prism_docs_roots")`. Then call `mcp__prism__prism_docs_roots`.
 
 | Result | optional | required |
 |--------|----------|----------|
@@ -29,7 +29,7 @@ First load the deferred tool: `ToolSearch(query="select:mcp__prism-mcp__prism_do
 
 ## Step 2a: MCP Data Source Selection
 
-Call `ToolSearch(query="mcp", max_results=200)`. Keep only tools matching `mcp__<server>__<tool>` pattern. Extract unique server names, **exclude**: `prism-mcp`, names containing `plugin_`, names starting with `__`.
+Call `ToolSearch(query="mcp", max_results=200)`. Keep only tools matching `mcp__<server>__<tool>` pattern. Extract unique server names, **exclude**: `prism`, names containing `plugin_`, names starting with `__`.
 
 If no servers found → skip to Step 2b.
 

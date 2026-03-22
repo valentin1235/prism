@@ -42,4 +42,4 @@ If "Cancel" or no selection → stop.
 
 Remove selected paths from the `directories` array. Write updated config to `~/.prism/ontology-docs.json`.
 
-Confirm to the user: list of remaining directories (or "No directories remaining" if all removed). Tell them to restart Claude Code for prism-mcp to pick up changes.
+Confirm to the user: list of remaining directories (or "No directories remaining" if all removed). Tell them to restart Claude Code for prism to pick up changes.

@@ -109,7 +109,7 @@ First, discover the DA review MCP tool:
 ToolSearch("prism_da_review")
 ```
 
-This returns the `mcp__prism-mcp__prism_da_review` tool. If the tool is not available, skip this step entirely and proceed to output (do not set `da_passed`).
+This returns the `mcp__prism__prism_da_review` tool. If the tool is not available, skip this step entirely and proceed to output (do not set `da_passed`).
 
 ### Loop Protocol
 
@@ -117,7 +117,7 @@ For each round (1 to 3):
 
 **1. Call the DA review tool:**
 ```
-mcp__prism-mcp__prism_da_review(
+mcp__prism__prism_da_review(
   seed_analysis_path = "~/.prism/state/analyze-{SHORT_ID}/seed-analysis.json",
   round = <current round number, 1-based>
 )

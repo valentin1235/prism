@@ -192,11 +192,11 @@ pipeline → parallel                      ✅ 단방향
 
 ### ouroboros 구조와의 대응
 
-| ouroboros (Python) | prism-mcp (Go) | 설계 판단 |
+| ouroboros (Python) | prism (Go) | 설계 판단 |
 |-------------------|----------------|----------|
 | `tools/` (핸들러 모음) | `handler/` | 동일 관심사. Go에서는 `tools`가 표준 라이브러리와 혼동 가능하므로 `handler` 사용 |
 | `server/` (프로토콜 어댑터) | `main.go` (mcp-go 라이브러리 사용) | Go는 mcp-go가 서버 추상화를 제공하므로 별도 패키지 불필요 |
-| `client/` (MCP 클라이언트) | 해당 없음 | prism-mcp는 서버만 구현 |
+| `client/` (MCP 클라이언트) | 해당 없음 | prism는 서버만 구현 |
 | `resources/` | `handler/docs.go` | filesystem 리소스가 4개 핸들러뿐이므로 handler에 통합 |
 | `types.py` (공유 타입) | 각 패키지 내 분산 | Go 관례: 타입은 사용처 가까이 배치 |
 | `job_manager.py` | `task/store.go` | 동일 관심사: 비동기 작업 수명주기 관리 |

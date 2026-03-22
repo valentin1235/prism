@@ -35,7 +35,7 @@ Read `~/.prism/state/analyze-{SHORT_ID}/perspectives/{perspective-id}/findings.j
 #### 2. Start Interview
 
 ```
-mcp__prism-mcp__prism_interview(
+mcp__prism__prism_interview(
   context_id="analyze-{SHORT_ID}",
   perspective_id="{perspective-id}",
   topic="{perspective-id} findings verification — {TOPIC_SUMMARY}"
@@ -52,7 +52,7 @@ For each question from the interviewer:
 1. **Answer the question** — re-investigate using tools (Grep, Read, Bash, MCP docs) if needed to provide evidence-backed answers
 2. **Submit answer:**
 ```
-mcp__prism-mcp__prism_interview(
+mcp__prism__prism_interview(
   context_id="analyze-{SHORT_ID}",
   perspective_id="{perspective-id}",
   response="{your answer}"

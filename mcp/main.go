@@ -18,7 +18,7 @@ func main() {
 	handler.TaskStore = taskpkg.NewTaskStore()
 
 	s := server.NewMCPServer(
-		"prism-mcp",
+		"prism",
 		"1.0.0",
 	)
 

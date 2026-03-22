@@ -3,7 +3,7 @@ name: incident
 description: Incident root cause analysis with UX impact — takes an incident description (text + optional screenshots) as input, runs multi-perspective analysis including UX impact perspective via prism_analyze MCP pipeline, producing a developer-facing RCA report. Use this skill for "incident analysis", "incident postmortem", "RCA", "root cause analysis", "incident review", "장애 분석", "인시던트 분석", "장애 리뷰", "포스트모템", or any request about analyzing an incident or outage.
 version: 2.0.0
 user-invocable: true
-allowed-tools: Read, Glob, Grep, Bash, Write, ToolSearch, AskUserQuestion, WebFetch, WebSearch, mcp__prism-mcp__prism_analyze, mcp__prism-mcp__prism_task_status, mcp__prism-mcp__prism_analyze_result, mcp__prism-mcp__prism_cancel_task, mcp__prism-mcp__prism_docs_roots, mcp__prism-mcp__prism_docs_list, mcp__prism-mcp__prism_docs_read, mcp__prism-mcp__prism_docs_search
+allowed-tools: Read, Glob, Grep, Bash, Write, ToolSearch, AskUserQuestion, WebFetch, WebSearch, mcp__prism__prism_analyze, mcp__prism__prism_task_status, mcp__prism__prism_analyze_result, mcp__prism__prism_cancel_task, mcp__prism__prism_docs_roots, mcp__prism__prism_docs_list, mcp__prism__prism_docs_read, mcp__prism__prism_docs_search
 ---
 
 # Incident RCA Analysis (Thin Wrapper for prism_analyze)
@@ -96,7 +96,7 @@ Resolve ontology scope to a JSON string in canonical `{"sources": [...]}` format
 ### Step 2.1: Call prism_analyze
 
 ```
-mcp__prism-mcp__prism_analyze(
+mcp__prism__prism_analyze(
   topic: "Incident root cause analysis: {first 80 chars of INCIDENT_DESCRIPTION} — multi-perspective analysis of root cause, contributing factors, and user-facing UX impact\n\n{full INCIDENT_DESCRIPTION with inlined screenshot descriptions}",
   session_id: "{short-id}",
   ontology_scope: "{ontology scope JSON string or omit if null}",
@@ -133,7 +133,7 @@ Store the `task_id` for polling.
 Poll `prism_task_status` every 30 seconds until status is `completed` or `failed`:
 
 ```
-mcp__prism-mcp__prism_task_status(task_id: "{task_id}")
+mcp__prism__prism_task_status(task_id: "{task_id}")
 ```
 
 Response includes:
@@ -181,7 +181,7 @@ If status is `failed`:
 ### Step 4.1: Get Analysis Result
 
 ```
-mcp__prism-mcp__prism_analyze_result(task_id: "{task_id}")
+mcp__prism__prism_analyze_result(task_id: "{task_id}")
 ```
 
 Response includes:

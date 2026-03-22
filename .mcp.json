@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "prism-mcp": {
+    "prism": {
       "command": "bash",
       "args": ["./mcp/run.sh"]
     }
