@@ -101,16 +101,43 @@ func handleScan(ctx context.Context, args map[string]interface{}) (*mcp.CallTool
 		return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
 	}
 
-	count, err := store.BulkRegister(repos)
-	result := map[string]interface{}{
-		"action":     "scan",
-		"found":      len(repos),
-		"registered": count,
+	count, bulkErr := store.BulkRegister(repos)
+
+	// Fetch all repos with defaults to build formatted list (matches ouroboros format)
+	allRepos, _, listErr := store.List(0, 0, false)
+	if listErr != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("list after scan failed: %v", listErr)), nil
 	}
-	if err != nil {
-		result["warning"] = err.Error()
+	defaults, _, _ := store.List(0, 0, true)
+
+	// Build compact numbered list: "{rowid}. {name} *"
+	var lines []string
+	lines = append(lines, fmt.Sprintf("Scan complete. %d repositories registered.", count), "")
+	for _, r := range allRepos {
+		marker := ""
+		if r.IsDefault {
+			marker = " *"
+		}
+		lines = append(lines, fmt.Sprintf("%2d. %s%s", r.RowID, r.Name, marker))
 	}
-	return jsonResult(result)
+	lines = append(lines, "")
+	if len(defaults) > 0 {
+		var ids, names []string
+		for _, d := range defaults {
+			ids = append(ids, fmt.Sprintf("%d", d.RowID))
+			names = append(names, d.Name)
+		}
+		lines = append(lines, fmt.Sprintf("Defaults (* marked): %s (%s)", strings.Join(ids, ", "), strings.Join(names, ", ")))
+	} else {
+		lines = append(lines, "No defaults set.")
+	}
+	summary := strings.Join(lines, "\n")
+
+	if bulkErr != nil {
+		summary += fmt.Sprintf("\n\nWarning: %s", bulkErr.Error())
+	}
+
+	return mcp.NewToolResultText(summary), nil
 }
 
 func handleRegister(ctx context.Context, args map[string]interface{}) (*mcp.CallToolResult, error) {
