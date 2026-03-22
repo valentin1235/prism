@@ -3,5 +3,5 @@ skills/incident-v3-workspace/
 skills/test-analyze/analyze-workspace/
 skills/test-analyze/test-results/
 *-workspace/
-.claude/settings.local.json
-.claude/commands/
+.claude/*
+!.claude/settings.json

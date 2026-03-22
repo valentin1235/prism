@@ -14,8 +14,6 @@ esac
 # Extract file_path from tool_input
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
 
-PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
-
 # Must be under mcp/, must be .go, must NOT be _test.go
 if [[ "$FILE_PATH" != *"/mcp/"* ]]; then
   exit 0

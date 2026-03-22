@@ -13,7 +13,7 @@ fi
 # Check if the command is a git push
 COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
 
-if ! echo "$COMMAND" | grep -qE '^\s*git\s+push'; then
+if ! echo "$COMMAND" | grep -qE '\bgit\s+push\b'; then
   exit 0
 fi
 
