@@ -7,8 +7,8 @@ Complete list of JSON contracts between prism:analyze phases. Each contract spec
 ```
 Phase 0.5 (seed-analyst)
   └─ seed-analysis.json
-       ├─→ Phase 0.55 (perspective-generator) reads: topic, research (findings, key_areas)
-       └─→ Phase 0.8 (orchestrator) reads: research → context.json
+       ├─→ Phase 0.55 (perspective-generator) reads: topic, findings, key_areas
+       └─→ Phase 0.8 (orchestrator) reads: findings, key_areas → context.json
 
 Phase 0.55 (perspective-generator)
   └─ perspectives.json
@@ -50,16 +50,14 @@ For each arrow (→) in the map above:
 ```json
 {
   "topic": "description",
-  "research": {
-    "summary": "...",
-    "findings": [{"area": "...", "description": "...", "source": "..."}],
-    "key_areas": ["area1", "area2"]
-  }
+  "summary": "...",
+  "findings": [{"area": "...", "description": "...", "source": "..."}],
+  "key_areas": ["area1", "area2"]
 }
 ```
 
 **Consumer expectations:**
-- `perspectives[].scope` should reference topics from `research.findings` and `research.key_areas`
+- `perspectives[].scope` should reference topics from `findings` and `key_areas`
 - Perspective count: minimum 2, typically 3-5
 - Perspectives should cover key areas identified in seed research
 - `quality_gate` fields must all be `true` (all_orthogonal, all_evidence_backed, all_specific, all_actionable, min_perspectives_met)
@@ -85,14 +83,12 @@ For each arrow (→) in the map above:
 **Producer fields:**
 ```json
 {
-  "research": {
-    "findings": [{"area": "...", "description": "..."}]
-  }
+  "findings": [{"area": "...", "description": "..."}]
 }
 ```
 
 **Consumer expectations:**
-- `context.json.research_summary.key_findings` derived from `research.findings[].area` and `research.findings[].description`
+- `context.json.research_summary.key_findings` derived from `findings[].area` and `findings[].description`
 - `context.json.research_summary.key_areas` reflects seed key_areas
 
 #### 4. context.json → report.md

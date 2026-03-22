@@ -42,7 +42,7 @@ mcp/
 │   │   ├── synthesis.go                 #   Stage 4: SynthesisContext, LoadSynthesisContext,
 │   │   │                                #            runSynthesis, buildSynthesisPrompt
 │   │   │
-│   │   ├── seed.go                      #   SeedAnalysis, SeedFinding, SeedResearch, SeedPatch,
+│   │   ├── seed.go                      #   SeedAnalysis, SeedFinding, SeedPatch,
 │   │   │                                #   MergeSeedAnalysis, PatchSeedAnalysisFile,
 │   │   │                                #   ReadSeedAnalysis, WriteSeedAnalysis
 │   │   ├── perspectives.go              #   Perspective, AnalystPrompt, PerspectivesOutput,

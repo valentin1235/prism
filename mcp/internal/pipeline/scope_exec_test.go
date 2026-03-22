@@ -468,7 +468,7 @@ func TestStage1FileFlow_SeedToPerspectives(t *testing.T) {
 	// Simulate the complete Stage 1 file flow:
 	// 1. Write seed-analysis.json (as RunSeedAnalysis would)
 	// 2. Read it back (as RunDAReviewLoop would)
-	// 3. Update da_passed (as DA review pass would)
+	// 3. Write back (simulating DA review update)
 	// 4. Read for perspective gen (as RunPerspectiveGeneration would)
 	// 5. Write perspectives.json
 

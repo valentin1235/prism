@@ -111,9 +111,9 @@ Key contracts to verify:
 
 | Producer | Consumer | Fields |
 |----------|----------|--------|
-| seed-analysis.json | perspectives.json | dimensions.domain, failure_type, complexity, research.findings |
+| seed-analysis.json | perspectives.json | dimensions.domain, failure_type, complexity, findings |
 | perspectives.json | Phase 1 spawn | id, model, agent_type, key_questions |
-| perspectives.json | context.json | summary derived from research |
+| perspectives.json | context.json | summary derived from seed analysis |
 | context.json | Phase 1 {CONTEXT} | summary, research_summary.*, dimensions |
 | context.json | Phase 3 report | report_language |
 | findings.json | Phase 2B verifier | analyst, findings[].finding, findings[].evidence |

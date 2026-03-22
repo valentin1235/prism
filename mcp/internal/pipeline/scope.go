@@ -520,7 +520,7 @@ func RunSeedAnalysis(task *taskpkg.AnalysisTask, cfg AnalysisConfig) error {
 // Each round:
 //  1. Read current seed-analysis.json
 //  2. Run DA review (uses existing DA prompt + LLM call)
-//  3. If no CRITICAL/MAJOR findings → pass, set da_passed=true, exit
+//  3. If no CRITICAL/MAJOR findings → pass, write DA history, exit
 //  4. If actionable findings found and rounds remain → run supplementary research
 //  5. Merge new findings into seed-analysis.json
 //  6. Repeat
@@ -626,7 +626,7 @@ func RunDAReviewLoop(task *taskpkg.AnalysisTask, cfg AnalysisConfig) error {
 		}
 	}
 
-	// Hard stop — da_passed stays false (initial value from seed analyst)
+	// Hard stop — FinalPassed stays false
 	history.FinalPassed = false
 	history.TotalRounds = len(history.Rounds)
 	return writeDAHistory(stateDir, history)

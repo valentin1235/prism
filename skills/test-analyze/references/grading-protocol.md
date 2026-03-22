@@ -38,9 +38,9 @@ For each `field_contract` assertion, read the relevant JSON and verify fields:
 ### seed-analysis.json
 ```
 Required: topic,
-          research.summary, research.findings[], research.findings[].area,
-          research.findings[].description, research.findings[].source,
-          research.key_areas
+          summary, findings[], findings[].area,
+          findings[].description, findings[].source,
+          key_areas
 ```
 
 ### perspectives.json
@@ -80,7 +80,7 @@ For each `data_flow` assertion and each `contract_check`:
 **Concrete checks:**
 
 ### seed-analysis → perspectives
-- perspectives.json's perspective selection should be grounded in seed-analysis.json's `research.findings` and `research.key_areas`
+- perspectives.json's perspective selection should be grounded in seed-analysis.json's `findings` and `key_areas`
 - Security-related findings should result in a security-focused perspective
 - Perspective count: minimum 2, typically 3-5
 
@@ -89,7 +89,7 @@ For each `data_flow` assertion and each `contract_check`:
 - Number of findings.json files must equal number of perspectives
 
 ### seed-analysis → context
-- context.json `research_summary.key_findings` should contain content from seed-analysis.json `research.findings`
+- context.json `research_summary.key_findings` should contain content from seed-analysis.json `findings`
 
 ### context → report
 - If `report_language` is "ko" or "Korean", report.md should be primarily in Korean
