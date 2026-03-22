@@ -906,15 +906,12 @@ func TestFreshReadEachRound_FileContentChanges(t *testing.T) {
 	// Round 1: Write initial content with 2 findings
 	initialContent := `{
   "topic": "API performance analysis",
-  "da_passed": false,
-  "research": {
-    "summary": "Initial investigation of API performance",
-    "findings": [
-      {"id": 1, "area": "database", "description": "Slow queries in user table", "source": "db/queries.go:42", "tool_used": "Grep"},
-      {"id": 2, "area": "cache", "description": "Cache miss rate is high", "source": "cache/redis.go:15", "tool_used": "Read"}
-    ],
-    "key_areas": ["database", "cache"]
-  }
+  "summary": "Initial investigation of API performance",
+  "findings": [
+    {"id": 1, "area": "database", "description": "Slow queries in user table", "source": "db/queries.go:42", "tool_used": "Grep"},
+    {"id": 2, "area": "cache", "description": "Cache miss rate is high", "source": "cache/redis.go:15", "tool_used": "Read"}
+  ],
+  "key_areas": ["database", "cache"]
 }`
 	if err := os.WriteFile(seedPath, []byte(initialContent), 0644); err != nil {
 		t.Fatalf("failed to write initial seed: %v", err)
@@ -929,8 +926,7 @@ func TestFreshReadEachRound_FileContentChanges(t *testing.T) {
 	if err := json.Unmarshal(data1, &parsed1); err != nil {
 		t.Fatalf("failed to parse initial seed: %v", err)
 	}
-	research1 := parsed1["research"].(map[string]interface{})
-	findings1 := research1["findings"].([]interface{})
+	findings1 := parsed1["findings"].([]interface{})
 	if len(findings1) != 2 {
 		t.Fatalf("round 1: expected 2 findings, got %d", len(findings1))
 	}
@@ -938,17 +934,14 @@ func TestFreshReadEachRound_FileContentChanges(t *testing.T) {
 	// Simulate seed analyst updating seed-analysis.json with new findings (between rounds)
 	updatedContent := `{
   "topic": "API performance analysis",
-  "da_passed": false,
-  "research": {
-    "summary": "Expanded investigation including network and auth layers",
-    "findings": [
-      {"id": 1, "area": "database", "description": "Slow queries in user table", "source": "db/queries.go:42", "tool_used": "Grep"},
-      {"id": 2, "area": "cache", "description": "Cache miss rate is high", "source": "cache/redis.go:15", "tool_used": "Read"},
-      {"id": 3, "area": "network", "description": "Connection pooling not configured", "source": "net/pool.go:8", "tool_used": "Grep"},
-      {"id": 4, "area": "auth", "description": "Token validation adds 50ms per request", "source": "auth/jwt.go:23", "tool_used": "Read"}
-    ],
-    "key_areas": ["database", "cache", "network", "auth"]
-  }
+  "summary": "Expanded investigation including network and auth layers",
+  "findings": [
+    {"id": 1, "area": "database", "description": "Slow queries in user table", "source": "db/queries.go:42", "tool_used": "Grep"},
+    {"id": 2, "area": "cache", "description": "Cache miss rate is high", "source": "cache/redis.go:15", "tool_used": "Read"},
+    {"id": 3, "area": "network", "description": "Connection pooling not configured", "source": "net/pool.go:8", "tool_used": "Grep"},
+    {"id": 4, "area": "auth", "description": "Token validation adds 50ms per request", "source": "auth/jwt.go:23", "tool_used": "Read"}
+  ],
+  "key_areas": ["database", "cache", "network", "auth"]
 }`
 	if err := os.WriteFile(seedPath, []byte(updatedContent), 0644); err != nil {
 		t.Fatalf("failed to write updated seed: %v", err)
@@ -963,8 +956,7 @@ func TestFreshReadEachRound_FileContentChanges(t *testing.T) {
 	if err := json.Unmarshal(data2, &parsed2); err != nil {
 		t.Fatalf("failed to parse updated seed: %v", err)
 	}
-	research2 := parsed2["research"].(map[string]interface{})
-	findings2 := research2["findings"].([]interface{})
+	findings2 := parsed2["findings"].([]interface{})
 
 	// Critical assertion: DA sees the ENTIRE updated file (4 findings), not the old one (2)
 	if len(findings2) != 4 {
@@ -982,7 +974,7 @@ func TestFreshReadEachRound_FileContentChanges(t *testing.T) {
 	}
 
 	// Verify the summary was also updated (DA sees complete updated content)
-	summary := research2["summary"].(string)
+	summary := parsed2["summary"].(string)
 	if !strings.Contains(summary, "network") {
 		t.Error("updated summary should reference new areas — DA must evaluate the complete updated file")
 	}
@@ -994,16 +986,13 @@ func TestFreshReadEachRound_EntireContentSentToLLM(t *testing.T) {
 
 	seedContent := `{
   "topic": "Payment processing reliability",
-  "da_passed": false,
-  "research": {
-    "summary": "Comprehensive payment flow analysis",
-    "findings": [
-      {"id": 1, "area": "payment-gateway", "description": "Gateway timeout handling", "source": "pay/gateway.go:100", "tool_used": "Read"},
-      {"id": 2, "area": "retry-logic", "description": "No exponential backoff", "source": "pay/retry.go:45", "tool_used": "Grep"},
-      {"id": 3, "area": "idempotency", "description": "Missing idempotency keys", "source": "pay/handler.go:78", "tool_used": "Read"}
-    ],
-    "key_areas": ["payment-gateway", "retry-logic", "idempotency"]
-  }
+  "summary": "Comprehensive payment flow analysis",
+  "findings": [
+    {"id": 1, "area": "payment-gateway", "description": "Gateway timeout handling", "source": "pay/gateway.go:100", "tool_used": "Read"},
+    {"id": 2, "area": "retry-logic", "description": "No exponential backoff", "source": "pay/retry.go:45", "tool_used": "Grep"},
+    {"id": 3, "area": "idempotency", "description": "Missing idempotency keys", "source": "pay/handler.go:78", "tool_used": "Read"}
+  ],
+  "key_areas": ["payment-gateway", "retry-logic", "idempotency"]
 }`
 
 	// Simulate building the user prompt (same logic as HandleDAReview)
@@ -1047,9 +1036,9 @@ func TestFreshReadEachRound_NoCaching(t *testing.T) {
 
 	// Write, read, modify, read — must always get latest
 	versions := []string{
-		`{"topic":"v1","research":{"findings":[]}}`,
-		`{"topic":"v2","research":{"findings":[{"id":1}]}}`,
-		`{"topic":"v3","research":{"findings":[{"id":1},{"id":2},{"id":3}]}}`,
+		`{"topic":"v1","findings":[]}`,
+		`{"topic":"v2","findings":[{"id":1}]}`,
+		`{"topic":"v3","findings":[{"id":1},{"id":2},{"id":3}]}`,
 	}
 
 	for i, content := range versions {
@@ -1074,11 +1063,11 @@ func TestFreshReadEachRound_NoCaching(t *testing.T) {
 	}
 }
 
-// === AC 11: On 3-round failure, da_passed set to false and workflow proceeds ===
+// === AC 11: On 3-round failure, workflow proceeds ===
 
-func TestThreeRoundFailure_DAPassedFalse(t *testing.T) {
+func TestThreeRoundFailure_WorkflowContinues(t *testing.T) {
 	// Simulate the complete 3-round failure scenario end-to-end:
-	// All 3 rounds return CRITICAL/MAJOR findings → da_passed must be false
+	// All 3 rounds return CRITICAL/MAJOR findings
 	// and seed-analysis.json must be consumable by perspective generator.
 
 	tmpDir := t.TempDir()
@@ -1086,15 +1075,12 @@ func TestThreeRoundFailure_DAPassedFalse(t *testing.T) {
 
 	// Initial seed analysis
 	initial := pipeline.SeedAnalysis{
-		Topic:    "Investigate payment processing failures",
-		DAPassed: false,
-		Research: pipeline.SeedResearch{
-			Summary:  "Found payment module with basic error handling",
-			Findings: []pipeline.SeedFinding{
-				{ID: 1, Area: "payment-processor", Description: "Handles payments", Source: "src/pay.go:1", ToolUsed: "Grep"},
-			},
-			KeyAreas: []string{"payments"},
+		Topic:   "Investigate payment processing failures",
+		Summary: "Found payment module with basic error handling",
+		Findings: []pipeline.SeedFinding{
+			{ID: 1, Area: "payment-processor", Description: "Handles payments", Source: "src/pay.go:1", ToolUsed: "Grep"},
 		},
+		KeyAreas: []string{"payments"},
 	}
 	data, _ := json.MarshalIndent(initial, "", "  ")
 	os.WriteFile(seedPath, data, 0644)
@@ -1109,32 +1095,21 @@ func TestThreeRoundFailure_DAPassedFalse(t *testing.T) {
 			NewKeyAreas: []string{fmt.Sprintf("round-%d-area", round)},
 		}
 
-		// On final round (3), set da_passed=false (hard stop)
-		if round == pipeline.MaxDARounds {
-			patch.DAPassed = false
-			patch.SetDAPassed = true
-		}
-
 		_, err := pipeline.PatchSeedAnalysisFile(seedPath, patch)
 		if err != nil {
 			t.Fatalf("round %d: PatchSeedAnalysisFile failed: %v", round, err)
 		}
 	}
 
-	// Verify: da_passed must be false after 3-round failure
 	final, err := pipeline.ReadSeedAnalysis(seedPath)
 	if err != nil {
 		t.Fatalf("failed to read final seed analysis: %v", err)
 	}
 
-	if final.DAPassed {
-		t.Error("da_passed must be false after 3-round failure (hard stop)")
-	}
-
 	// Verify: all original + incrementally added findings are preserved
 	// Initial (1) + 3 rounds × 1 finding each = 4
-	if len(final.Research.Findings) != 4 {
-		t.Errorf("expected 4 findings (1 original + 3 rounds), got %d", len(final.Research.Findings))
+	if len(final.Findings) != 4 {
+		t.Errorf("expected 4 findings (1 original + 3 rounds), got %d", len(final.Findings))
 	}
 
 	// Verify: topic is preserved
@@ -1152,24 +1127,19 @@ func TestThreeRoundFailure_NoUnresolvedFindingsRecorded(t *testing.T) {
 	seedPath := filepath.Join(tmpDir, "seed-analysis.json")
 
 	initial := pipeline.SeedAnalysis{
-		Topic:    "API latency investigation",
-		DAPassed: false,
-		Research: pipeline.SeedResearch{
-			Summary: "Found 2 areas",
-			Findings: []pipeline.SeedFinding{
-				{ID: 1, Area: "db-queries", Description: "Slow queries", Source: "db/q.go:10", ToolUsed: "Grep"},
-				{ID: 2, Area: "cache-layer", Description: "Cache misses", Source: "cache/r.go:5", ToolUsed: "Read"},
-			},
-			KeyAreas: []string{"database", "caching"},
+		Topic:   "API latency investigation",
+		Summary: "Found 2 areas",
+		Findings: []pipeline.SeedFinding{
+			{ID: 1, Area: "db-queries", Description: "Slow queries", Source: "db/q.go:10", ToolUsed: "Grep"},
+			{ID: 2, Area: "cache-layer", Description: "Cache misses", Source: "cache/r.go:5", ToolUsed: "Read"},
 		},
+		KeyAreas: []string{"database", "caching"},
 	}
 	data, _ := json.MarshalIndent(initial, "", "  ")
 	os.WriteFile(seedPath, data, 0644)
 
-	// Hard stop: set da_passed=false, do NOT add DA findings to the file
+	// Hard stop: do NOT add DA findings to the file
 	patch := pipeline.SeedPatch{
-		DAPassed:    false,
-		SetDAPassed: true,
 		// Note: NO NewFindings from DA critique — they must not be recorded
 	}
 
@@ -1179,11 +1149,8 @@ func TestThreeRoundFailure_NoUnresolvedFindingsRecorded(t *testing.T) {
 	}
 
 	// Only original findings should exist — no DA findings leaked
-	if len(result.Research.Findings) != 2 {
-		t.Errorf("expected 2 findings (original only, no DA findings), got %d", len(result.Research.Findings))
-	}
-	if result.DAPassed {
-		t.Error("da_passed must be false")
+	if len(result.Findings) != 2 {
+		t.Errorf("expected 2 findings (original only, no DA findings), got %d", len(result.Findings))
 	}
 
 	// Verify on disk: no DA-related fields contaminated the file
@@ -1203,32 +1170,29 @@ func TestThreeRoundFailure_NoUnresolvedFindingsRecorded(t *testing.T) {
 
 func TestThreeRoundFailure_WorkflowProceeds(t *testing.T) {
 	// AC 11: After 3-round failure, the workflow MUST proceed to perspective
-	// generator. This means seed-analysis.json with da_passed=false must be
-	// a valid, consumable input for the perspective generator.
+	// generator. This means seed-analysis.json must be a valid, consumable
+	// input for the perspective generator.
 
 	tmpDir := t.TempDir()
 	seedPath := filepath.Join(tmpDir, "seed-analysis.json")
 
-	// Write a seed analysis that failed DA review (da_passed=false)
+	// Write a seed analysis that failed DA review
 	sa := pipeline.SeedAnalysis{
-		Topic:    "Investigate service degradation",
-		DAPassed: false,
-		Research: pipeline.SeedResearch{
-			Summary: "Found 3 areas related to service degradation",
-			Findings: []pipeline.SeedFinding{
-				{ID: 1, Area: "load-balancer", Description: "LB config", Source: "lb/config.go:20", ToolUsed: "Read"},
-				{ID: 2, Area: "circuit-breaker", Description: "CB thresholds", Source: "cb/breaker.go:45", ToolUsed: "Grep"},
-				{ID: 3, Area: "health-checks", Description: "HC intervals", Source: "hc/check.go:12", ToolUsed: "Grep"},
-			},
-			KeyAreas: []string{"load-balancing", "circuit-breaking", "health-monitoring"},
+		Topic:   "Investigate service degradation",
+		Summary: "Found 3 areas related to service degradation",
+		Findings: []pipeline.SeedFinding{
+			{ID: 1, Area: "load-balancer", Description: "LB config", Source: "lb/config.go:20", ToolUsed: "Read"},
+			{ID: 2, Area: "circuit-breaker", Description: "CB thresholds", Source: "cb/breaker.go:45", ToolUsed: "Grep"},
+			{ID: 3, Area: "health-checks", Description: "HC intervals", Source: "hc/check.go:12", ToolUsed: "Grep"},
 		},
+		KeyAreas: []string{"load-balancing", "circuit-breaking", "health-monitoring"},
 	}
 	if err := pipeline.WriteSeedAnalysis(seedPath, sa); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 
 	// Simulate perspective generator reading seed-analysis.json
-	// It must be able to read and parse it successfully, regardless of da_passed value
+	// It must be able to read and parse it successfully
 	consumed, err := pipeline.ReadSeedAnalysis(seedPath)
 	if err != nil {
 		t.Fatalf("perspective generator cannot read seed-analysis.json: %v", err)
@@ -1238,16 +1202,11 @@ func TestThreeRoundFailure_WorkflowProceeds(t *testing.T) {
 	if consumed.Topic == "" {
 		t.Error("topic must be present for perspective generator")
 	}
-	if len(consumed.Research.Findings) == 0 {
+	if len(consumed.Findings) == 0 {
 		t.Error("findings must be present for perspective generator")
 	}
-	if len(consumed.Research.KeyAreas) == 0 {
+	if len(consumed.KeyAreas) == 0 {
 		t.Error("key_areas must be present for perspective generator")
-	}
-
-	// da_passed=false does NOT block consumption
-	if consumed.DAPassed {
-		t.Error("da_passed should be false (3-round failure)")
 	}
 
 	// The file must be valid JSON (perspective generator can parse it)
@@ -1257,19 +1216,11 @@ func TestThreeRoundFailure_WorkflowProceeds(t *testing.T) {
 		t.Fatalf("seed-analysis.json must be valid JSON for downstream consumers: %v", err)
 	}
 
-	// Verify da_passed is present as boolean in JSON (not omitted)
-	daPassed, exists := genericJSON["da_passed"]
-	if !exists {
-		t.Fatal("da_passed field must be present in JSON output")
-	}
-	if daPassed != false {
-		t.Errorf("da_passed = %v, want false", daPassed)
-	}
 }
 
 func TestThreeRoundFailure_HardStopResult(t *testing.T) {
 	// Verify that on round 3, HandleDAReview returns hard_stop=true, pass=false
-	// This is the signal for the seed analyst to set da_passed=false and exit.
+	// This is the signal for the seed analyst to exit the loop.
 	result := pipeline.DAReviewResult{
 		Pass:          false,
 		CriticalCount: 1,
@@ -1290,8 +1241,8 @@ func TestThreeRoundFailure_HardStopResult(t *testing.T) {
 		t.Error("pass must be false when CRITICAL/MAJOR findings exist")
 	}
 
-	// The seed analyst should set da_passed=false based on this response
-	// (pass=false AND hard_stop=true → set da_passed=false, exit loop, proceed)
+	// The seed analyst should exit the loop based on this response
+	// (pass=false AND hard_stop=true → exit loop, proceed)
 	data, _ := json.Marshal(result)
 	var parsed map[string]interface{}
 	json.Unmarshal(data, &parsed)

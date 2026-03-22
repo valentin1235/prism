@@ -78,10 +78,8 @@ func LoadSynthesisContext(cfg AnalysisConfig, perspectives []Perspective) (Synth
 
 	var seedMap map[string]interface{}
 	if err := json.Unmarshal(seedData, &seedMap); err == nil {
-		if research, ok := seedMap["research"].(map[string]interface{}); ok {
-			if summary, ok := research["summary"].(string); ok {
-				ctx.SeedSummary = summary
-			}
+		if summary, ok := seedMap["summary"].(string); ok {
+			ctx.SeedSummary = summary
 		}
 	}
 	if ctx.SeedSummary == "" {

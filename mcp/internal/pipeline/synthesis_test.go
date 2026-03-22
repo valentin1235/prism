@@ -367,7 +367,7 @@ func TestLoadSynthesisContext(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Create seed-analysis.json
-	seedData := `{"research": {"summary": "Test seed summary for synthesis"}}`
+	seedData := `{"summary": "Test seed summary for synthesis"}`
 	if err := os.WriteFile(filepath.Join(tmpDir, "seed-analysis.json"), []byte(seedData), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -747,7 +747,7 @@ func TestRunSynthesisSessionWritesReport(t *testing.T) {
 	// Note: reportDir is NOT pre-created — runSynthesisSession should create it
 
 	// Create required state files
-	seedData := `{"research": {"summary": "Test seed"}}`
+	seedData := `{"summary": "Test seed"}`
 	if err := os.WriteFile(filepath.Join(stateDir, "seed-analysis.json"), []byte(seedData), 0644); err != nil {
 		t.Fatal(err)
 	}

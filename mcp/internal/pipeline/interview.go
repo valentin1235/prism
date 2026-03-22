@@ -214,7 +214,7 @@ func LoadInterviewContext(cfg AnalysisConfig) (InterviewContext, error) {
 	if err := json.Unmarshal(seedData, &seed); err != nil {
 		return ctx, fmt.Errorf("parse seed analysis for interview context: %w", err)
 	}
-	ctx.SeedSummary = seed.Research.Summary
+	ctx.SeedSummary = seed.Summary
 
 	// Build ontology scope text block
 	ctx.OntologyScopeText = LoadOntologyScopeText(cfg.StateDir)

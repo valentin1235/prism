@@ -69,32 +69,27 @@ Write the following JSON to `~/.prism/state/analyze-{SHORT_ID}/seed-analysis.jso
 ```json
 {
   "topic": "{DESCRIPTION}",
-  "da_passed": true,
-  "research": {
-    "summary": "Brief summary of what was investigated and distinct areas discovered",
-    "findings": [
-      {
-        "id": 1,
-        "area": "name of the code area, module, or system",
-        "description": "what this area does and how it relates to the topic",
-        "source": "file:function:line or tool:query",
-        "tool_used": "Grep|Read|Bash|MCP"
-      }
-    ],
-    "key_areas": ["area or domain identified as relevant"],
-    "mcp_queries": ["tool: query → result summary"]
-  }
+  "summary": "Brief summary of what was investigated and distinct areas discovered",
+  "findings": [
+    {
+      "id": 1,
+      "area": "name of the code area, module, or system",
+      "description": "what this area does and how it relates to the topic",
+      "source": "file:function:line or tool:query",
+      "tool_used": "Grep|Read|Bash|MCP"
+    }
+  ],
+  "key_areas": ["area or domain identified as relevant"]
 }
 ```
 
 ### Field Rules
 - `topic`: Copy the original topic description exactly
-- `da_passed`: Set by Step 3 DA review loop — `true` if DA passed, `false` if max rounds exhausted without passing
-- `research.summary`: High-level summary to orient the perspective generator
-- `research.findings`: Every finding MUST have a concrete `source` — no unsourced claims
-- `research.findings[].area`: A distinct code area, module, or system name
-- `research.findings[].description`: What this area does and how it relates to the topic
-- `research.key_areas`: List the main domains/areas discovered during research (helps perspective generator identify analysis angles)
+- `summary`: High-level summary to orient the perspective generator
+- `findings`: Every finding MUST have a concrete `source` — no unsourced claims
+- `findings[].area`: A distinct code area, module, or system name
+- `findings[].description`: What this area does and how it relates to the topic
+- `key_areas`: List the main domains/areas discovered during research (helps perspective generator identify analysis angles)
 
 ---
 
@@ -109,7 +104,7 @@ First, discover the DA review MCP tool:
 ToolSearch("prism_da_review")
 ```
 
-This returns the `mcp__prism__prism_da_review` tool. If the tool is not available, skip this step entirely and proceed to output (do not set `da_passed`).
+This returns the `mcp__prism__prism_da_review` tool. If the tool is not available, skip this step entirely and proceed to output.
 
 ### Loop Protocol
 
@@ -152,7 +147,7 @@ The `round` parameter tracks the current iteration (1, 2, or 3). The tool hard-s
 **3. Evaluate `pass`:**
 
 - **If `pass` is `true`** (no CRITICAL or MAJOR findings):
-  → Set `"da_passed": true` in `seed-analysis.json`. **Exit loop.** Proceed to output.
+  → **Exit loop.** Proceed to output.
 
 - **If `pass` is `false`** AND this is **NOT round 3**:
   → Process CRITICAL and MAJOR findings for re-research (see below).
@@ -160,7 +155,6 @@ The `round` parameter tracks the current iteration (1, 2, or 3). The tool hard-s
   → Continue to next round.
 
 - **If `pass` is `false`** AND this is **round 3** (hard stop):
-  → Set `"da_passed": false` in `seed-analysis.json`.
   → Do **NOT** record unresolved findings in `seed-analysis.json`.
   → **Exit loop.** Proceed to output with current coverage.
 
@@ -179,11 +173,11 @@ The `round` parameter tracks the current iteration (1, 2, or 3). The tool hard-s
 3. Use the same tools as Step 1 (Grep, Read, Bash, MCP) to investigate.
 
 **Incremental update rules:**
-- **Preserve all existing findings** — do NOT remove, modify, or rewrite any existing `research.findings[]` entry.
+- **Preserve all existing findings** — do NOT remove, modify, or rewrite any existing `findings[]` entry.
 - **Append** new findings with incrementing `id` values (next sequential after the current max).
 - **No round metadata** — do not tag findings with which DA round triggered their discovery.
-- Update `research.summary` to reflect expanded coverage.
-- Append to `research.key_areas` if new areas were discovered.
+- Update `summary` to reflect expanded coverage.
+- Append to `key_areas` if new areas were discovered.
 
 ### Important Constraints
 

@@ -79,6 +79,26 @@ type DAReviewResult struct {
 	RawOutput         string      `json:"raw_output"`
 }
 
+// DAReviewRound captures the result of a single DA review round for history tracking.
+type DAReviewRound struct {
+	Round             int         `json:"round"`
+	Pass              bool        `json:"pass"`
+	CriticalCount     int         `json:"critical_count"`
+	MajorCount        int         `json:"major_count"`
+	Findings          []DAFinding `json:"findings"`
+	OverallConfidence string      `json:"overall_confidence,omitempty"`
+	TopConcerns       string      `json:"top_concerns,omitempty"`
+	WhatHoldsUp       string      `json:"what_holds_up,omitempty"`
+	ParseWarning      string      `json:"parse_warning,omitempty"`
+}
+
+// DAReviewHistory stores the complete DA review history for a session.
+type DAReviewHistory struct {
+	FinalPassed bool            `json:"final_passed"`
+	TotalRounds int             `json:"total_rounds"`
+	Rounds      []DAReviewRound `json:"rounds"`
+}
+
 // Package-level compiled regexes for DA markdown parsing.
 // Hoisted from ParseDAFindings/ParseDASummary to avoid recompilation on every call.
 var (

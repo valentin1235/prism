@@ -20,67 +20,51 @@ import (
 // Mirrors the SeedAnalysis struct in seed.go.
 const seedAnalysisJSONSchema = `{
   "type": "object",
-  "required": ["topic", "da_passed", "research"],
+  "required": ["topic", "summary", "findings", "key_areas"],
   "additionalProperties": false,
   "properties": {
     "topic": {
       "type": "string",
       "description": "Copy of the original topic description"
     },
-    "da_passed": {
-      "type": "boolean",
-      "description": "Always true when output by seed analyst (DA review handled externally)"
+    "summary": {
+      "type": "string",
+      "description": "High-level summary of investigated areas for the perspective generator"
     },
-    "research": {
-      "type": "object",
-      "required": ["summary", "findings", "key_areas"],
-      "additionalProperties": false,
-      "properties": {
-        "summary": {
-          "type": "string",
-          "description": "High-level summary of investigated areas for the perspective generator"
-        },
-        "findings": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "required": ["id", "area", "description", "source", "tool_used"],
-            "additionalProperties": false,
-            "properties": {
-              "id": {
-                "type": "integer",
-                "description": "Sequential finding ID starting from 1"
-              },
-              "area": {
-                "type": "string",
-                "description": "Name of the code area, module, or system"
-              },
-              "description": {
-                "type": "string",
-                "description": "What this area does and how it relates to the topic"
-              },
-              "source": {
-                "type": "string",
-                "description": "Evidence source: file:function:line or tool:query"
-              },
-              "tool_used": {
-                "type": "string",
-                "description": "Tool that found this: Grep, Read, Bash, or Glob"
-              }
-            }
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "area", "description", "source", "tool_used"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Sequential finding ID starting from 1"
+          },
+          "area": {
+            "type": "string",
+            "description": "Name of the code area, module, or system"
+          },
+          "description": {
+            "type": "string",
+            "description": "What this area does and how it relates to the topic"
+          },
+          "source": {
+            "type": "string",
+            "description": "Evidence source: file:function:line or tool:query"
+          },
+          "tool_used": {
+            "type": "string",
+            "description": "Tool that found this: Grep, Read, Bash, or Glob"
           }
-        },
-        "key_areas": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "Main domains/areas discovered during research"
-        },
-        "mcp_queries": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "MCP queries performed (empty when no MCP tools available)"
         }
       }
+    },
+    "key_areas": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Main domains/areas discovered during research"
     }
   }
 }`
@@ -174,16 +158,14 @@ Synthesize your discoveries into a structured summary that will help the perspec
 After completing your research, output a JSON object with EXACTLY this structure:
 
 - topic: Copy the original topic description exactly
-- da_passed: Set to true (DA review is handled externally)
-- research.summary: High-level summary to orient the perspective generator
-- research.findings: Array of findings, each with:
+- summary: High-level summary to orient the perspective generator
+- findings: Array of findings, each with:
   - id: Sequential integer starting from 1
   - area: Name of the code area, module, or system
   - description: What this area does and how it relates to the topic
   - source: Evidence source (file:function:line or tool:query)
   - tool_used: Which tool found this (Grep, Read, Bash, or Glob)
-- research.key_areas: List the main domains/areas discovered during research
-- research.mcp_queries: Empty array (no MCP tools in this context)
+- key_areas: List the main domains/areas discovered during research
 
 Every finding MUST have a concrete source — no unsourced claims.
 `)
@@ -433,6 +415,25 @@ func SeedAnalysisPath(stateDir string) string {
 	return filepath.Join(stateDir, "seed-analysis.json")
 }
 
+// DAHistoryPath returns the path to seed-analysis-da.json for a given state directory.
+func DAHistoryPath(stateDir string) string {
+	return filepath.Join(stateDir, "seed-analysis-da.json")
+}
+
+// writeDAHistory writes the DA review history to seed-analysis-da.json.
+func writeDAHistory(stateDir string, history DAReviewHistory) error {
+	data, err := json.MarshalIndent(history, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal DA history: %w", err)
+	}
+	path := DAHistoryPath(stateDir)
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		return fmt.Errorf("write DA history: %w", err)
+	}
+	log.Printf("DA review history written: %s (%d rounds, passed=%v)", path, history.TotalRounds, history.FinalPassed)
+	return nil
+}
+
 // PerspectivesPath returns the path to perspectives.json for a given state directory.
 func PerspectivesPath(stateDir string) string {
 	return filepath.Join(stateDir, "perspectives.json")
@@ -499,7 +500,7 @@ func RunSeedAnalysis(task *taskpkg.AnalysisTask, cfg AnalysisConfig) error {
 	}
 
 	// Basic validation: must have at least one finding
-	if len(seedAnalysis.Research.Findings) == 0 {
+	if len(seedAnalysis.Findings) == 0 {
 		return fmt.Errorf("seed analysis produced no findings")
 	}
 
@@ -510,7 +511,7 @@ func RunSeedAnalysis(task *taskpkg.AnalysisTask, cfg AnalysisConfig) error {
 	}
 
 	log.Printf("[%s] Seed analysis complete: %d findings, %d key areas",
-		task.ID, len(seedAnalysis.Research.Findings), len(seedAnalysis.Research.KeyAreas))
+		task.ID, len(seedAnalysis.Findings), len(seedAnalysis.KeyAreas))
 
 	return nil
 }
@@ -530,6 +531,9 @@ func RunDAReviewLoop(task *taskpkg.AnalysisTask, cfg AnalysisConfig) error {
 	stateDir := task.GetStateDir()
 
 	seedPath := SeedAnalysisPath(stateDir)
+
+	// Collect DA review history across all rounds
+	history := DAReviewHistory{}
 
 	for round := 1; round <= MaxDARounds; round++ {
 		task.UpdateStageDetail(taskpkg.StageScope, fmt.Sprintf("DA review round %d/%d", round, MaxDARounds))
@@ -563,6 +567,7 @@ func RunDAReviewLoop(task *taskpkg.AnalysisTask, cfg AnalysisConfig) error {
 
 		// Parse DA findings from markdown output
 		findings := ParseDAFindings(rawOutput)
+		overallConfidence, topConcerns, whatHoldsUp := ParseDASummary(rawOutput)
 		actionable := FilterActionableFindings(findings)
 		criticalCount, majorCount := CountSeverities(actionable)
 		pass := ShouldPassDA(criticalCount, majorCount)
@@ -570,27 +575,39 @@ func RunDAReviewLoop(task *taskpkg.AnalysisTask, cfg AnalysisConfig) error {
 		// Detect parse failure: no findings extracted but severity keywords present
 		// in raw output. The DA likely produced non-standard markdown. Treat as
 		// not-passed to avoid false positive pass on parse failure.
+		var parseWarning string
 		if pass && len(findings) == 0 && SeverityKeywordRe.MatchString(rawOutput) {
 			pass = false
-			log.Printf("[%s] DA round %d: parse warning — no findings parsed but CRITICAL/MAJOR keywords detected in raw output; treating as not-passed",
-				task.ID, round)
+			parseWarning = "no findings parsed but CRITICAL/MAJOR keywords detected in raw output; treating as not-passed"
+			log.Printf("[%s] DA round %d: parse warning — %s", task.ID, round, parseWarning)
 		}
 
 		log.Printf("[%s] DA round %d: pass=%v critical=%d major=%d total_actionable=%d",
 			task.ID, round, pass, criticalCount, majorCount, len(actionable))
 
+		// Record round in history and flush to disk immediately
+		history.Rounds = append(history.Rounds, DAReviewRound{
+			Round:             round,
+			Pass:              pass,
+			CriticalCount:     criticalCount,
+			MajorCount:        majorCount,
+			Findings:          actionable,
+			OverallConfidence: overallConfidence,
+			TopConcerns:       topConcerns,
+			WhatHoldsUp:       whatHoldsUp,
+			ParseWarning:      parseWarning,
+		})
+		history.TotalRounds = round
+
 		if pass {
-			// No actionable findings — update da_passed and exit loop
-			sa, err := ReadSeedAnalysis(seedPath)
-			if err != nil {
-				return fmt.Errorf("read seed for DA pass update: %w", err)
-			}
-			sa.DAPassed = true
-			if err := WriteSeedAnalysis(seedPath, sa); err != nil {
-				return fmt.Errorf("write seed DA pass: %w", err)
-			}
 			log.Printf("[%s] DA review passed at round %d", task.ID, round)
-			return nil
+			history.FinalPassed = true
+			return writeDAHistory(stateDir, history)
+		}
+
+		// Flush after each non-pass round (FinalPassed stays false until pass)
+		if err := writeDAHistory(stateDir, history); err != nil {
+			log.Printf("[%s] Warning: failed to write DA history after round %d: %v", task.ID, round, err)
 		}
 
 		// Last allowed round — stop regardless of findings
@@ -609,7 +626,10 @@ func RunDAReviewLoop(task *taskpkg.AnalysisTask, cfg AnalysisConfig) error {
 		}
 	}
 
-	return nil
+	// Hard stop — da_passed stays false (initial value from seed analyst)
+	history.FinalPassed = false
+	history.TotalRounds = len(history.Rounds)
+	return writeDAHistory(stateDir, history)
 }
 
 // runSupplementaryResearch runs a focused research subprocess to address
@@ -676,11 +696,11 @@ func runSupplementaryResearch(task *taskpkg.AnalysisTask, cfg AnalysisConfig, fi
 	// Merge supplementary findings into existing seed analysis
 	seedPath := SeedAnalysisPath(stateDir)
 	patch := SeedPatch{
-		NewFindings: supplementary.Research.Findings,
-		NewKeyAreas: supplementary.Research.KeyAreas,
+		NewFindings: supplementary.Findings,
+		NewKeyAreas: supplementary.KeyAreas,
 	}
-	if supplementary.Research.Summary != "" {
-		patch.Summary = supplementary.Research.Summary
+	if supplementary.Summary != "" {
+		patch.Summary = supplementary.Summary
 	}
 
 	merged, err := PatchSeedAnalysisFile(seedPath, patch)
@@ -689,7 +709,7 @@ func runSupplementaryResearch(task *taskpkg.AnalysisTask, cfg AnalysisConfig, fi
 	}
 
 	log.Printf("[%s] Supplementary research merged: %d total findings",
-		task.ID, len(merged.Research.Findings))
+		task.ID, len(merged.Findings))
 
 	return nil
 }

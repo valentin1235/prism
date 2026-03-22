@@ -15,35 +15,23 @@ type SeedFinding struct {
 	ToolUsed    string `json:"tool_used"`
 }
 
-// SeedResearch represents the research section of seed-analysis.json.
-type SeedResearch struct {
-	Summary    string        `json:"summary"`
-	Findings   []SeedFinding `json:"findings"`
-	KeyAreas   []string      `json:"key_areas"`
-	MCPQueries []string      `json:"mcp_queries"`
-}
-
 // SeedAnalysis represents the full seed-analysis.json structure.
 type SeedAnalysis struct {
-	Topic    string       `json:"topic"`
-	DAPassed bool         `json:"da_passed"`
-	Research SeedResearch `json:"research"`
+	Topic    string        `json:"topic"`
+	Summary  string        `json:"summary"`
+	Findings []SeedFinding `json:"findings"`
+	KeyAreas []string      `json:"key_areas"`
 }
 
 // SeedPatch contains new data to merge into an existing SeedAnalysis.
 // Only non-zero/non-empty fields are applied.
 type SeedPatch struct {
-	// NewFindings are appended to research.findings with auto-incremented IDs.
+	// NewFindings are appended to findings with auto-incremented IDs.
 	NewFindings []SeedFinding `json:"new_findings,omitempty"`
-	// Summary replaces research.summary if non-empty.
+	// Summary replaces summary if non-empty.
 	Summary string `json:"summary,omitempty"`
-	// NewKeyAreas are appended (deduplicated) to research.key_areas.
+	// NewKeyAreas are appended (deduplicated) to key_areas.
 	NewKeyAreas []string `json:"new_key_areas,omitempty"`
-	// NewMCPQueries are appended to research.mcp_queries.
-	NewMCPQueries []string `json:"new_mcp_queries,omitempty"`
-	// DAPassed sets the da_passed flag. Use SetDAPassed to control whether it's applied.
-	DAPassed    bool `json:"-"`
-	SetDAPassed bool `json:"-"`
 }
 
 // maxFindingID returns the highest id among existing findings, or 0 if empty.
@@ -80,40 +68,27 @@ func MergeSeedAnalysis(existing SeedAnalysis, patch SeedPatch) SeedAnalysis {
 	merged := existing
 
 	// Deep copy existing findings to avoid mutation
-	merged.Research.Findings = make([]SeedFinding, len(existing.Research.Findings))
-	copy(merged.Research.Findings, existing.Research.Findings)
+	merged.Findings = make([]SeedFinding, len(existing.Findings))
+	copy(merged.Findings, existing.Findings)
 
 	// Append new findings with auto-incremented IDs
 	if len(patch.NewFindings) > 0 {
-		nextID := maxFindingID(merged.Research.Findings) + 1
+		nextID := maxFindingID(merged.Findings) + 1
 		for _, f := range patch.NewFindings {
 			f.ID = nextID
 			nextID++
-			merged.Research.Findings = append(merged.Research.Findings, f)
+			merged.Findings = append(merged.Findings, f)
 		}
 	}
 
 	// Update summary if provided
 	if patch.Summary != "" {
-		merged.Research.Summary = patch.Summary
+		merged.Summary = patch.Summary
 	}
 
 	// Deduplicate and append key_areas
 	if len(patch.NewKeyAreas) > 0 {
-		merged.Research.KeyAreas = deduplicateStrings(existing.Research.KeyAreas, patch.NewKeyAreas)
-	}
-
-	// Append mcp_queries
-	if len(patch.NewMCPQueries) > 0 {
-		merged.Research.MCPQueries = append(
-			append([]string{}, existing.Research.MCPQueries...),
-			patch.NewMCPQueries...,
-		)
-	}
-
-	// Set da_passed if explicitly requested
-	if patch.SetDAPassed {
-		merged.DAPassed = patch.DAPassed
+		merged.KeyAreas = deduplicateStrings(existing.KeyAreas, patch.NewKeyAreas)
 	}
 
 	return merged
@@ -146,8 +121,6 @@ func WriteSeedAnalysis(path string, sa SeedAnalysis) error {
 
 // PatchSeedAnalysisFile reads seed-analysis.json, applies a patch, and writes it back.
 // This is the primary entry point for incremental updates.
-// Currently used as library code for potential future prism_seed_merge MCP tool.
-// The seed analyst agent performs incremental updates via direct JSON Write for now.
 func PatchSeedAnalysisFile(path string, patch SeedPatch) (SeedAnalysis, error) {
 	existing, err := ReadSeedAnalysis(path)
 	if err != nil {

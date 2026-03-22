@@ -46,11 +46,6 @@ func TestBuildSeedAnalystPrompt_BasicStructure(t *testing.T) {
 		}
 	}
 
-	// Must contain output format instructions
-	if !strings.Contains(prompt, "da_passed") {
-		t.Error("prompt must describe da_passed field")
-	}
-
 	// Must NOT contain team-related instructions
 	for _, forbidden := range []string{"SendMessage", "TaskGet", "TaskUpdate", "team-lead", "team_name"} {
 		if strings.Contains(prompt, forbidden) {
@@ -153,7 +148,7 @@ func TestBuildSeedAnalystPrompt_WithoutDocPaths(t *testing.T) {
 }
 
 func TestBuildPerspectiveGeneratorPrompt_BasicStructure(t *testing.T) {
-	seedJSON := `{"topic":"test","da_passed":true,"research":{"summary":"test summary","findings":[],"key_areas":[],"mcp_queries":[]}}`
+	seedJSON := `{"topic":"test","summary":"test summary","findings":[],"key_areas":[]}`
 
 	prompt := BuildPerspectiveGeneratorPrompt("Test topic", seedJSON)
 
@@ -262,27 +257,25 @@ func TestSeedAnalysisSchema_ValidJSON(t *testing.T) {
 	for _, r := range required {
 		requiredSet[r.(string)] = true
 	}
-	for _, field := range []string{"topic", "da_passed", "research"} {
+	for _, field := range []string{"topic", "summary", "findings", "key_areas"} {
 		if !requiredSet[field] {
 			t.Errorf("schema must require field %q", field)
 		}
 	}
 }
 
-func TestSeedAnalysisSchema_ResearchFields(t *testing.T) {
+func TestSeedAnalysisSchema_TopLevelFields(t *testing.T) {
 	schema := SeedAnalysisSchema()
 
 	var parsed map[string]interface{}
 	json.Unmarshal([]byte(schema), &parsed)
 
 	props := parsed["properties"].(map[string]interface{})
-	research := props["research"].(map[string]interface{})
-	researchProps := research["properties"].(map[string]interface{})
 
-	expectedFields := []string{"summary", "findings", "key_areas", "mcp_queries"}
+	expectedFields := []string{"topic", "summary", "findings", "key_areas"}
 	for _, field := range expectedFields {
-		if _, ok := researchProps[field]; !ok {
-			t.Errorf("research schema must include field %q", field)
+		if _, ok := props[field]; !ok {
+			t.Errorf("schema must include top-level field %q", field)
 		}
 	}
 }
@@ -294,9 +287,7 @@ func TestSeedAnalysisSchema_FindingsFields(t *testing.T) {
 	json.Unmarshal([]byte(schema), &parsed)
 
 	props := parsed["properties"].(map[string]interface{})
-	research := props["research"].(map[string]interface{})
-	researchProps := research["properties"].(map[string]interface{})
-	findings := researchProps["findings"].(map[string]interface{})
+	findings := props["findings"].(map[string]interface{})
 	items := findings["items"].(map[string]interface{})
 	itemProps := items["properties"].(map[string]interface{})
 
@@ -414,15 +405,133 @@ func TestBuildSeedAnalystPrompt_OutputInstructsJSONFormat(t *testing.T) {
 	// Must instruct about key JSON fields for structured output
 	expectedFields := []string{
 		"topic",
-		"da_passed",
-		"research.summary",
-		"research.findings",
-		"research.key_areas",
+		"summary",
+		"findings",
+		"key_areas",
 	}
 	for _, field := range expectedFields {
 		if !strings.Contains(prompt, field) {
 			t.Errorf("prompt must describe output field %q", field)
 		}
+	}
+}
+
+func TestDAHistoryPath(t *testing.T) {
+	got := DAHistoryPath("/tmp/test-state")
+	want := filepath.Join("/tmp/test-state", "seed-analysis-da.json")
+	if got != want {
+		t.Errorf("DAHistoryPath = %q, want %q", got, want)
+	}
+}
+
+func TestWriteDAHistory_RoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	history := DAReviewHistory{
+		FinalPassed: true,
+		TotalRounds: 2,
+		Rounds: []DAReviewRound{
+			{
+				Round:             1,
+				Pass:              false,
+				CriticalCount:     1,
+				MajorCount:        0,
+				Findings:          []DAFinding{{Severity: "CRITICAL", Title: "Missing coverage"}},
+				OverallConfidence: "LOW",
+				TopConcerns:       "gap in API layer",
+			},
+			{
+				Round:             2,
+				Pass:              true,
+				CriticalCount:     0,
+				MajorCount:        0,
+				Findings:          []DAFinding{},
+				OverallConfidence: "HIGH",
+				WhatHoldsUp:       "all areas covered",
+			},
+		},
+	}
+
+	err := writeDAHistory(dir, history)
+	if err != nil {
+		t.Fatalf("writeDAHistory failed: %v", err)
+	}
+
+	// Read back and verify
+	data, err := os.ReadFile(DAHistoryPath(dir))
+	if err != nil {
+		t.Fatalf("read DA history file: %v", err)
+	}
+
+	var loaded DAReviewHistory
+	if err := json.Unmarshal(data, &loaded); err != nil {
+		t.Fatalf("parse DA history: %v", err)
+	}
+
+	if !loaded.FinalPassed {
+		t.Error("final_passed should be true")
+	}
+	if loaded.TotalRounds != 2 {
+		t.Errorf("total_rounds = %d, want 2", loaded.TotalRounds)
+	}
+	if len(loaded.Rounds) != 2 {
+		t.Fatalf("rounds count = %d, want 2", len(loaded.Rounds))
+	}
+
+	// Round 1 checks
+	r1 := loaded.Rounds[0]
+	if r1.Pass {
+		t.Error("round 1 should not pass")
+	}
+	if r1.CriticalCount != 1 {
+		t.Errorf("round 1 critical_count = %d, want 1", r1.CriticalCount)
+	}
+	if len(r1.Findings) != 1 {
+		t.Errorf("round 1 findings count = %d, want 1", len(r1.Findings))
+	}
+	// Round 2 checks
+	r2 := loaded.Rounds[1]
+	if !r2.Pass {
+		t.Error("round 2 should pass")
+	}
+	if r2.CriticalCount != 0 || r2.MajorCount != 0 {
+		t.Error("round 2 should have zero critical and major counts")
+	}
+}
+
+func TestWriteDAHistory_HardStop(t *testing.T) {
+	dir := t.TempDir()
+	history := DAReviewHistory{
+		FinalPassed: false,
+		TotalRounds: 3,
+		Rounds: []DAReviewRound{
+			{Round: 1, Pass: false, CriticalCount: 2},
+			{Round: 2, Pass: false, CriticalCount: 1},
+			{Round: 3, Pass: false, CriticalCount: 1},
+		},
+	}
+
+	if err := writeDAHistory(dir, history); err != nil {
+		t.Fatalf("writeDAHistory failed: %v", err)
+	}
+
+	data, err := os.ReadFile(DAHistoryPath(dir))
+	if err != nil {
+		t.Fatalf("read DA history file: %v", err)
+	}
+
+	var loaded DAReviewHistory
+	if err := json.Unmarshal(data, &loaded); err != nil {
+		t.Fatalf("parse DA history: %v", err)
+	}
+
+	if loaded.FinalPassed {
+		t.Error("final_passed should be false after hard stop")
+	}
+	if loaded.TotalRounds != 3 {
+		t.Errorf("total_rounds = %d, want 3", loaded.TotalRounds)
+	}
+	if len(loaded.Rounds) != 3 {
+		t.Errorf("rounds count = %d, want 3", len(loaded.Rounds))
 	}
 }
 

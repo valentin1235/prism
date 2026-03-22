@@ -396,7 +396,7 @@ func TestBuildAllInterviewCommands_SkipsFailedSpecialists(t *testing.T) {
 	seedDir := stateDir
 	os.MkdirAll(seedDir, 0755)
 	seedAnalysis := SeedAnalysis{
-		Research: SeedResearch{Summary: "Test seed summary"},
+		Summary: "Test seed summary",
 	}
 	seedData, _ := json.MarshalIndent(seedAnalysis, "", "  ")
 	os.WriteFile(filepath.Join(seedDir, "seed-analysis.json"), seedData, 0644)

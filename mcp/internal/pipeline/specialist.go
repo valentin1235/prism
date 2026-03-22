@@ -197,7 +197,7 @@ func LoadSpecialistContext(cfg AnalysisConfig) (SpecialistContext, error) {
 	if err := json.Unmarshal(seedData, &seed); err != nil {
 		return ctx, fmt.Errorf("parse seed analysis for specialist context: %w", err)
 	}
-	ctx.SeedSummary = seed.Research.Summary
+	ctx.SeedSummary = seed.Summary
 
 	// Build ontology scope text block from ontology-scope.json if it exists
 	ctx.OntologyScopeText = LoadOntologyScopeText(cfg.StateDir)

@@ -13,7 +13,7 @@ import (
 // --- Tests for extractJSON ---
 
 func TestExtractJSON_CleanJSON(t *testing.T) {
-	input := `{"topic":"test","da_passed":true,"research":{"summary":"s","findings":[],"key_areas":[],"mcp_queries":[]}}`
+	input := `{"topic":"test","summary":"s","findings":[],"key_areas":[]}`
 	got, err := engine.ExtractJSON(input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -52,7 +52,7 @@ func TestExtractJSON_MarkdownFences(t *testing.T) {
 func TestExtractJSON_SurroundingText(t *testing.T) {
 	input := `Here is the result:
 
-{"topic":"test","da_passed":true,"research":{"summary":"s","findings":[],"key_areas":[],"mcp_queries":[]}}
+{"topic":"test","summary":"s","findings":[],"key_areas":[]}
 
 That completes the analysis.`
 	got, err := engine.ExtractJSON(input)
@@ -173,17 +173,13 @@ func TestRunSeedAnalysis_WritesOutputFile(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	seed := SeedAnalysis{
-		Topic:    "Test topic",
-		DAPassed: true,
-		Research: SeedResearch{
-			Summary: "Found 3 areas",
-			Findings: []SeedFinding{
-				{ID: 1, Area: "auth", Description: "Auth module", Source: "auth.go:10", ToolUsed: "Grep"},
-				{ID: 2, Area: "db", Description: "Database layer", Source: "db.go:20", ToolUsed: "Read"},
-			},
-			KeyAreas:   []string{"auth", "db"},
-			MCPQueries: []string{},
+		Topic:   "Test topic",
+		Summary: "Found 3 areas",
+		Findings: []SeedFinding{
+			{ID: 1, Area: "auth", Description: "Auth module", Source: "auth.go:10", ToolUsed: "Grep"},
+			{ID: 2, Area: "db", Description: "Database layer", Source: "db.go:20", ToolUsed: "Read"},
 		},
+		KeyAreas: []string{"auth", "db"},
 	}
 
 	outputPath := SeedAnalysisPath(tmpDir)
@@ -200,8 +196,8 @@ func TestRunSeedAnalysis_WritesOutputFile(t *testing.T) {
 	if got.Topic != "Test topic" {
 		t.Errorf("topic = %q, want %q", got.Topic, "Test topic")
 	}
-	if len(got.Research.Findings) != 2 {
-		t.Errorf("findings count = %d, want 2", len(got.Research.Findings))
+	if len(got.Findings) != 2 {
+		t.Errorf("findings count = %d, want 2", len(got.Findings))
 	}
 }
 
@@ -306,13 +302,9 @@ func TestSupplementaryResearchMerge(t *testing.T) {
 	// Write initial seed analysis
 	initial := SeedAnalysis{
 		Topic:    "Test topic",
-		DAPassed: false,
-		Research: SeedResearch{
-			Summary:       "Initial summary",
-			Findings:      []SeedFinding{{ID: 1, Area: "area1", Description: "desc1", Source: "file1:10", ToolUsed: "Grep"}},
-			KeyAreas:   []string{"area1"},
-			MCPQueries: []string{},
-		},
+		Summary:  "Initial summary",
+		Findings: []SeedFinding{{ID: 1, Area: "area1", Description: "desc1", Source: "file1:10", ToolUsed: "Grep"}},
+		KeyAreas: []string{"area1"},
 	}
 	if err := WriteSeedAnalysis(seedPath, initial); err != nil {
 		t.Fatalf("write initial seed: %v", err)
@@ -333,18 +325,18 @@ func TestSupplementaryResearchMerge(t *testing.T) {
 	}
 
 	// Verify merge results
-	if len(merged.Research.Findings) != 2 {
-		t.Errorf("expected 2 findings after merge, got %d", len(merged.Research.Findings))
+	if len(merged.Findings) != 2 {
+		t.Errorf("expected 2 findings after merge, got %d", len(merged.Findings))
 	}
 	// New finding should get auto-incremented ID (2, not 99)
-	if merged.Research.Findings[1].ID != 2 {
-		t.Errorf("expected auto-incremented ID 2, got %d", merged.Research.Findings[1].ID)
+	if merged.Findings[1].ID != 2 {
+		t.Errorf("expected auto-incremented ID 2, got %d", merged.Findings[1].ID)
 	}
-	if merged.Research.Summary != "Updated summary with area2" {
-		t.Errorf("expected updated summary, got %q", merged.Research.Summary)
+	if merged.Summary != "Updated summary with area2" {
+		t.Errorf("expected updated summary, got %q", merged.Summary)
 	}
-	if len(merged.Research.KeyAreas) != 2 {
-		t.Errorf("expected 2 key areas, got %d", len(merged.Research.KeyAreas))
+	if len(merged.KeyAreas) != 2 {
+		t.Errorf("expected 2 key areas, got %d", len(merged.KeyAreas))
 	}
 }
 
@@ -416,28 +408,24 @@ func TestExtractJSON_SeedAnalysisOutput(t *testing.T) {
 	// Test extractJSON with a realistic seed analysis output
 	seedJSON := `{
   "topic": "Payment processing analysis",
-  "da_passed": true,
-  "research": {
-    "summary": "Found 3 key areas related to payment processing",
-    "findings": [
-      {
-        "id": 1,
-        "area": "Payment Gateway",
-        "description": "Stripe integration in payment_gateway.go",
-        "source": "payment_gateway.go:handle_payment:45",
-        "tool_used": "Grep"
-      },
-      {
-        "id": 2,
-        "area": "Transaction Logger",
-        "description": "Transaction audit logging in tx_log.go",
-        "source": "tx_log.go:log_transaction:22",
-        "tool_used": "Read"
-      }
-    ],
-    "key_areas": ["payment-gateway", "transaction-logging"],
-    "mcp_queries": []
-  }
+  "summary": "Found 3 key areas related to payment processing",
+  "findings": [
+    {
+      "id": 1,
+      "area": "Payment Gateway",
+      "description": "Stripe integration in payment_gateway.go",
+      "source": "payment_gateway.go:handle_payment:45",
+      "tool_used": "Grep"
+    },
+    {
+      "id": 2,
+      "area": "Transaction Logger",
+      "description": "Transaction audit logging in tx_log.go",
+      "source": "tx_log.go:log_transaction:22",
+      "tool_used": "Read"
+    }
+  ],
+  "key_areas": ["payment-gateway", "transaction-logging"]
 }`
 
 	got, err := engine.ExtractJSON(seedJSON)
@@ -453,8 +441,8 @@ func TestExtractJSON_SeedAnalysisOutput(t *testing.T) {
 	if seed.Topic != "Payment processing analysis" {
 		t.Errorf("expected topic, got %q", seed.Topic)
 	}
-	if len(seed.Research.Findings) != 2 {
-		t.Errorf("expected 2 findings, got %d", len(seed.Research.Findings))
+	if len(seed.Findings) != 2 {
+		t.Errorf("expected 2 findings, got %d", len(seed.Findings))
 	}
 }
 
@@ -488,17 +476,13 @@ func TestStage1FileFlow_SeedToPerspectives(t *testing.T) {
 
 	// Step 1: Write seed analysis
 	seed := SeedAnalysis{
-		Topic:    "E2E test topic",
-		DAPassed: false,
-		Research: SeedResearch{
-			Summary: "Found auth and db areas",
-			Findings: []SeedFinding{
-				{ID: 1, Area: "auth", Description: "Authentication module", Source: "auth.go:10", ToolUsed: "Grep"},
-				{ID: 2, Area: "db", Description: "Database layer", Source: "db.go:20", ToolUsed: "Read"},
-			},
-			KeyAreas:   []string{"auth", "db"},
-			MCPQueries: []string{},
+		Topic:   "E2E test topic",
+		Summary: "Found auth and db areas",
+		Findings: []SeedFinding{
+			{ID: 1, Area: "auth", Description: "Authentication module", Source: "auth.go:10", ToolUsed: "Grep"},
+			{ID: 2, Area: "db", Description: "Database layer", Source: "db.go:20", ToolUsed: "Read"},
 		},
+		KeyAreas: []string{"auth", "db"},
 	}
 	seedPath := SeedAnalysisPath(tmpDir)
 	if err := WriteSeedAnalysis(seedPath, seed); err != nil {
@@ -514,10 +498,9 @@ func TestStage1FileFlow_SeedToPerspectives(t *testing.T) {
 		t.Fatalf("topic mismatch after read")
 	}
 
-	// Step 3: Update da_passed (DA review pass)
-	readBack.DAPassed = true
+	// Step 3: Write back (simulating DA review update)
 	if err := WriteSeedAnalysis(seedPath, readBack); err != nil {
-		t.Fatalf("write DA passed: %v", err)
+		t.Fatalf("write seed after DA review: %v", err)
 	}
 
 	// Step 4: Read for perspective generation
@@ -529,10 +512,6 @@ func TestStage1FileFlow_SeedToPerspectives(t *testing.T) {
 	if err := json.Unmarshal(seedForPersp, &seedParsed); err != nil {
 		t.Fatalf("parse seed for perspective gen: %v", err)
 	}
-	if !seedParsed.DAPassed {
-		t.Error("expected da_passed=true after DA update")
-	}
-
 	// Step 5: Write perspectives
 	perspectives := PerspectivesOutput{
 		Perspectives: []Perspective{

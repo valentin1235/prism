@@ -330,12 +330,9 @@ func TestBuildAllSpecialistCommands(t *testing.T) {
 	// Write seed-analysis.json
 	seed := SeedAnalysis{
 		Topic:    "Test multi-specialist",
-		DAPassed: true,
-		Research: SeedResearch{
-			Summary:  "Found 3 distinct areas for analysis.",
-			Findings: []SeedFinding{{ID: 1, Area: "auth", Description: "Auth module found", Source: "auth.go:10", ToolUsed: "Grep"}},
-			KeyAreas: []string{"auth", "payments"},
-		},
+		Summary:  "Found 3 distinct areas for analysis.",
+		Findings: []SeedFinding{{ID: 1, Area: "auth", Description: "Auth module found", Source: "auth.go:10", ToolUsed: "Grep"}},
+		KeyAreas: []string{"auth", "payments"},
 	}
 	seedData, _ := json.MarshalIndent(seed, "", "  ")
 	if err := os.WriteFile(filepath.Join(tmpDir, "seed-analysis.json"), seedData, 0644); err != nil {
@@ -620,12 +617,9 @@ func TestLoadSpecialistContext(t *testing.T) {
 	// Write seed-analysis.json
 	seed := SeedAnalysis{
 		Topic:    "Test context loading",
-		DAPassed: true,
-		Research: SeedResearch{
-			Summary:  "Context summary for specialists.",
-			Findings: []SeedFinding{{ID: 1, Area: "test", Description: "Test finding", Source: "test.go:1", ToolUsed: "Grep"}},
-			KeyAreas: []string{"test"},
-		},
+		Summary:  "Context summary for specialists.",
+		Findings: []SeedFinding{{ID: 1, Area: "test", Description: "Test finding", Source: "test.go:1", ToolUsed: "Grep"}},
+		KeyAreas: []string{"test"},
 	}
 	seedData, _ := json.MarshalIndent(seed, "", "  ")
 	if err := os.WriteFile(filepath.Join(tmpDir, "seed-analysis.json"), seedData, 0644); err != nil {
