@@ -1,72 +1,142 @@
 ---
 name: brownfield
-description: Scan home directory for GitHub repos, register them, and manage default selections for analysis context
-version: 1.0.0
+description: "Scan and manage brownfield repository defaults for interviews"
 user-invocable: true
-allowed-tools: AskUserQuestion, mcp__prism__prism_brownfield
+allowed-tools: ToolSearch, AskUserQuestion, mcp__prism__prism_brownfield, mcp__plugin_prism_prism-mcp__prism_brownfield
 ---
 
-# Brownfield Repository Registry
+# /prism:brownfield
 
-Scan the user's home directory for existing GitHub repositories, register them in the brownfield registry, and let the user select defaults for analysis context.
+Scan your home directory for existing git repositories and manage default repos used as context in interviews.
 
-## Phase 1: Scan
-
-1. Call `prism_brownfield` with `action: "scan"` to discover GitHub repos under `~/`.
-2. Report scan results: `"Found {found} GitHub repositories, {registered} registered."`
-
-## Phase 2: Display & Page Through Results
-
-3. Call `prism_brownfield` with `action: "query"`, `offset: 0`, `limit: 30` to fetch the first page.
-4. Present results in a formatted table via `AskUserQuestion`:
+## Usage
 
 ```
-AskUserQuestion(
-  header: "Brownfield Repositories ({offset+1}–{offset+count} of {total})",
-  question: "<table>\n\nSelect repos to mark as default, or navigate pages:",
-  options: [
-    {label: "Select defaults", description: "Enter rowid numbers to set as defaults"},
-    {label: "Next page", description: "Show next 30 repos"},
-    {label: "Previous page", description: "Show previous 30 repos"},
-    {label: "Done", description: "Finish browsing"}
-  ]
-)
+/prism:brownfield                # Scan repos and set defaults
+/prism:brownfield scan           # Scan only (no default selection)
+/prism:brownfield defaults       # Show current defaults
+/prism:brownfield set 6,18,19   # Set defaults by repo numbers
 ```
 
-**Table format** (include in the question text):
+**Trigger keywords:** "brownfield", "scan repos", "default repos", "brownfield scan"
+
+---
+
+## How It Works
+
+### Default flow (no args)
+
+**Step 1: Scan**
+
+Show scanning indicator:
 ```
-#    | ★ | Name              | Path                          | Description
------|---|-------------------|-------------------------------|------------------
-  6  |   | my-api            | /Users/me/my-api              | REST API for ...
- 18  | ★ | frontend          | /Users/me/frontend            | React dashboard
- 19  | ★ | infra             | /Users/me/infra               | Terraform configs
-```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Scanning for Existing Projects...
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-- `★` marks repos currently set as default.
-- `#` is the rowid from the query result.
-
-### Navigation Logic
-
-- **"Select defaults"**: Ask the user for a comma-separated list of rowid numbers. Call `prism_brownfield` with `action: "set_defaults"`, `indices: "<user_input>"`. Then re-display the current page with updated defaults.
-- **"Next page"**: Increment offset by 30, fetch and display next page. Hide if already at last page.
-- **"Previous page"**: Decrement offset by 30, fetch and display previous page. Hide if offset is 0.
-- **"Done"**: Exit the browsing loop.
-
-## Phase 3: Summary
-
-5. Call `prism_brownfield` with `action: "query"`, `default_only: true` to get final defaults.
-6. Display summary:
-
-```
-Default repositories:
-- {name} — {path} — {desc}
-- ...
-
-Use `/brownfield` again to rescan or change defaults.
+Looking for git repositories in your home directory.
+Only GitHub-hosted repos will be registered.
+This may take a moment...
 ```
 
-## Edge Cases
+**Implementation — use MCP tools only, do NOT use CLI or Python scripts:**
 
-- If scan finds 0 repos: inform user no GitHub repos found, suggest checking git remote configuration.
-- If no defaults are set after "Done": warn that no default repos are selected.
-- Description generation: when a repo is set as default and has no description, the MCP server auto-generates one from README/CLAUDE.md.
+1. Load the brownfield MCP tool: `ToolSearch query: "+prism brownfield"`
+2. Call scan+register:
+   ```
+   Tool: prism_brownfield
+   Arguments: { "action": "scan" }
+   ```
+   This scans `~/` for GitHub repos and registers them in DB. Existing defaults are preserved.
+
+The scan response `text` already contains a pre-formatted numbered list with `[default]` markers. **Do NOT make any additional MCP calls to list or query repos.**
+
+**Display the repos in a compact 2-column grid** so the user can scan all repos quickly. Format the scan response `text` as two side-by-side columns. Include `*` markers for defaults exactly as they appear in the response.
+
+**If no repos found**, show:
+```
+No GitHub repositories found in your home directory.
+```
+Then stop.
+
+**Step 2: Default Selection**
+
+**IMMEDIATELY after showing the list**, use `AskUserQuestion` with the current default numbers from the scan response:
+
+```json
+{
+  "questions": [{
+    "question": "Which repos to set as default for interviews? Enter numbers like '6, 18, 19'.",
+    "header": "Default Repos",
+    "options": [
+      {"label": "<current default numbers> (Recommended)", "description": "<current default names>"},
+      {"label": "None", "description": "No default repos — interviews will run in greenfield mode"}
+    ],
+    "multiSelect": false
+  }]
+}
+```
+
+The user can select the recommended defaults, choose "None", or type custom numbers.
+
+After the user responds, use ONE MCP call to update all defaults at once:
+
+```
+Tool: prism_brownfield
+Arguments: { "action": "set_defaults", "indices": "<comma-separated IDs>" }
+```
+
+Example: if the user picks IDs 6, 18, 19 → `{ "action": "set_defaults", "indices": "6,18,19" }`
+
+This clears all existing defaults and sets the selected repos as default in one call.
+
+If "None" → `{ "action": "set_defaults", "indices": "" }` to clear all defaults.
+
+**Step 3: Confirmation**
+
+```
+Brownfield defaults updated!
+Defaults: grape, podo-app, podo-backend
+
+These repos will be used as context in interviews.
+```
+
+Or if "None" selected:
+```
+No default repos set. Interviews will run in greenfield mode.
+You can set defaults anytime with: /prism:brownfield
+```
+
+---
+
+### Subcommand: `scan`
+
+Scan only, no default selection prompt. Show the numbered list and stop.
+
+---
+
+### Subcommand: `defaults`
+
+Load the brownfield MCP tool and call:
+```
+Tool: prism_brownfield
+Arguments: { "action": "scan" }
+```
+
+Display only the repos marked with `*` (defaults). If none, show:
+```
+No default repos set. Run '/prism:brownfield' to configure.
+```
+
+---
+
+### Subcommand: `set <indices>`
+
+Directly set defaults without scanning. Parse the comma-separated indices from the user's input and call:
+
+```
+Tool: prism_brownfield
+Arguments: { "action": "set_defaults", "indices": "<indices>" }
+```
+
+Show confirmation with updated defaults.
