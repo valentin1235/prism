@@ -1,4 +1,4 @@
-package main
+package handler
 
 import (
 	"context"
@@ -11,9 +11,11 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
-var allowedDirs []string
+// AllowedDirs holds the list of allowed documentation directories.
+var AllowedDirs []string
 
-func initFilesystem() error {
+// InitFilesystem reads ~/.prism/ontology-docs.json and populates AllowedDirs.
+func InitFilesystem() error {
 	configPath := filepath.Join(os.Getenv("HOME"), ".prism", "ontology-docs.json")
 	data, err := os.ReadFile(configPath)
 	if err != nil {
@@ -42,7 +44,7 @@ func initFilesystem() error {
 		if err != nil || !info.IsDir() {
 			continue
 		}
-		allowedDirs = append(allowedDirs, abs)
+		AllowedDirs = append(AllowedDirs, abs)
 	}
 	return nil
 }
@@ -69,7 +71,7 @@ func isAllowed(path string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("invalid path: %w", err)
 	}
-	for _, dir := range allowedDirs {
+	for _, dir := range AllowedDirs {
 		if abs == dir || strings.HasPrefix(abs, dir+string(os.PathSeparator)) {
 			return abs, nil
 		}
@@ -77,14 +79,16 @@ func isAllowed(path string) (string, error) {
 	return "", fmt.Errorf("access denied: %s is outside allowed directories", path)
 }
 
-func handleListRoots(_ context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	if len(allowedDirs) == 0 {
+// HandleListRoots is the MCP tool handler for prism_docs_roots.
+func HandleListRoots(_ context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	if len(AllowedDirs) == 0 {
 		return mcp.NewToolResultText("No directories configured. Add paths to ~/.prism/docs.json"), nil
 	}
-	return mcp.NewToolResultText(strings.Join(allowedDirs, "\n")), nil
+	return mcp.NewToolResultText(strings.Join(AllowedDirs, "\n")), nil
 }
 
-func handleListDir(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+// HandleListDir is the MCP tool handler for prism_docs_list.
+func HandleListDir(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := request.Params.Arguments
 	path, _ := args["path"].(string)
 	if path == "" {
@@ -112,7 +116,8 @@ func handleListDir(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToo
 	return mcp.NewToolResultText(strings.Join(lines, "\n")), nil
 }
 
-func handleReadFile(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+// HandleReadFile is the MCP tool handler for prism_docs_read.
+func HandleReadFile(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := request.Params.Arguments
 	path, _ := args["path"].(string)
 	if path == "" {
@@ -160,7 +165,8 @@ func handleReadFile(_ context.Context, request mcp.CallToolRequest) (*mcp.CallTo
 	return mcp.NewToolResultText(content), nil
 }
 
-func handleSearchFiles(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+// HandleSearchFiles is the MCP tool handler for prism_docs_search.
+func HandleSearchFiles(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := request.Params.Arguments
 	path, _ := args["path"].(string)
 	pattern, _ := args["pattern"].(string)

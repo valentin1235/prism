@@ -1,4 +1,4 @@
-package main
+package pipeline
 
 import (
 	"context"
@@ -60,7 +60,7 @@ func createTestTask(t *testing.T, topic, model string) (*taskpkg.AnalysisTask, s
 	return task, tmpDir
 }
 
-// --- Tests for readAnalysisConfig ---
+// --- Tests for ReadAnalysisConfig ---
 
 func TestReadAnalysisConfig(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -75,7 +75,7 @@ func TestReadAnalysisConfig(t *testing.T) {
 	data, _ := json.MarshalIndent(cfg, "", "  ")
 	os.WriteFile(filepath.Join(tmpDir, "config.json"), data, 0644)
 
-	got, err := readAnalysisConfig(tmpDir)
+	got, err := ReadAnalysisConfig(tmpDir)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -89,7 +89,7 @@ func TestReadAnalysisConfig(t *testing.T) {
 
 func TestReadAnalysisConfigMissing(t *testing.T) {
 	tmpDir := t.TempDir()
-	_, err := readAnalysisConfig(tmpDir)
+	_, err := ReadAnalysisConfig(tmpDir)
 	if err == nil {
 		t.Fatal("expected error for missing config.json")
 	}
@@ -98,7 +98,7 @@ func TestReadAnalysisConfigMissing(t *testing.T) {
 func TestReadAnalysisConfigInvalid(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.WriteFile(filepath.Join(tmpDir, "config.json"), []byte("not json"), 0644)
-	_, err := readAnalysisConfig(tmpDir)
+	_, err := ReadAnalysisConfig(tmpDir)
 	if err == nil {
 		t.Fatal("expected error for invalid JSON")
 	}
@@ -116,7 +116,7 @@ func TestPipelineFailsOnMissingConfig(t *testing.T) {
 	task.UpdateDirs(task.ID, stateDir, "/tmp/reports")
 	// No config.json written
 
-	runAnalysisPipeline(task)
+	RunAnalysisPipeline(task)
 
 	snap := task.Snapshot()
 	if snap.Status != taskpkg.TaskStatusFailed {
@@ -135,7 +135,7 @@ func TestPipelineStartsWithRunningStatus(t *testing.T) {
 	task, _ := createTestTask(t, "test analysis", "claude-sonnet-4-6")
 
 	// Pipeline will fail at scope (stub returns error), but we can observe the state transitions
-	runAnalysisPipeline(task)
+	RunAnalysisPipeline(task)
 
 	snap := task.Snapshot()
 	// Should have tried to run scope, which fails because stubs return errors
@@ -235,7 +235,7 @@ func TestSpecialistStageProgressTracking(t *testing.T) {
 	task := taskpkg.NewAnalysisTask("ctx-spec", "model", "/state", "/reports", "")
 	task.SetStatus(taskpkg.TaskStatusRunning)
 
-	// Simulate what runAnalysisPipeline does for the specialist stage
+	// Simulate what RunAnalysisPipeline does for the specialist stage
 	numPerspectives := 5
 	task.StartStage(taskpkg.StageSpecialist, "launching 5 specialists")
 	task.SetStageParallel(taskpkg.StageSpecialist, numPerspectives)
@@ -474,7 +474,7 @@ func TestReadAnalysisConfigOptionalFields(t *testing.T) {
 	data, _ := json.MarshalIndent(cfg, "", "  ")
 	os.WriteFile(filepath.Join(tmpDir, "config.json"), data, 0644)
 
-	got, err := readAnalysisConfig(tmpDir)
+	got, err := ReadAnalysisConfig(tmpDir)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

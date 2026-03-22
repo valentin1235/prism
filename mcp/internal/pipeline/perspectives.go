@@ -1,4 +1,4 @@
-package main
+package pipeline
 
 import (
 	"encoding/json"
@@ -13,7 +13,7 @@ import (
 // 2. Generating the JSON schema string passed to claude CLI via --json-schema
 
 // AnalystPrompt contains the dynamically generated prompt sections for a specialist.
-// Matches perspectives.json → perspectives[].prompt as defined in
+// Matches perspectives.json -> perspectives[].prompt as defined in
 // analyst-prompt-structure.md.
 type AnalystPrompt struct {
 	// Role identity, e.g., "You are the POLICY CONFLICT ANALYST."
@@ -46,10 +46,10 @@ type Perspective struct {
 
 // PerspectiveQualityGate documents which quality checks the perspective set passed.
 type PerspectiveQualityGate struct {
-	AllOrthogonal    bool `json:"all_orthogonal"`
+	AllOrthogonal     bool `json:"all_orthogonal"`
 	AllEvidenceBacked bool `json:"all_evidence_backed"`
-	AllSpecific      bool `json:"all_specific"`
-	AllActionable    bool `json:"all_actionable"`
+	AllSpecific       bool `json:"all_specific"`
+	AllActionable     bool `json:"all_actionable"`
 	MinPerspectivesMet bool `json:"min_perspectives_met"`
 }
 

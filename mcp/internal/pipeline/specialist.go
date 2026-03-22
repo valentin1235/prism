@@ -1,12 +1,17 @@
-package main
+package pipeline
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/heechul/prism-mcp/internal/engine"
+	taskpkg "github.com/heechul/prism-mcp/internal/task"
 )
 
 // SpecialistCommand holds all parameters needed to invoke a claude CLI subprocess
@@ -195,7 +200,7 @@ func LoadSpecialistContext(cfg AnalysisConfig) (SpecialistContext, error) {
 	ctx.SeedSummary = seed.Research.Summary
 
 	// Build ontology scope text block from ontology-scope.json if it exists
-	ctx.OntologyScopeText = loadOntologyScopeText(cfg.StateDir)
+	ctx.OntologyScopeText = LoadOntologyScopeText(cfg.StateDir)
 
 	// Load registered doc paths
 	ctx.DocPaths = LoadOntologyDocPaths()
@@ -203,10 +208,10 @@ func LoadSpecialistContext(cfg AnalysisConfig) (SpecialistContext, error) {
 	return ctx, nil
 }
 
-// loadOntologyScopeText reads ontology-scope.json from the state directory
+// LoadOntologyScopeText reads ontology-scope.json from the state directory
 // and renders it into the text block format defined in ontology-scope-schema.md.
 // Returns empty string with fallback message if file doesn't exist.
-func loadOntologyScopeText(stateDir string) string {
+func LoadOntologyScopeText(stateDir string) string {
 	scopePath := filepath.Join(stateDir, "ontology-scope.json")
 	data, err := os.ReadFile(scopePath)
 	if err != nil {
@@ -216,22 +221,22 @@ func loadOntologyScopeText(stateDir string) string {
 	// Parse the ontology-scope.json structure
 	var scope struct {
 		Sources []struct {
-			ID       int    `json:"id"`
-			Type     string `json:"type"`
-			Path     string `json:"path,omitempty"`
-			URL      string `json:"url,omitempty"`
-			Server   string `json:"server_name,omitempty"`
-			Domain   string `json:"domain,omitempty"`
-			Summary  string `json:"summary,omitempty"`
-			Status   string `json:"status"`
-			Reason   string `json:"reason,omitempty"`
-			Access   struct {
-				Tools         []string `json:"tools,omitempty"`
-				Instructions  string   `json:"instructions,omitempty"`
-				Capabilities  string   `json:"capabilities,omitempty"`
-				GettingStarted string  `json:"getting_started,omitempty"`
-				ErrorHandling string   `json:"error_handling,omitempty"`
-				CachedSummary string   `json:"cached_summary,omitempty"`
+			ID      int    `json:"id"`
+			Type    string `json:"type"`
+			Path    string `json:"path,omitempty"`
+			URL     string `json:"url,omitempty"`
+			Server  string `json:"server_name,omitempty"`
+			Domain  string `json:"domain,omitempty"`
+			Summary string `json:"summary,omitempty"`
+			Status  string `json:"status"`
+			Reason  string `json:"reason,omitempty"`
+			Access  struct {
+				Tools          []string `json:"tools,omitempty"`
+				Instructions   string   `json:"instructions,omitempty"`
+				Capabilities   string   `json:"capabilities,omitempty"`
+				GettingStarted string   `json:"getting_started,omitempty"`
+				ErrorHandling  string   `json:"error_handling,omitempty"`
+				CachedSummary  string   `json:"cached_summary,omitempty"`
 			} `json:"access,omitempty"`
 		} `json:"sources"`
 		CitationFormat map[string]string `json:"citation_format,omitempty"`
@@ -453,7 +458,7 @@ func buildFindingProtocol(sctx SpecialistContext, perspective Perspective) strin
 	sb.WriteString("### 2. Output Findings\n\n")
 	sb.WriteString("Output your findings as a JSON object with this structure:\n\n")
 	sb.WriteString(fmt.Sprintf("- analyst: \"%s\"\n", perspective.ID))
-	sb.WriteString(fmt.Sprintf("- input: Copy the original topic description exactly: \"%s\"\n", truncateForPrompt(sctx.Topic, 200)))
+	sb.WriteString(fmt.Sprintf("- input: Copy the original topic description exactly: \"%s\"\n", TruncateForPrompt(sctx.Topic, 200)))
 	sb.WriteString("- findings: Array of finding objects, each with:\n")
 	sb.WriteString("  - finding: Description of the finding\n")
 	sb.WriteString("  - evidence: Evidence source (file:function:line — detail)\n")
@@ -489,9 +494,9 @@ func BuildAllSpecialistCommands(cfg AnalysisConfig, perspectives []Perspective) 
 	return commands, nil
 }
 
-// truncateForPrompt truncates a string to maxLen runes for prompt inclusion,
+// TruncateForPrompt truncates a string to maxLen runes for prompt inclusion,
 // appending "..." if truncated. Uses []rune conversion for UTF-8 safe truncation.
-func truncateForPrompt(s string, maxLen int) string {
+func TruncateForPrompt(s string, maxLen int) string {
 	if maxLen <= 3 {
 		if maxLen <= 0 {
 			return ""
@@ -503,4 +508,66 @@ func truncateForPrompt(s string, maxLen int) string {
 		return s
 	}
 	return string(runes[:maxLen-3]) + "..."
+}
+
+// RunSpecialistSession runs a single specialist finding session via claude CLI subprocess.
+// It takes a pre-built SpecialistCommand (constructed via BuildAllSpecialistCommands)
+// to avoid redundant LoadSpecialistContext calls per perspective.
+//
+// The subprocess runs in the perspective-specific working directory with no shared state,
+// making it safe for concurrent execution via goroutines.
+//
+// The ctx parameter carries the per-job timeout set by the ParallelExecutor. This function
+// does NOT create its own timeout — the executor manages timeouts centrally to ensure
+// consistent behavior across all parallel jobs.
+func RunSpecialistSession(ctx context.Context, task *taskpkg.AnalysisTask, cmd SpecialistCommand) error {
+	log.Printf("[%s] Specialist %s: starting CLI subprocess (model=%s, maxTurns=%d, workDir=%s)",
+		task.ID, cmd.PerspectiveID, cmd.Model, cmd.MaxTurns, cmd.WorkDir)
+
+	// Run claude CLI with tool access and structured output.
+	// The ctx already carries a per-job timeout from the ParallelExecutor.
+	rawOutput, err := engine.QueryLLMScopedWithToolsAndSchema(
+		ctx,
+		cmd.WorkDir,
+		cmd.Model,
+		cmd.JSONSchema,
+		cmd.SystemPrompt,
+		cmd.UserPrompt,
+		cmd.MaxTurns,
+	)
+	if err != nil {
+		return fmt.Errorf("specialist %s subprocess: %w", cmd.PerspectiveID, err)
+	}
+
+	// Extract JSON from potentially wrapped output
+	jsonStr, err := engine.ExtractJSON(rawOutput)
+	if err != nil {
+		return fmt.Errorf("extract specialist %s JSON: %w (raw length: %d)", cmd.PerspectiveID, err, len(rawOutput))
+	}
+
+	// Parse into SpecialistFindings struct
+	var findings SpecialistFindings
+	if err := json.Unmarshal([]byte(jsonStr), &findings); err != nil {
+		return fmt.Errorf("parse specialist %s findings: %w", cmd.PerspectiveID, err)
+	}
+
+	// Validate: must have at least one finding
+	if len(findings.Findings) == 0 {
+		return fmt.Errorf("specialist %s produced no findings", cmd.PerspectiveID)
+	}
+
+	// Ensure analyst field matches perspective ID
+	if findings.Analyst == "" {
+		findings.Analyst = cmd.PerspectiveID
+	}
+
+	// Write findings.json to the perspective directory
+	if err := WriteSpecialistFindings(cmd.OutputPath, findings); err != nil {
+		return fmt.Errorf("write specialist %s findings: %w", cmd.PerspectiveID, err)
+	}
+
+	log.Printf("[%s] Specialist %s: completed with %d findings -> %s",
+		task.ID, cmd.PerspectiveID, len(findings.Findings), cmd.OutputPath)
+
+	return nil
 }

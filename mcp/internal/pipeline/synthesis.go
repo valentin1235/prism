@@ -1,4 +1,4 @@
-package main
+package pipeline
 
 import (
 	"context"
@@ -89,7 +89,7 @@ func LoadSynthesisContext(cfg AnalysisConfig, perspectives []Perspective) (Synth
 	}
 
 	// Load ontology scope text
-	ctx.OntologyScopeText = loadOntologyScopeText(cfg.StateDir)
+	ctx.OntologyScopeText = LoadOntologyScopeText(cfg.StateDir)
 
 	// Read collected findings from disk
 	cf, err := ReadCollectedFindings(cfg.StateDir)
@@ -145,10 +145,10 @@ func loadReportTemplate(cfg AnalysisConfig) (string, error) {
 	return string(data), nil
 }
 
-// buildSynthesisSystemPrompt constructs the full system prompt for the
+// BuildSynthesisSystemPrompt constructs the full system prompt for the
 // synthesis claude CLI subprocess. Includes all collected data and the
 // report template to fill.
-func buildSynthesisSystemPrompt(sctx SynthesisContext) string {
+func BuildSynthesisSystemPrompt(sctx SynthesisContext) string {
 	var sb strings.Builder
 
 	// --- Section 1: Synthesizer Role Identity ---
@@ -311,8 +311,8 @@ func buildSynthesisSystemPrompt(sctx SynthesisContext) string {
 	return sb.String()
 }
 
-// buildSynthesisUserPrompt constructs the user message for the synthesis subprocess.
-func buildSynthesisUserPrompt(sctx SynthesisContext) string {
+// BuildSynthesisUserPrompt constructs the user message for the synthesis subprocess.
+func BuildSynthesisUserPrompt(sctx SynthesisContext) string {
 	var sb strings.Builder
 
 	sb.WriteString(fmt.Sprintf("Generate the analysis report for topic: %s\n\n", sctx.Topic))
@@ -335,14 +335,14 @@ func buildSynthesisUserPrompt(sctx SynthesisContext) string {
 	return sb.String()
 }
 
-// runSynthesisSession executes the synthesis/report generation via a single claude CLI subprocess.
+// RunSynthesisSession executes the synthesis/report generation via a single claude CLI subprocess.
 // It loads all collected data (findings, verifications, perspectives), builds a comprehensive
 // synthesis prompt, invokes the claude CLI, validates the report has required sections,
 // and writes the final report to the report directory.
 //
 // Unlike specialist and interview stages which run in parallel, synthesis is a single
 // sequential subprocess that consumes all prior stage outputs.
-func runSynthesisSession(ctx context.Context, task *taskpkg.AnalysisTask, cfg AnalysisConfig, perspectives []Perspective, reportPath string) error {
+func RunSynthesisSession(ctx context.Context, task *taskpkg.AnalysisTask, cfg AnalysisConfig, perspectives []Perspective, reportPath string) error {
 	stateDir := task.GetStateDir()
 
 	// Load all synthesis context from disk
@@ -357,8 +357,8 @@ func runSynthesisSession(ctx context.Context, task *taskpkg.AnalysisTask, cfg An
 		sctx.CollectedVerifications != nil)
 
 	// Build prompts
-	systemPrompt := buildSynthesisSystemPrompt(sctx)
-	userPrompt := buildSynthesisUserPrompt(sctx)
+	systemPrompt := BuildSynthesisSystemPrompt(sctx)
+	userPrompt := BuildSynthesisUserPrompt(sctx)
 
 	// Update progress detail
 	task.UpdateStageDetail(taskpkg.StageSynthesis, "invoking synthesis subprocess")
@@ -461,4 +461,3 @@ func extractTemplateSections(template string) []string {
 	}
 	return sections
 }
-

@@ -1,4 +1,4 @@
-package main
+package pipeline
 
 import (
 	"encoding/json"
@@ -529,16 +529,16 @@ func TestTruncateForPrompt(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got := truncateForPrompt(tt.input, tt.maxLen)
+		got := TruncateForPrompt(tt.input, tt.maxLen)
 		if got != tt.want {
-			t.Errorf("truncateForPrompt(%q, %d) = %q, want %q", tt.input, tt.maxLen, got, tt.want)
+			t.Errorf("TruncateForPrompt(%q, %d) = %q, want %q", tt.input, tt.maxLen, got, tt.want)
 		}
 	}
 }
 
 func TestLoadOntologyScopeText_MissingFile(t *testing.T) {
 	tmpDir := t.TempDir()
-	text := loadOntologyScopeText(tmpDir)
+	text := LoadOntologyScopeText(tmpDir)
 	if !strings.Contains(text, "N/A") {
 		t.Errorf("missing ontology scope should return N/A fallback, got: %s", text)
 	}
@@ -581,7 +581,7 @@ func TestLoadOntologyScopeText_ValidFile(t *testing.T) {
 		t.Fatalf("write ontology-scope.json: %v", err)
 	}
 
-	text := loadOntologyScopeText(tmpDir)
+	text := LoadOntologyScopeText(tmpDir)
 
 	// Should contain available doc source
 	if !strings.Contains(text, "API documentation") {
@@ -608,7 +608,7 @@ func TestLoadOntologyScopeText_InvalidJSON(t *testing.T) {
 		t.Fatalf("write: %v", err)
 	}
 
-	text := loadOntologyScopeText(tmpDir)
+	text := LoadOntologyScopeText(tmpDir)
 	if !strings.Contains(text, "N/A") {
 		t.Error("invalid JSON should return N/A fallback")
 	}
@@ -790,7 +790,7 @@ func TestLoadOntologyScopeText_MCPQuerySource(t *testing.T) {
 		t.Fatalf("write: %v", err)
 	}
 
-	text := loadOntologyScopeText(tmpDir)
+	text := LoadOntologyScopeText(tmpDir)
 
 	// Should contain MCP query source details
 	if !strings.Contains(text, "mcp-query: grafana") {

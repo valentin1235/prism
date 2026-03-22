@@ -3,18 +3,19 @@ package main
 import (
 	"log"
 
+	"github.com/heechul/prism-mcp/internal/handler"
 	taskpkg "github.com/heechul/prism-mcp/internal/task"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 func main() {
-	if err := initFilesystem(); err != nil {
+	if err := handler.InitFilesystem(); err != nil {
 		log.Printf("Warning: filesystem init failed: %v", err)
 	}
 
 	// Initialize the task store for analysis orchestration
-	taskStore = taskpkg.NewTaskStore()
+	handler.TaskStore = taskpkg.NewTaskStore()
 
 	s := server.NewMCPServer(
 		"prism-mcp",
@@ -29,7 +30,7 @@ func main() {
 			mcp.WithString("topic", mcp.Description("Short title for the interview. Provide to start a new session.")),
 			mcp.WithString("response", mcp.Description("Answer to the previous question. Required for follow-up rounds.")),
 		),
-		handleInterview,
+		handler.HandleInterview,
 	)
 
 	s.AddTool(
@@ -39,7 +40,7 @@ func main() {
 			mcp.WithNumber("round", mcp.Description("Current loop round (1-based). Defaults to 1. Hard-stops after round 3.")),
 			mcp.WithString("context", mcp.Description("Optional additional context for the DA review (e.g., specific areas of concern)")),
 		),
-		handleDAReview,
+		handler.HandleDAReview,
 	)
 
 	s.AddTool(
@@ -48,7 +49,7 @@ func main() {
 			mcp.WithString("context_id", mcp.Required(), mcp.Description("Context identifier (e.g., incident-abc123, plan-def456, prd-ghi789)")),
 			mcp.WithString("perspective_id", mcp.Required(), mcp.Description("Perspective identifier")),
 		),
-		handleScore,
+		handler.HandleScore,
 	)
 
 	// Analysis orchestration tools
@@ -65,7 +66,7 @@ func main() {
 			mcp.WithString("language", mcp.Description("Language for the final report output (e.g. \"ko\", \"en\", \"ja\"). When omitted, the report is written in English by default")),
 			mcp.WithString("perspective_injection", mcp.Description("Absolute path to a JSON file containing additional perspectives to merge into the generated perspective set after stage1. The file must be a JSON array of perspective objects matching the standard perspective schema.")),
 		),
-		handleAnalyze,
+		handler.HandleAnalyze,
 	)
 
 	s.AddTool(
@@ -73,7 +74,7 @@ func main() {
 			mcp.WithDescription("Query the status and progress of an analysis task by task_id. Returns current stage progress for running tasks, report_path for completed tasks, or error details for failed tasks. Use this to poll after prism_analyze returns a task_id."),
 			mcp.WithString("task_id", mcp.Required(), mcp.Description("The task identifier returned by prism_analyze")),
 		),
-		handleTaskStatus,
+		handler.HandleTaskStatus,
 	)
 
 	s.AddTool(
@@ -81,7 +82,7 @@ func main() {
 			mcp.WithDescription("Cancel a running analysis task. Propagates cancellation to all in-flight subprocess work (specialists, interviews, synthesis). Returns the updated task snapshot. No-op if the task is already completed or failed."),
 			mcp.WithString("task_id", mcp.Required(), mcp.Description("The task identifier returned by prism_analyze")),
 		),
-		handleCancelTask,
+		handler.HandleCancelTask,
 	)
 
 	s.AddTool(
@@ -89,16 +90,16 @@ func main() {
 			mcp.WithDescription("Retrieve the final result of a completed analysis task. Returns the report file path and an executive summary extracted from the report. Only works for completed tasks — returns an error for running, queued, or failed tasks."),
 			mcp.WithString("task_id", mcp.Required(), mcp.Description("The task identifier returned by prism_analyze")),
 		),
-		handleAnalyzeResult,
+		handler.HandleAnalyzeResult,
 	)
 
 	// Filesystem tools (configured via ~/.prism/ontology-docs.json)
-	if len(allowedDirs) > 0 {
+	if len(handler.AllowedDirs) > 0 {
 		s.AddTool(
 			mcp.NewTool("prism_docs_roots",
 				mcp.WithDescription("Returns the list of configured documentation directories."),
 			),
-			handleListRoots,
+			handler.HandleListRoots,
 		)
 
 		s.AddTool(
@@ -106,7 +107,7 @@ func main() {
 				mcp.WithDescription("List contents of a documentation directory. Only works within configured directories."),
 				mcp.WithString("path", mcp.Required(), mcp.Description("Directory path to list")),
 			),
-			handleListDir,
+			handler.HandleListDir,
 		)
 
 		s.AddTool(
@@ -116,7 +117,7 @@ func main() {
 				mcp.WithNumber("head", mcp.Description("Return only the first N lines")),
 				mcp.WithNumber("tail", mcp.Description("Return only the last N lines")),
 			),
-			handleReadFile,
+			handler.HandleReadFile,
 		)
 
 		s.AddTool(
@@ -125,10 +126,10 @@ func main() {
 				mcp.WithString("path", mcp.Required(), mcp.Description("Directory to search in")),
 				mcp.WithString("pattern", mcp.Required(), mcp.Description("Glob pattern to match filenames (e.g., *.md, *payment*)")),
 			),
-			handleSearchFiles,
+			handler.HandleSearchFiles,
 		)
 
-		log.Printf("Filesystem tools enabled: %d directories", len(allowedDirs))
+		log.Printf("Filesystem tools enabled: %d directories", len(handler.AllowedDirs))
 	}
 
 	log.Println("Prism MCP server starting on stdio...")

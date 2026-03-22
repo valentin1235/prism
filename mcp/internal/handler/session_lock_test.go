@@ -1,4 +1,4 @@
-package main
+package handler
 
 import (
 	"fmt"
@@ -63,7 +63,7 @@ func TestParallelSubprocessStateDirIsolation(t *testing.T) {
 // correctly isolates concurrent access to different sessions while
 // serializing access to the same session.
 func TestSessionLockMapParallelSafety(t *testing.T) {
-	lockMap := &sessionLockMap{locks: make(map[string]*sync.Mutex)}
+	lockMap := &SessionLockMap{Locks: make(map[string]*sync.Mutex)}
 
 	const numSessions = 20
 	const opsPerSession = 100
@@ -92,7 +92,7 @@ func TestSessionLockMapParallelSafety(t *testing.T) {
 				persp := fmt.Sprintf("persp-%d", sessionIdx)
 				key := ctx + "/" + persp
 
-				mu := lockMap.get(ctx, persp)
+				mu := lockMap.Get(ctx, persp)
 				mu.Lock()
 				countersMu.Lock()
 				*counters[key]++
@@ -118,7 +118,7 @@ func TestSessionLockMapParallelSafety(t *testing.T) {
 
 	// Verify lock map has exactly numSessions entries
 	lockMap.mu.Lock()
-	numLocks := len(lockMap.locks)
+	numLocks := len(lockMap.Locks)
 	lockMap.mu.Unlock()
 	if numLocks != numSessions {
 		t.Errorf("expected %d session locks, got %d", numSessions, numLocks)
@@ -128,7 +128,7 @@ func TestSessionLockMapParallelSafety(t *testing.T) {
 // TestSessionLockMapSameKey verifies that concurrent get() calls for the
 // same session key return the same mutex instance.
 func TestSessionLockMapSameKey(t *testing.T) {
-	lockMap := &sessionLockMap{locks: make(map[string]*sync.Mutex)}
+	lockMap := &SessionLockMap{Locks: make(map[string]*sync.Mutex)}
 
 	const numGoroutines = 100
 	mutexes := make([]*sync.Mutex, numGoroutines)
@@ -138,7 +138,7 @@ func TestSessionLockMapSameKey(t *testing.T) {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			mutexes[idx] = lockMap.get("same-ctx", "same-persp")
+			mutexes[idx] = lockMap.Get("same-ctx", "same-persp")
 		}(i)
 	}
 	wg.Wait()

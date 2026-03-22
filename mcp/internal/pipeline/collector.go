@@ -1,4 +1,4 @@
-package main
+package pipeline
 
 import (
 	"encoding/json"
@@ -13,25 +13,25 @@ import (
 type SpecialistOutcome string
 
 const (
-	OutcomeSuccess      SpecialistOutcome = "success"
-	OutcomeTimeout      SpecialistOutcome = "timeout"
-	OutcomeCrashed      SpecialistOutcome = "crashed"
-	OutcomeParseError   SpecialistOutcome = "parse_error"
-	OutcomeEmptyOutput  SpecialistOutcome = "empty_output"
-	OutcomeCancelled    SpecialistOutcome = "cancelled"
-	OutcomeRetryFailed  SpecialistOutcome = "retry_exhausted"
+	OutcomeSuccess     SpecialistOutcome = "success"
+	OutcomeTimeout     SpecialistOutcome = "timeout"
+	OutcomeCrashed     SpecialistOutcome = "crashed"
+	OutcomeParseError  SpecialistOutcome = "parse_error"
+	OutcomeEmptyOutput SpecialistOutcome = "empty_output"
+	OutcomeCancelled   SpecialistOutcome = "cancelled"
+	OutcomeRetryFailed SpecialistOutcome = "retry_exhausted"
 )
 
 // SpecialistResult tracks the outcome of a single specialist's analysis,
 // including parsed findings on success or classified error on failure.
 type SpecialistResult struct {
-	PerspectiveID string            `json:"perspective_id"`
-	Outcome       SpecialistOutcome `json:"outcome"`
+	PerspectiveID string              `json:"perspective_id"`
+	Outcome       SpecialistOutcome   `json:"outcome"`
 	Findings      *SpecialistFindings `json:"findings,omitempty"`
-	FindingsCount int               `json:"findings_count"`
-	OutputPath    string            `json:"output_path,omitempty"`
-	ErrorMessage  string            `json:"error_message,omitempty"`
-	ErrorClass    string            `json:"error_class,omitempty"`
+	FindingsCount int                 `json:"findings_count"`
+	OutputPath    string              `json:"output_path,omitempty"`
+	ErrorMessage  string              `json:"error_message,omitempty"`
+	ErrorClass    string              `json:"error_class,omitempty"`
 	// Skipped is true when the specialist was skipped after retry exhaustion.
 	// A skipped specialist means the perspective is missing from the analysis.
 	Skipped bool `json:"skipped"`
@@ -97,7 +97,7 @@ type FailedSpecialist struct {
 // and the underlying failure reason for inclusion in degradation notices.
 type SkippedPerspective struct {
 	PerspectiveID string `json:"perspective_id"`
-	Reason        string `json:"reason"` // human-readable failure reason
+	Reason        string `json:"reason"`        // human-readable failure reason
 	ErrorMessage  string `json:"error_message"` // original error detail
 }
 
@@ -381,15 +381,15 @@ const (
 // InterviewResult tracks the outcome of a single interview/verification session,
 // including parsed verified findings on success or classified error on failure.
 type InterviewResult struct {
-	PerspectiveID string            `json:"perspective_id"`
-	Outcome       InterviewOutcome  `json:"outcome"`
+	PerspectiveID string           `json:"perspective_id"`
+	Outcome       InterviewOutcome `json:"outcome"`
 	Verified      *VerifiedFindings `json:"verified,omitempty"`
-	FindingsCount int               `json:"findings_count"`
-	OutputPath    string            `json:"output_path,omitempty"`
-	Verdict       string            `json:"verdict,omitempty"`
-	Score         float64           `json:"score,omitempty"`
-	ErrorMessage  string            `json:"error_message,omitempty"`
-	ErrorClass    string            `json:"error_class,omitempty"`
+	FindingsCount int              `json:"findings_count"`
+	OutputPath    string           `json:"output_path,omitempty"`
+	Verdict       string           `json:"verdict,omitempty"`
+	Score         float64          `json:"score,omitempty"`
+	ErrorMessage  string           `json:"error_message,omitempty"`
+	ErrorClass    string           `json:"error_class,omitempty"`
 	// Skipped is true when the interview was skipped after retry exhaustion.
 	// A skipped interview means findings for this perspective are unverified.
 	Skipped bool `json:"skipped"`

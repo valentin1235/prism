@@ -1,4 +1,4 @@
-package main
+package handler
 
 import (
 	"context"
@@ -19,12 +19,14 @@ var safeID = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 const maxRounds = 20
 
+// QA represents a single question-answer pair in an interview session.
 type QA struct {
 	Question  string `json:"question"`
 	Answer    string `json:"answer"`
 	Timestamp string `json:"timestamp"`
 }
 
+// InterviewResponse is the JSON structure returned by prism_interview.
 type InterviewResponse struct {
 	ContextID     string `json:"context_id"`
 	PerspectiveID string `json:"perspective_id"`
@@ -40,8 +42,9 @@ func jsonResponse(resp InterviewResponse) string {
 	return string(data)
 }
 
+// InterviewSession represents a single interview session's state.
 type InterviewSession struct {
-	ContextID    string `json:"context_id"`
+	ContextID     string `json:"context_id"`
 	PerspectiveID string `json:"perspective_id"`
 	Topic         string `json:"topic"`
 	Rounds        []QA   `json:"rounds"`
@@ -50,27 +53,28 @@ type InterviewSession struct {
 	UpdatedAt     string `json:"updated_at"`
 }
 
-// sessionLocks provides per-session mutex granularity to enable parallel
+// SessionLocks provides per-session mutex granularity to enable parallel
 // interview execution across different perspective sessions. Each session
 // (identified by contextID + perspectiveID) gets its own lock, so concurrent
 // interviews for different specialists within the same or different analysis
 // tasks do not block each other.
-var sessionLocks = &sessionLockMap{locks: make(map[string]*sync.Mutex)}
+var SessionLocks = &SessionLockMap{Locks: make(map[string]*sync.Mutex)}
 
-type sessionLockMap struct {
+// SessionLockMap manages per-session mutexes.
+type SessionLockMap struct {
 	mu    sync.Mutex
-	locks map[string]*sync.Mutex
+	Locks map[string]*sync.Mutex
 }
 
-// get returns the mutex for a specific session, creating one if needed.
+// Get returns the mutex for a specific session, creating one if needed.
 // The meta-lock (mu) is only held briefly to look up or create the per-session lock.
-func (m *sessionLockMap) get(contextID, perspectiveID string) *sync.Mutex {
+func (m *SessionLockMap) Get(contextID, perspectiveID string) *sync.Mutex {
 	key := contextID + "/" + perspectiveID
 	m.mu.Lock()
-	lk, ok := m.locks[key]
+	lk, ok := m.Locks[key]
 	if !ok {
 		lk = &sync.Mutex{}
-		m.locks[key] = lk
+		m.Locks[key] = lk
 	}
 	m.mu.Unlock()
 	return lk
@@ -147,7 +151,8 @@ func loadFindings(contextID, perspectiveID string) string {
 	return string(data)
 }
 
-func handleInterview(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+// HandleInterview is the MCP tool handler for prism_interview.
+func HandleInterview(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := request.Params.Arguments
 	contextID, _ := args["context_id"].(string)
 	perspectiveID, _ := args["perspective_id"].(string)
@@ -163,7 +168,7 @@ func handleInterview(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 
 	// Per-session lock: only serializes concurrent calls to the SAME session,
 	// allowing parallel interviews across different perspectives/tasks.
-	sessionMu := sessionLocks.get(contextID, perspectiveID)
+	sessionMu := SessionLocks.Get(contextID, perspectiveID)
 	sessionMu.Lock()
 	defer sessionMu.Unlock()
 
@@ -174,7 +179,7 @@ func handleInterview(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 		}
 
 		session := &InterviewSession{
-			ContextID:    contextID,
+			ContextID:     contextID,
 			PerspectiveID: perspectiveID,
 			Topic:         topic,
 			CreatedAt:     time.Now().Format(time.RFC3339),
@@ -223,13 +228,13 @@ func handleInterview(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 		if err := saveSession(session); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("failed to save session: %v", err)), nil
 		}
-		scoreResult, _ := scoreSession(ctx, session)
+		scoreResult, _ := ScoreSession(ctx, session)
 		cont := false
 		return mcp.NewToolResultText(jsonResponse(InterviewResponse{ContextID: contextID, PerspectiveID: perspectiveID, Round: round, Continue: &cont, Reason: "max_rounds", Score: scoreResult})), nil
 	}
 
 	// Score FIRST (all Q&A complete, no pending question)
-	scoreResult, err := scoreSession(ctx, session)
+	scoreResult, err := ScoreSession(ctx, session)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("scoring failed: %v", err)), nil
 	}
@@ -330,4 +335,74 @@ Rules:
 Respond with ONLY the question (or INTERVIEW_COMPLETE), nothing else.`, session.Topic, findingsBlock(session), history.String())
 
 	return engine.QueryLLM(ctx, prompt)
+}
+
+// --- Scorer (merged from scorer.go) ---
+
+// ScoreSession evaluates the clarity of findings + interview Q&A.
+// Returns the raw LLM scoring text.
+func ScoreSession(ctx context.Context, session *InterviewSession) (string, error) {
+	if len(session.Rounds) == 0 {
+		return "", fmt.Errorf("no interview rounds completed yet")
+	}
+
+	var history strings.Builder
+	for i, qa := range session.Rounds {
+		history.WriteString(fmt.Sprintf("Q%d: %s\nA%d: %s\n\n", i+1, qa.Question, i+1, qa.Answer))
+	}
+
+	findings := loadFindings(session.ContextID, session.PerspectiveID)
+	findingsSection := ""
+	if findings != "" {
+		findingsSection = fmt.Sprintf("\nAnalyst findings:\n---\n%s\n---\n", findings)
+	}
+
+	prompt := fmt.Sprintf(`You are an ambiguity scorer evaluating how well-defined a set of requirements are.
+
+Topic: %s
+%s
+Interview transcript:
+%s
+
+Score on these 3 axes (0.0 = completely ambiguous, 1.0 = perfectly clear):
+
+1. **Assumption** (weight: 40%%): Are assumptions from input context verified rather than taken as fact? Are there unvalidated hypotheses treated as confirmed?
+2. **Relevance** (weight: 40%%): Do the findings directly address the original topic/problem? Are the findings actually related to what was asked, or did the analyst find real but unrelated issues? If the topic mentions a concept that doesn't exist in the codebase, did the analyst acknowledge this gap?
+3. **Constraints** (weight: 20%%): Are technical, resource, and scope constraints specified?
+
+Respond in EXACTLY this format (no other text):
+assumption: <score>
+relevance: <score>
+constraints: <score>
+weighted_total: <weighted average>
+pass: <true if weighted_total > 0.8, false otherwise>
+summary: <one-line assessment in same language as topic>`, session.Topic, findingsSection, history.String())
+
+	return engine.QueryLLM(ctx, prompt)
+}
+
+// HandleScore is the MCP tool handler for prism_score.
+func HandleScore(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := request.Params.Arguments
+	contextID, _ := args["context_id"].(string)
+	perspectiveID, _ := args["perspective_id"].(string)
+
+	if contextID == "" || perspectiveID == "" {
+		return mcp.NewToolResultError("context_id and perspective_id are required"), nil
+	}
+	if !safeID.MatchString(contextID) || !safeID.MatchString(perspectiveID) {
+		return mcp.NewToolResultError("context_id and perspective_id must contain only alphanumeric characters, hyphens, and underscores"), nil
+	}
+
+	session, err := loadSession(contextID, perspectiveID)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	result, err := ScoreSession(ctx, session)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("scoring failed: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(result), nil
 }

@@ -1,4 +1,4 @@
-package main
+package handler
 
 import (
 	"context"
@@ -43,9 +43,9 @@ func getResultText(t *testing.T, result *mcp.CallToolResult) string {
 }
 
 func TestHandleAnalyzeResultMissingID(t *testing.T) {
-	taskStore = taskpkg.NewTaskStore()
+	TaskStore = taskpkg.NewTaskStore()
 
-	result, err := handleAnalyzeResult(context.Background(), makeResultRequest(""))
+	result, err := HandleAnalyzeResult(context.Background(), makeResultRequest(""))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -59,9 +59,9 @@ func TestHandleAnalyzeResultMissingID(t *testing.T) {
 }
 
 func TestHandleAnalyzeResultNotFound(t *testing.T) {
-	taskStore = taskpkg.NewTaskStore()
+	TaskStore = taskpkg.NewTaskStore()
 
-	result, err := handleAnalyzeResult(context.Background(), makeResultRequest("analyze-nonexistent"))
+	result, err := HandleAnalyzeResult(context.Background(), makeResultRequest("analyze-nonexistent"))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -75,11 +75,11 @@ func TestHandleAnalyzeResultNotFound(t *testing.T) {
 }
 
 func TestHandleAnalyzeResultStillRunning(t *testing.T) {
-	taskStore = taskpkg.NewTaskStore()
-	task := taskStore.Create("ctx-run", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
+	TaskStore = taskpkg.NewTaskStore()
+	task := TaskStore.Create("ctx-run", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
 	task.SetStatus(taskpkg.TaskStatusRunning)
 
-	result, err := handleAnalyzeResult(context.Background(), makeResultRequest(task.ID))
+	result, err := HandleAnalyzeResult(context.Background(), makeResultRequest(task.ID))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -96,11 +96,11 @@ func TestHandleAnalyzeResultStillRunning(t *testing.T) {
 }
 
 func TestHandleAnalyzeResultQueued(t *testing.T) {
-	taskStore = taskpkg.NewTaskStore()
-	task := taskStore.Create("ctx-q", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
+	TaskStore = taskpkg.NewTaskStore()
+	task := TaskStore.Create("ctx-q", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
 	// Default status is queued
 
-	result, err := handleAnalyzeResult(context.Background(), makeResultRequest(task.ID))
+	result, err := HandleAnalyzeResult(context.Background(), makeResultRequest(task.ID))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -114,11 +114,11 @@ func TestHandleAnalyzeResultQueued(t *testing.T) {
 }
 
 func TestHandleAnalyzeResultFailed(t *testing.T) {
-	taskStore = taskpkg.NewTaskStore()
-	task := taskStore.Create("ctx-fail", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
+	TaskStore = taskpkg.NewTaskStore()
+	task := TaskStore.Create("ctx-fail", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
 	task.SetError("scope analysis exploded")
 
-	result, err := handleAnalyzeResult(context.Background(), makeResultRequest(task.ID))
+	result, err := HandleAnalyzeResult(context.Background(), makeResultRequest(task.ID))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -135,7 +135,7 @@ func TestHandleAnalyzeResultFailed(t *testing.T) {
 }
 
 func TestHandleAnalyzeResultCompleted(t *testing.T) {
-	taskStore = taskpkg.NewTaskStore()
+	TaskStore = taskpkg.NewTaskStore()
 
 	// Create a temp report file with executive summary
 	tmpDir := t.TempDir()
@@ -176,10 +176,10 @@ Raw data available in state directory.
 		t.Fatalf("failed to write test report: %v", err)
 	}
 
-	task := taskStore.Create("ctx-done", "claude-sonnet-4-6", "/tmp/state", tmpDir, "")
+	task := TaskStore.Create("ctx-done", "claude-sonnet-4-6", "/tmp/state", tmpDir, "")
 	task.SetReportPath(reportPath)
 
-	result, err := handleAnalyzeResult(context.Background(), makeResultRequest(task.ID))
+	result, err := HandleAnalyzeResult(context.Background(), makeResultRequest(task.ID))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -212,12 +212,12 @@ Raw data available in state directory.
 }
 
 func TestHandleAnalyzeResultCompletedNoReportPath(t *testing.T) {
-	taskStore = taskpkg.NewTaskStore()
-	task := taskStore.Create("ctx-noreport", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
+	TaskStore = taskpkg.NewTaskStore()
+	task := TaskStore.Create("ctx-noreport", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
 	// Manually set completed without report path (edge case)
 	task.SetStatus(taskpkg.TaskStatusCompleted)
 
-	result, err := handleAnalyzeResult(context.Background(), makeResultRequest(task.ID))
+	result, err := HandleAnalyzeResult(context.Background(), makeResultRequest(task.ID))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -231,11 +231,11 @@ func TestHandleAnalyzeResultCompletedNoReportPath(t *testing.T) {
 }
 
 func TestHandleAnalyzeResultReportFileUnreadable(t *testing.T) {
-	taskStore = taskpkg.NewTaskStore()
-	task := taskStore.Create("ctx-unreadable", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
+	TaskStore = taskpkg.NewTaskStore()
+	task := TaskStore.Create("ctx-unreadable", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
 	task.SetReportPath("/nonexistent/path/report.md")
 
-	result, err := handleAnalyzeResult(context.Background(), makeResultRequest(task.ID))
+	result, err := HandleAnalyzeResult(context.Background(), makeResultRequest(task.ID))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -315,7 +315,7 @@ Other stuff.`,
 				t.Fatalf("write test file: %v", err)
 			}
 
-			summary, err := extractReportSummary(path)
+			summary, err := ExtractReportSummary(path)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -342,7 +342,7 @@ Sub content.
 Content C.`
 
 	// Extract Section A
-	a := extractSection(content, "Section A")
+	a := ExtractSection(content, "Section A")
 	if !strings.Contains(a, "Content A here.") {
 		t.Errorf("expected Section A content, got %q", a)
 	}
@@ -351,7 +351,7 @@ Content C.`
 	}
 
 	// Extract Section B (should include sub-heading content)
-	b := extractSection(content, "Section B")
+	b := ExtractSection(content, "Section B")
 	if !strings.Contains(b, "Content B here.") {
 		t.Errorf("expected Section B content, got %q", b)
 	}
@@ -360,7 +360,7 @@ Content C.`
 	}
 
 	// Extract non-existent section
-	none := extractSection(content, "Nonexistent")
+	none := ExtractSection(content, "Nonexistent")
 	if none != "" {
 		t.Errorf("expected empty for nonexistent section, got %q", none)
 	}

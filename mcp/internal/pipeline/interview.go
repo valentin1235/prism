@@ -1,4 +1,4 @@
-package main
+package pipeline
 
 import (
 	"encoding/json"
@@ -52,12 +52,12 @@ type InterviewCommand struct {
 
 // VerifiedFindings represents the structured output from a verification session.
 type VerifiedFindings struct {
-	Analyst  string           `json:"analyst"`
-	Topic    string           `json:"topic"`
-	Verdict  string           `json:"verdict"`
+	Analyst  string            `json:"analyst"`
+	Topic    string            `json:"topic"`
+	Verdict  string            `json:"verdict"`
 	Score    VerificationScore `json:"score"`
 	Findings []VerifiedFinding `json:"findings"`
-	Summary  string           `json:"summary"`
+	Summary  string            `json:"summary"`
 }
 
 // VerificationScore holds the scoring axes for interview verification.
@@ -217,7 +217,7 @@ func LoadInterviewContext(cfg AnalysisConfig) (InterviewContext, error) {
 	ctx.SeedSummary = seed.Research.Summary
 
 	// Build ontology scope text block
-	ctx.OntologyScopeText = loadOntologyScopeText(cfg.StateDir)
+	ctx.OntologyScopeText = LoadOntologyScopeText(cfg.StateDir)
 
 	// Load registered doc paths
 	ctx.DocPaths = LoadOntologyDocPaths()

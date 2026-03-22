@@ -1,4 +1,4 @@
-package main
+package pipeline
 
 import (
 	"encoding/json"
@@ -164,10 +164,10 @@ func TestExtractJSON_ObjectBeforeArray(t *testing.T) {
 	}
 }
 
-// --- Tests for runSeedAnalysis integration ---
+// --- Tests for RunSeedAnalysis integration ---
 
 func TestRunSeedAnalysis_WritesOutputFile(t *testing.T) {
-	// This test verifies the file I/O and validation parts of runSeedAnalysis
+	// This test verifies the file I/O and validation parts of RunSeedAnalysis
 	// by pre-creating a seed-analysis.json and verifying it can be read back.
 	// The actual claude CLI call is tested via integration tests.
 	tmpDir := t.TempDir()
@@ -205,10 +205,10 @@ func TestRunSeedAnalysis_WritesOutputFile(t *testing.T) {
 	}
 }
 
-// --- Tests for runPerspectiveGeneration integration ---
+// --- Tests for RunPerspectiveGeneration integration ---
 
 func TestRunPerspectiveGeneration_WritesAndValidatesOutput(t *testing.T) {
-	// This test verifies the validation and file I/O parts of runPerspectiveGeneration.
+	// This test verifies the validation and file I/O parts of RunPerspectiveGeneration.
 	tmpDir := t.TempDir()
 
 	perspectives := PerspectivesOutput{
@@ -276,7 +276,7 @@ func TestRunPerspectiveGeneration_WritesAndValidatesOutput(t *testing.T) {
 	}
 }
 
-// --- Tests for runDAReviewLoop file operations ---
+// --- Tests for RunDAReviewLoop file operations ---
 
 func TestRunDAReviewLoop_SeedAnalysisFileRequired(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -290,7 +290,7 @@ func TestRunDAReviewLoop_SeedAnalysisFileRequired(t *testing.T) {
 	}
 
 	// No seed-analysis.json exists — should fail
-	err := runDAReviewLoop(task, cfg)
+	err := RunDAReviewLoop(task, cfg)
 	if err == nil {
 		t.Fatal("expected error when seed-analysis.json is missing")
 	}
@@ -478,10 +478,10 @@ func TestStage1OutputPaths(t *testing.T) {
 
 func TestStage1FileFlow_SeedToPerspectives(t *testing.T) {
 	// Simulate the complete Stage 1 file flow:
-	// 1. Write seed-analysis.json (as runSeedAnalysis would)
-	// 2. Read it back (as runDAReviewLoop would)
+	// 1. Write seed-analysis.json (as RunSeedAnalysis would)
+	// 2. Read it back (as RunDAReviewLoop would)
 	// 3. Update da_passed (as DA review pass would)
-	// 4. Read for perspective gen (as runPerspectiveGeneration would)
+	// 4. Read for perspective gen (as RunPerspectiveGeneration would)
 	// 5. Write perspectives.json
 
 	tmpDir := t.TempDir()

@@ -1,8 +1,6 @@
-package main
+package pipeline
 
 import (
-	"context"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,7 +8,6 @@ import (
 	"time"
 
 	taskpkg "github.com/heechul/prism-mcp/internal/task"
-	"github.com/mark3labs/mcp-go/mcp"
 )
 
 func TestBuildSynthesisSystemPrompt(t *testing.T) {
@@ -123,7 +120,7 @@ func TestBuildSynthesisSystemPrompt(t *testing.T) {
 		ReportTemplate:    "## Executive Summary\n[placeholder]\n## Appendix\n[placeholder]",
 	}
 
-	prompt := buildSynthesisSystemPrompt(sctx)
+	prompt := BuildSynthesisSystemPrompt(sctx)
 
 	// Verify key sections are present
 	checks := []struct {
@@ -201,7 +198,7 @@ func TestBuildSynthesisSystemPromptDegradedMode(t *testing.T) {
 		ReportTemplate:         "## Executive Summary\n",
 	}
 
-	prompt := buildSynthesisSystemPrompt(sctx)
+	prompt := BuildSynthesisSystemPrompt(sctx)
 
 	// Should contain degradation notice
 	if !strings.Contains(prompt, "could not be completed") {
@@ -230,7 +227,7 @@ func TestBuildSynthesisUserPrompt(t *testing.T) {
 		},
 	}
 
-	prompt := buildSynthesisUserPrompt(sctx)
+	prompt := BuildSynthesisUserPrompt(sctx)
 
 	if !strings.Contains(prompt, "Performance analysis") {
 		t.Error("user prompt should contain topic")
@@ -561,7 +558,7 @@ func TestBuildSynthesisSystemPromptMissingPerspectives(t *testing.T) {
 		ReportTemplate: "## Executive Summary\n",
 	}
 
-	prompt := buildSynthesisSystemPrompt(sctx)
+	prompt := BuildSynthesisSystemPrompt(sctx)
 
 	// Should contain Missing Perspectives section
 	if !strings.Contains(prompt, "Missing Perspectives") {
@@ -621,7 +618,7 @@ func TestBuildSynthesisSystemPromptNoMissingPerspectives(t *testing.T) {
 		ReportTemplate: "template",
 	}
 
-	prompt := buildSynthesisSystemPrompt(sctx)
+	prompt := BuildSynthesisSystemPrompt(sctx)
 
 	// Should NOT contain the missing perspectives table (no failures)
 	if strings.Contains(prompt, "perspective(s)** could not be fully completed") {
@@ -808,92 +805,6 @@ func TestRunSynthesisSessionWritesReport(t *testing.T) {
 	}
 }
 
-// TestReportDirCreatedByHandleAnalyze verifies that handleAnalyze pre-creates
-// the report directory at ~/.prism/reports/analyze-{id}/ before launching the pipeline.
-func TestReportDirCreatedByHandleAnalyze(t *testing.T) {
-	tmpDir := t.TempDir()
-	// Override prismBaseDir for testing
-	origBase := prismBaseDir
-	prismBaseDir = tmpDir
-	defer func() { prismBaseDir = origBase }()
-
-	taskStore = taskpkg.NewTaskStore()
-
-	// Create the base directories
-	os.MkdirAll(filepath.Join(tmpDir, "state"), 0755)
-	os.MkdirAll(filepath.Join(tmpDir, "reports"), 0755)
-
-	// Build a minimal analyze request
-	args := map[string]interface{}{
-		"topic": "Test report dir creation",
-		"model": "claude-sonnet-4-6",
-	}
-	req := mcp.CallToolRequest{
-		Params: struct {
-			Name      string                 `json:"name"`
-			Arguments map[string]interface{} `json:"arguments,omitempty"`
-			Meta      *struct {
-				ProgressToken mcp.ProgressToken `json:"progressToken,omitempty"`
-			} `json:"_meta,omitempty"`
-		}{
-			Arguments: args,
-		},
-	}
-
-	// Use a cancellable context so the background pipeline goroutine
-	// (which spawns Claude CLI subprocesses) is cleaned up after verification.
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	result, err := handleAnalyze(ctx, req)
-	if err != nil {
-		t.Fatalf("handleAnalyze error: %v", err)
-	}
-	if result.IsError {
-		t.Fatalf("handleAnalyze returned error: %v", result.Content)
-	}
-
-	// Parse response to get task ID
-	text := result.Content[0].(mcp.TextContent).Text
-	var snap taskpkg.TaskSnapshot
-	if err := json.Unmarshal([]byte(text), &snap); err != nil {
-		t.Fatalf("failed to parse response: %v", err)
-	}
-
-	// Verify report directory was created
-	expectedReportDir := filepath.Join(tmpDir, "reports", snap.ID)
-	info, err := os.Stat(expectedReportDir)
-	if err != nil {
-		t.Fatalf("report directory %s should exist: %v", expectedReportDir, err)
-	}
-	if !info.IsDir() {
-		t.Fatal("report path should be a directory")
-	}
-
-	// Verify state directory was also created
-	expectedStateDir := filepath.Join(tmpDir, "state", snap.ID)
-	info, err = os.Stat(expectedStateDir)
-	if err != nil {
-		t.Fatalf("state directory %s should exist: %v", expectedStateDir, err)
-	}
-	if !info.IsDir() {
-		t.Fatal("state path should be a directory")
-	}
-
-	// Verify config.json contains the correct report_dir
-	configData, err := os.ReadFile(filepath.Join(expectedStateDir, "config.json"))
-	if err != nil {
-		t.Fatalf("config.json should exist: %v", err)
-	}
-	var config map[string]interface{}
-	if err := json.Unmarshal(configData, &config); err != nil {
-		t.Fatalf("failed to parse config.json: %v", err)
-	}
-	if config["report_dir"] != expectedReportDir {
-		t.Errorf("config.json report_dir should be %s, got %s", expectedReportDir, config["report_dir"])
-	}
-}
-
 func TestSynthesisPromptVerificationScoresTable(t *testing.T) {
 	sctx := SynthesisContext{
 		Topic:        "Test",
@@ -929,7 +840,7 @@ func TestSynthesisPromptVerificationScoresTable(t *testing.T) {
 		ReportTemplate: "template",
 	}
 
-	prompt := buildSynthesisSystemPrompt(sctx)
+	prompt := BuildSynthesisSystemPrompt(sctx)
 
 	// Must contain markdown table headers for verification scores
 	if !strings.Contains(prompt, "| Analyst | Verdict | Assumption | Relevance | Constraints | Weighted Total |") {

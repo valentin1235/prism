@@ -1,4 +1,4 @@
-package main
+package handler
 
 import (
 	"context"
@@ -29,9 +29,9 @@ func makeStatusRequest(taskID string) mcp.CallToolRequest {
 }
 
 func TestHandleTaskStatusMissingID(t *testing.T) {
-	taskStore = taskpkg.NewTaskStore()
+	TaskStore = taskpkg.NewTaskStore()
 
-	result, err := handleTaskStatus(context.Background(), makeStatusRequest(""))
+	result, err := HandleTaskStatus(context.Background(), makeStatusRequest(""))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -41,7 +41,7 @@ func TestHandleTaskStatusMissingID(t *testing.T) {
 }
 
 func TestHandleTaskStatusNotFound(t *testing.T) {
-	taskStore = taskpkg.NewTaskStore()
+	TaskStore = taskpkg.NewTaskStore()
 
 	// Table-driven test for various unknown/lost/malformed task_ids
 	tests := []struct {
@@ -79,7 +79,7 @@ func TestHandleTaskStatusNotFound(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := handleTaskStatus(context.Background(), makeStatusRequest(tt.taskID))
+			result, err := HandleTaskStatus(context.Background(), makeStatusRequest(tt.taskID))
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -99,10 +99,10 @@ func TestHandleTaskStatusNotFound(t *testing.T) {
 }
 
 func TestHandleTaskStatusWhitespaceOnly(t *testing.T) {
-	taskStore = taskpkg.NewTaskStore()
+	TaskStore = taskpkg.NewTaskStore()
 
 	// Whitespace-only task_id should be treated as missing (empty after trim)
-	result, err := handleTaskStatus(context.Background(), makeStatusRequest("   "))
+	result, err := HandleTaskStatus(context.Background(), makeStatusRequest("   "))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -116,14 +116,14 @@ func TestHandleTaskStatusWhitespaceOnly(t *testing.T) {
 }
 
 func TestHandleTaskStatusRemovedTask(t *testing.T) {
-	taskStore = taskpkg.NewTaskStore()
+	TaskStore = taskpkg.NewTaskStore()
 
 	// Create a task, then remove it (simulates lost state or cleanup)
-	task := taskStore.Create("ctx-removed", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
+	task := TaskStore.Create("ctx-removed", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
 	taskID := task.ID
 
 	// Verify it exists first
-	result, err := handleTaskStatus(context.Background(), makeStatusRequest(taskID))
+	result, err := HandleTaskStatus(context.Background(), makeStatusRequest(taskID))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -132,10 +132,10 @@ func TestHandleTaskStatusRemovedTask(t *testing.T) {
 	}
 
 	// Remove the task (simulates server restart losing in-memory state)
-	taskStore.Remove(taskID)
+	TaskStore.Remove(taskID)
 
 	// Now polling should return "not found"
-	result, err = handleTaskStatus(context.Background(), makeStatusRequest(taskID))
+	result, err = HandleTaskStatus(context.Background(), makeStatusRequest(taskID))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -154,15 +154,15 @@ func TestHandleTaskStatusRemovedTask(t *testing.T) {
 func TestHandleTaskStatusServerRestart(t *testing.T) {
 	// Simulate server restart: old task_id from previous session
 	// is polled against a fresh (empty) TaskStore
-	taskStore = taskpkg.NewTaskStore()
-	oldTask := taskStore.Create("ctx-old", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
+	TaskStore = taskpkg.NewTaskStore()
+	oldTask := TaskStore.Create("ctx-old", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
 	oldTaskID := oldTask.ID
 
 	// "Restart" — replace the store with a fresh one
-	taskStore = taskpkg.NewTaskStore()
+	TaskStore = taskpkg.NewTaskStore()
 
 	// Polling the old task_id should return "not found"
-	result, err := handleTaskStatus(context.Background(), makeStatusRequest(oldTaskID))
+	result, err := HandleTaskStatus(context.Background(), makeStatusRequest(oldTaskID))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -176,10 +176,10 @@ func TestHandleTaskStatusServerRestart(t *testing.T) {
 }
 
 func TestHandleTaskStatusQueued(t *testing.T) {
-	taskStore = taskpkg.NewTaskStore()
-	task := taskStore.Create("ctx-test", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
+	TaskStore = taskpkg.NewTaskStore()
+	task := TaskStore.Create("ctx-test", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
 
-	result, err := handleTaskStatus(context.Background(), makeStatusRequest(task.ID))
+	result, err := HandleTaskStatus(context.Background(), makeStatusRequest(task.ID))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -206,12 +206,12 @@ func TestHandleTaskStatusQueued(t *testing.T) {
 }
 
 func TestHandleTaskStatusRunning(t *testing.T) {
-	taskStore = taskpkg.NewTaskStore()
-	task := taskStore.Create("ctx-running", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
+	TaskStore = taskpkg.NewTaskStore()
+	task := TaskStore.Create("ctx-running", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
 	task.SetStatus(taskpkg.TaskStatusRunning)
 	task.StartStage(taskpkg.StageScope, "analyzing seed")
 
-	result, err := handleTaskStatus(context.Background(), makeStatusRequest(task.ID))
+	result, err := HandleTaskStatus(context.Background(), makeStatusRequest(task.ID))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -235,11 +235,11 @@ func TestHandleTaskStatusRunning(t *testing.T) {
 }
 
 func TestHandleTaskStatusCompleted(t *testing.T) {
-	taskStore = taskpkg.NewTaskStore()
-	task := taskStore.Create("ctx-done", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
+	TaskStore = taskpkg.NewTaskStore()
+	task := TaskStore.Create("ctx-done", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
 	task.SetReportPath("/tmp/reports/final.md")
 
-	result, err := handleTaskStatus(context.Background(), makeStatusRequest(task.ID))
+	result, err := HandleTaskStatus(context.Background(), makeStatusRequest(task.ID))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -259,11 +259,11 @@ func TestHandleTaskStatusCompleted(t *testing.T) {
 }
 
 func TestHandleTaskStatusFailed(t *testing.T) {
-	taskStore = taskpkg.NewTaskStore()
-	task := taskStore.Create("ctx-fail", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
+	TaskStore = taskpkg.NewTaskStore()
+	task := TaskStore.Create("ctx-fail", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
 	task.SetError("scope analysis failed")
 
-	result, err := handleTaskStatus(context.Background(), makeStatusRequest(task.ID))
+	result, err := HandleTaskStatus(context.Background(), makeStatusRequest(task.ID))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -283,8 +283,8 @@ func TestHandleTaskStatusFailed(t *testing.T) {
 }
 
 func TestHandleTaskStatusParallelProgress(t *testing.T) {
-	taskStore = taskpkg.NewTaskStore()
-	task := taskStore.Create("ctx-parallel", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
+	TaskStore = taskpkg.NewTaskStore()
+	task := TaskStore.Create("ctx-parallel", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
 	task.SetStatus(taskpkg.TaskStatusRunning)
 	task.CompleteStage(taskpkg.StageScope, "done")
 	task.StartStage(taskpkg.StageSpecialist, "running 5 specialists")
@@ -293,7 +293,7 @@ func TestHandleTaskStatusParallelProgress(t *testing.T) {
 	task.IncrStageCompleted(taskpkg.StageSpecialist)
 	task.IncrStageFailed(taskpkg.StageSpecialist)
 
-	result, err := handleTaskStatus(context.Background(), makeStatusRequest(task.ID))
+	result, err := HandleTaskStatus(context.Background(), makeStatusRequest(task.ID))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

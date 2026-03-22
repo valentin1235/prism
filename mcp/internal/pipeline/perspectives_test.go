@@ -1,4 +1,4 @@
-package main
+package pipeline
 
 import (
 	"encoding/json"
@@ -279,9 +279,9 @@ func TestLoadInjectedPerspectives_ValidFile(t *testing.T) {
 	}
 
 	// Load and verify
-	got, err := loadInjectedPerspectives(injectionPath)
+	got, err := LoadInjectedPerspectives(injectionPath)
 	if err != nil {
-		t.Fatalf("loadInjectedPerspectives: %v", err)
+		t.Fatalf("LoadInjectedPerspectives: %v", err)
 	}
 	if len(got) != 1 {
 		t.Fatalf("expected 1 injected perspective, got %d", len(got))
@@ -295,7 +295,7 @@ func TestLoadInjectedPerspectives_ValidFile(t *testing.T) {
 }
 
 func TestLoadInjectedPerspectives_FileNotFound(t *testing.T) {
-	_, err := loadInjectedPerspectives("/nonexistent/path/injection.json")
+	_, err := LoadInjectedPerspectives("/nonexistent/path/injection.json")
 	if err == nil {
 		t.Fatal("expected error for nonexistent file")
 	}
@@ -306,7 +306,7 @@ func TestLoadInjectedPerspectives_InvalidJSON(t *testing.T) {
 	path := filepath.Join(tmpDir, "bad.json")
 	os.WriteFile(path, []byte("{not valid json"), 0644)
 
-	_, err := loadInjectedPerspectives(path)
+	_, err := LoadInjectedPerspectives(path)
 	if err == nil {
 		t.Fatal("expected error for invalid JSON")
 	}
@@ -321,7 +321,7 @@ func TestMergeInjectedPerspectives_AppendsNew(t *testing.T) {
 		{ID: "ux-impact", Name: "UX Impact"},
 	}
 
-	merged := mergeInjectedPerspectives(generated, injected)
+	merged := MergeInjectedPerspectives(generated, injected)
 
 	if len(merged) != 3 {
 		t.Fatalf("expected 3 perspectives after merge, got %d", len(merged))
@@ -346,7 +346,7 @@ func TestMergeInjectedPerspectives_DeduplicatesByID(t *testing.T) {
 		{ID: "ux-impact", Name: "UX Impact"},
 	}
 
-	merged := mergeInjectedPerspectives(generated, injected)
+	merged := MergeInjectedPerspectives(generated, injected)
 
 	if len(merged) != 3 {
 		t.Fatalf("expected 3 perspectives (1 deduped), got %d", len(merged))
@@ -367,7 +367,7 @@ func TestMergeInjectedPerspectives_EmptyInjected(t *testing.T) {
 		{ID: "root-cause"},
 	}
 
-	merged := mergeInjectedPerspectives(generated, []Perspective{})
+	merged := MergeInjectedPerspectives(generated, []Perspective{})
 
 	if len(merged) != 2 {
 		t.Fatalf("expected 2 perspectives (no injection), got %d", len(merged))
@@ -384,7 +384,7 @@ func TestMergeInjectedPerspectives_DoesNotMutateOriginal(t *testing.T) {
 
 	// Copy original length
 	origLen := len(generated)
-	_ = mergeInjectedPerspectives(generated, injected)
+	_ = MergeInjectedPerspectives(generated, injected)
 
 	// Original slice should not be mutated
 	if len(generated) != origLen {
@@ -425,13 +425,13 @@ func TestMergeInjectedPerspectives_WrittenToDisk(t *testing.T) {
 	os.WriteFile(injectionPath, injData, 0644)
 
 	// Load injected
-	loaded, err := loadInjectedPerspectives(injectionPath)
+	loaded, err := LoadInjectedPerspectives(injectionPath)
 	if err != nil {
 		t.Fatalf("load injected: %v", err)
 	}
 
 	// Merge
-	generated.Perspectives = mergeInjectedPerspectives(generated.Perspectives, loaded)
+	generated.Perspectives = MergeInjectedPerspectives(generated.Perspectives, loaded)
 
 	// Write merged result back
 	if err := WritePerspectives(perspPath, generated); err != nil {
@@ -478,7 +478,7 @@ func TestReadAnalysisConfigPerspectiveInjection(t *testing.T) {
 	data, _ := json.MarshalIndent(cfg, "", "  ")
 	os.WriteFile(filepath.Join(tmpDir, "config.json"), data, 0644)
 
-	got, err := readAnalysisConfig(tmpDir)
+	got, err := ReadAnalysisConfig(tmpDir)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -500,7 +500,7 @@ func TestReadAnalysisConfigNoPerspectiveInjection(t *testing.T) {
 	data, _ := json.MarshalIndent(cfg, "", "  ")
 	os.WriteFile(filepath.Join(tmpDir, "config.json"), data, 0644)
 
-	got, err := readAnalysisConfig(tmpDir)
+	got, err := ReadAnalysisConfig(tmpDir)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
