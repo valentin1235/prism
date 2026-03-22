@@ -99,13 +99,21 @@ func (s *Store) BulkRegister(repos []Repo) (int, error) {
 	defer stmt.Close()
 
 	count := 0
+	var errs []string
 	for _, r := range repos {
 		if _, err := stmt.Exec(r.Path, r.Name); err != nil {
+			errs = append(errs, fmt.Sprintf("register %s: %v", r.Path, err))
 			continue
 		}
 		count++
 	}
-	return count, tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	if len(errs) > 0 {
+		return count, fmt.Errorf("%d rows failed: %s", len(errs), strings.Join(errs, "; "))
+	}
+	return count, nil
 }
 
 // List returns repos with pagination. If defaultOnly is true, returns only defaults.
@@ -146,7 +154,7 @@ func (s *Store) List(offset, limit int, defaultOnly bool) ([]Repo, int, error) {
 	for rows.Next() {
 		var r Repo
 		if err := rows.Scan(&r.RowID, &r.Path, &r.Name, &r.Desc, &r.IsDefault, &r.RegisteredAt); err != nil {
-			continue
+			return nil, 0, fmt.Errorf("scan row: %w", err)
 		}
 		repos = append(repos, r)
 	}
@@ -178,6 +186,14 @@ func (s *Store) SetDefaultsByRowIDs(ids []int64) error {
 	}
 	defer tx.Rollback()
 
+	// Validate all IDs exist before mutating
+	for _, id := range ids {
+		var exists int
+		if err := tx.QueryRow("SELECT 1 FROM brownfield_repos WHERE rowid = ?", id).Scan(&exists); err != nil {
+			return fmt.Errorf("rowid %d does not exist", id)
+		}
+	}
+
 	if _, err := tx.Exec("UPDATE brownfield_repos SET is_default = 0"); err != nil {
 		return err
 	}
@@ -200,8 +216,15 @@ func (s *Store) SetDefaultsByRowIDs(ids []int64) error {
 func (s *Store) UpdateDesc(path, desc string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	_, err := s.db.Exec("UPDATE brownfield_repos SET desc = ? WHERE path = ?", desc, path)
-	return err
+	res, err := s.db.Exec("UPDATE brownfield_repos SET desc = ? WHERE path = ?", desc, path)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("repo not found: %s", path)
+	}
+	return nil
 }
 
 // Close closes the database connection.

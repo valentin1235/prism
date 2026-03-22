@@ -45,8 +45,8 @@ func GenerateDesc(ctx context.Context, repoPath string) (string, error) {
 	if len(desc) >= 2 && desc[0] == '"' && desc[len(desc)-1] == '"' {
 		desc = desc[1 : len(desc)-1]
 	}
-	if len(desc) > maxDescLen {
-		desc = desc[:maxDescLen]
+	if runes := []rune(desc); len(runes) > maxDescLen {
+		desc = string(runes[:maxDescLen])
 	}
 	return desc, nil
 }
@@ -60,8 +60,8 @@ func readReadme(repoPath string) string {
 			continue
 		}
 		content := string(data)
-		if len(content) > maxReadmeChars {
-			content = content[:maxReadmeChars]
+		if runes := []rune(content); len(runes) > maxReadmeChars {
+			content = string(runes[:maxReadmeChars])
 		}
 		return content
 	}

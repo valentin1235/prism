@@ -8,24 +8,29 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
 // store is the package-level singleton, initialized by InitStore.
-var store *Store
+var (
+	store     *Store
+	storeOnce sync.Once
+	storeErr  error
+)
 
-// InitStore opens the brownfield database. Safe to call multiple times.
+// InitStore opens the brownfield database. Safe to call multiple times (sync.Once).
 func InitStore() error {
-	if store != nil {
-		return nil
-	}
-	s, err := NewStore()
-	if err != nil {
-		return err
-	}
-	store = s
-	return nil
+	storeOnce.Do(func() {
+		s, err := NewStore()
+		if err != nil {
+			storeErr = err
+			return
+		}
+		store = s
+	})
+	return storeErr
 }
 
 // HandleBrownfield is the MCP tool handler for prism_brownfield.
@@ -76,6 +81,17 @@ func inferAction(args map[string]interface{}) string {
 
 func handleScan(ctx context.Context, args map[string]interface{}) (*mcp.CallToolResult, error) {
 	scanRoot, _ := args["scan_root"].(string)
+	if scanRoot != "" {
+		abs, err := filepath.Abs(scanRoot)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("invalid scan_root: %v", err)), nil
+		}
+		home, _ := os.UserHomeDir()
+		if !strings.HasPrefix(abs, home) {
+			return mcp.NewToolResultError("scan_root must be within home directory"), nil
+		}
+		scanRoot = abs
+	}
 	repos, err := ScanHomeForRepos(scanRoot)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
@@ -239,6 +255,16 @@ func handleGenerateDesc(ctx context.Context, args map[string]interface{}) (*mcp.
 	if path == "" {
 		return mcp.NewToolResultError("path is required for generate_desc action"), nil
 	}
+
+	// Resolve path consistently with handleRegister
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("invalid path: %v", err)), nil
+	}
+	if evalPath, err := filepath.EvalSymlinks(abs); err == nil {
+		abs = evalPath
+	}
+	path = abs
 
 	desc, err := GenerateDesc(ctx, path)
 	if err != nil {
