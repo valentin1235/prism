@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	taskpkg "github.com/heechul/prism-mcp/internal/task"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
@@ -42,7 +43,7 @@ func getResultText(t *testing.T, result *mcp.CallToolResult) string {
 }
 
 func TestHandleAnalyzeResultMissingID(t *testing.T) {
-	taskStore = NewTaskStore()
+	taskStore = taskpkg.NewTaskStore()
 
 	result, err := handleAnalyzeResult(context.Background(), makeResultRequest(""))
 	if err != nil {
@@ -58,7 +59,7 @@ func TestHandleAnalyzeResultMissingID(t *testing.T) {
 }
 
 func TestHandleAnalyzeResultNotFound(t *testing.T) {
-	taskStore = NewTaskStore()
+	taskStore = taskpkg.NewTaskStore()
 
 	result, err := handleAnalyzeResult(context.Background(), makeResultRequest("analyze-nonexistent"))
 	if err != nil {
@@ -74,9 +75,9 @@ func TestHandleAnalyzeResultNotFound(t *testing.T) {
 }
 
 func TestHandleAnalyzeResultStillRunning(t *testing.T) {
-	taskStore = NewTaskStore()
+	taskStore = taskpkg.NewTaskStore()
 	task := taskStore.Create("ctx-run", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
-	task.SetStatus(TaskStatusRunning)
+	task.SetStatus(taskpkg.TaskStatusRunning)
 
 	result, err := handleAnalyzeResult(context.Background(), makeResultRequest(task.ID))
 	if err != nil {
@@ -95,7 +96,7 @@ func TestHandleAnalyzeResultStillRunning(t *testing.T) {
 }
 
 func TestHandleAnalyzeResultQueued(t *testing.T) {
-	taskStore = NewTaskStore()
+	taskStore = taskpkg.NewTaskStore()
 	task := taskStore.Create("ctx-q", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
 	// Default status is queued
 
@@ -113,7 +114,7 @@ func TestHandleAnalyzeResultQueued(t *testing.T) {
 }
 
 func TestHandleAnalyzeResultFailed(t *testing.T) {
-	taskStore = NewTaskStore()
+	taskStore = taskpkg.NewTaskStore()
 	task := taskStore.Create("ctx-fail", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
 	task.SetError("scope analysis exploded")
 
@@ -134,7 +135,7 @@ func TestHandleAnalyzeResultFailed(t *testing.T) {
 }
 
 func TestHandleAnalyzeResultCompleted(t *testing.T) {
-	taskStore = NewTaskStore()
+	taskStore = taskpkg.NewTaskStore()
 
 	// Create a temp report file with executive summary
 	tmpDir := t.TempDir()
@@ -211,12 +212,10 @@ Raw data available in state directory.
 }
 
 func TestHandleAnalyzeResultCompletedNoReportPath(t *testing.T) {
-	taskStore = NewTaskStore()
+	taskStore = taskpkg.NewTaskStore()
 	task := taskStore.Create("ctx-noreport", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
 	// Manually set completed without report path (edge case)
-	task.mu.Lock()
-	task.Status = TaskStatusCompleted
-	task.mu.Unlock()
+	task.SetStatus(taskpkg.TaskStatusCompleted)
 
 	result, err := handleAnalyzeResult(context.Background(), makeResultRequest(task.ID))
 	if err != nil {
@@ -232,7 +231,7 @@ func TestHandleAnalyzeResultCompletedNoReportPath(t *testing.T) {
 }
 
 func TestHandleAnalyzeResultReportFileUnreadable(t *testing.T) {
-	taskStore = NewTaskStore()
+	taskStore = taskpkg.NewTaskStore()
 	task := taskStore.Create("ctx-unreadable", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
 	task.SetReportPath("/nonexistent/path/report.md")
 

@@ -8,6 +8,9 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/heechul/prism-mcp/internal/engine"
+	taskpkg "github.com/heechul/prism-mcp/internal/task"
 )
 
 // runSeedAnalysis runs the seed analyst via claude CLI subprocess with --json-schema.
@@ -17,10 +20,8 @@ import (
 //
 // The seed analyst focuses purely on breadth of discovery. DA review is handled
 // separately by runDAReviewLoop after this step completes.
-func runSeedAnalysis(task *AnalysisTask, cfg AnalysisConfig) error {
-	task.mu.RLock()
-	stateDir := task.StateDir
-	task.mu.RUnlock()
+func runSeedAnalysis(task *taskpkg.AnalysisTask, cfg AnalysisConfig) error {
+	stateDir := task.GetStateDir()
 
 	// Resolve ontology doc paths for targeted search
 	docPaths := LoadOntologyDocPaths()
@@ -45,7 +46,7 @@ func runSeedAnalysis(task *AnalysisTask, cfg AnalysisConfig) error {
 	ctx, cancel := context.WithTimeout(task.Ctx, 10*time.Minute)
 	defer cancel()
 
-	rawOutput, err := queryLLMScopedWithToolsAndSchema(
+	rawOutput, err := engine.QueryLLMScopedWithToolsAndSchema(
 		ctx,
 		stateDir,
 		cfg.Model,
@@ -59,7 +60,7 @@ func runSeedAnalysis(task *AnalysisTask, cfg AnalysisConfig) error {
 	}
 
 	// Extract JSON from potentially wrapped output
-	jsonStr, err := extractJSON(rawOutput)
+	jsonStr, err := engine.ExtractJSON(rawOutput)
 	if err != nil {
 		return fmt.Errorf("extract seed analysis JSON: %w (raw length: %d)", err, len(rawOutput))
 	}
@@ -98,15 +99,13 @@ func runSeedAnalysis(task *AnalysisTask, cfg AnalysisConfig) error {
 //
 // On supplementary research failure, the loop continues with existing findings
 // rather than failing the entire pipeline.
-func runDAReviewLoop(task *AnalysisTask, cfg AnalysisConfig) error {
-	task.mu.RLock()
-	stateDir := task.StateDir
-	task.mu.RUnlock()
+func runDAReviewLoop(task *taskpkg.AnalysisTask, cfg AnalysisConfig) error {
+	stateDir := task.GetStateDir()
 
 	seedPath := SeedAnalysisPath(stateDir)
 
 	for round := 1; round <= maxDARounds; round++ {
-		task.UpdateStageDetail(StageScope, fmt.Sprintf("DA review round %d/%d", round, maxDARounds))
+		task.UpdateStageDetail(taskpkg.StageScope, fmt.Sprintf("DA review round %d/%d", round, maxDARounds))
 		log.Printf("[%s] DA review round %d/%d", task.ID, round, maxDARounds)
 
 		// Read current seed analysis fresh each round
@@ -129,7 +128,7 @@ func runDAReviewLoop(task *AnalysisTask, cfg AnalysisConfig) error {
 
 		// Call LLM for DA review (30-minute timeout per round)
 		ctx, cancel := context.WithTimeout(task.Ctx, 30*time.Minute)
-		rawOutput, err := queryLLMScopedWithSystemPrompt(ctx, stateDir, cfg.Model, daPrompt, userPrompt)
+		rawOutput, err := engine.QueryLLMScopedWithSystemPrompt(ctx, stateDir, cfg.Model, daPrompt, userPrompt)
 		cancel()
 		if err != nil {
 			return fmt.Errorf("DA review LLM call round %d: %w", round, err)
@@ -175,7 +174,7 @@ func runDAReviewLoop(task *AnalysisTask, cfg AnalysisConfig) error {
 		}
 
 		// Actionable findings found — run supplementary research to address gaps
-		task.UpdateStageDetail(StageScope, fmt.Sprintf("DA round %d: re-researching %d issues", round, len(actionable)))
+		task.UpdateStageDetail(taskpkg.StageScope, fmt.Sprintf("DA round %d: re-researching %d issues", round, len(actionable)))
 		if err := runSupplementaryResearch(task, cfg, actionable); err != nil {
 			// Log but don't fail — continue with existing findings
 			log.Printf("[%s] Supplementary research failed round %d: %v — continuing with existing findings",
@@ -189,10 +188,8 @@ func runDAReviewLoop(task *AnalysisTask, cfg AnalysisConfig) error {
 // runSupplementaryResearch runs a focused research subprocess to address
 // specific gaps identified by the DA review. New findings are merged into
 // the existing seed-analysis.json using MergeSeedAnalysis.
-func runSupplementaryResearch(task *AnalysisTask, cfg AnalysisConfig, findings []DAFinding) error {
-	task.mu.RLock()
-	stateDir := task.StateDir
-	task.mu.RUnlock()
+func runSupplementaryResearch(task *taskpkg.AnalysisTask, cfg AnalysisConfig, findings []DAFinding) error {
+	stateDir := task.GetStateDir()
 
 	// Build focused re-research system prompt
 	var sb strings.Builder
@@ -225,7 +222,7 @@ func runSupplementaryResearch(task *AnalysisTask, cfg AnalysisConfig, findings [
 	ctx, cancel := context.WithTimeout(task.Ctx, 5*time.Minute)
 	defer cancel()
 
-	rawOutput, err := queryLLMScopedWithToolsAndSchema(
+	rawOutput, err := engine.QueryLLMScopedWithToolsAndSchema(
 		ctx,
 		stateDir,
 		cfg.Model,
@@ -239,7 +236,7 @@ func runSupplementaryResearch(task *AnalysisTask, cfg AnalysisConfig, findings [
 	}
 
 	// Extract and parse JSON
-	jsonStr, err := extractJSON(rawOutput)
+	jsonStr, err := engine.ExtractJSON(rawOutput)
 	if err != nil {
 		return fmt.Errorf("extract supplementary JSON: %w (raw length: %d)", err, len(rawOutput))
 	}
@@ -277,10 +274,8 @@ func runSupplementaryResearch(task *AnalysisTask, cfg AnalysisConfig, findings [
 //
 // The output is parsed into PerspectivesOutput, validated with ValidatePerspectives,
 // and written to perspectives.json in the task's state directory.
-func runPerspectiveGeneration(task *AnalysisTask, cfg AnalysisConfig) error {
-	task.mu.RLock()
-	stateDir := task.StateDir
-	task.mu.RUnlock()
+func runPerspectiveGeneration(task *taskpkg.AnalysisTask, cfg AnalysisConfig) error {
+	stateDir := task.GetStateDir()
 
 	// Read seed analysis for inline inclusion in the prompt
 	seedPath := SeedAnalysisPath(stateDir)
@@ -297,7 +292,7 @@ func runPerspectiveGeneration(task *AnalysisTask, cfg AnalysisConfig) error {
 	ctx, cancel := context.WithTimeout(task.Ctx, 5*time.Minute)
 	defer cancel()
 
-	rawOutput, err := queryLLMScopedWithSchema(
+	rawOutput, err := engine.QueryLLMScopedWithSchema(
 		ctx,
 		stateDir,
 		cfg.Model,
@@ -309,7 +304,7 @@ func runPerspectiveGeneration(task *AnalysisTask, cfg AnalysisConfig) error {
 	}
 
 	// Extract JSON from potentially wrapped output
-	jsonStr, err := extractJSON(rawOutput)
+	jsonStr, err := engine.ExtractJSON(rawOutput)
 	if err != nil {
 		return fmt.Errorf("extract perspectives JSON: %w (raw length: %d)", err, len(rawOutput))
 	}

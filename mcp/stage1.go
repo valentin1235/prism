@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	taskpkg "github.com/heechul/prism-mcp/internal/task"
 )
 
 // --- Seed Analysis JSON schema for --json-schema flag ---
@@ -380,7 +382,7 @@ type Stage1Config struct {
 
 // LoadStage1Config reads config.json from the task's state directory
 // and resolves ontology doc paths for the seed analyst.
-func LoadStage1Config(task *AnalysisTask) (Stage1Config, error) {
+func LoadStage1Config(task *taskpkg.AnalysisTask) (Stage1Config, error) {
 	configPath := filepath.Join(task.StateDir, "config.json")
 	data, err := os.ReadFile(configPath)
 	if err != nil {

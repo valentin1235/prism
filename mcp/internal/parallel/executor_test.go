@@ -1,4 +1,4 @@
-package main
+package parallel
 
 import (
 	"context"
@@ -13,14 +13,14 @@ func TestParallelExecutor_BasicExecution(t *testing.T) {
 	pe := &ParallelExecutor{Concurrency: 2}
 
 	jobs := []ParallelJob{
-		{PerspectiveID: "p1", Fn: func(ctx context.Context) StageResult {
-			return StageResult{OutputPath: "/out/p1"}
+		{PerspectiveID: "p1", Fn: func(ctx context.Context) (string, error) {
+			return "/out/p1", nil
 		}},
-		{PerspectiveID: "p2", Fn: func(ctx context.Context) StageResult {
-			return StageResult{OutputPath: "/out/p2"}
+		{PerspectiveID: "p2", Fn: func(ctx context.Context) (string, error) {
+			return "/out/p2", nil
 		}},
-		{PerspectiveID: "p3", Fn: func(ctx context.Context) StageResult {
-			return StageResult{OutputPath: "/out/p3"}
+		{PerspectiveID: "p3", Fn: func(ctx context.Context) (string, error) {
+			return "/out/p3", nil
 		}},
 	}
 
@@ -58,7 +58,7 @@ func TestParallelExecutor_ConcurrencyLimit(t *testing.T) {
 		pid := fmt.Sprintf("p%d", i)
 		jobs[i] = ParallelJob{
 			PerspectiveID: pid,
-			Fn: func(ctx context.Context) StageResult {
+			Fn: func(ctx context.Context) (string, error) {
 				cur := atomic.AddInt64(&active, 1)
 				// Track max concurrent
 				for {
@@ -69,7 +69,7 @@ func TestParallelExecutor_ConcurrencyLimit(t *testing.T) {
 				}
 				time.Sleep(50 * time.Millisecond)
 				atomic.AddInt64(&active, -1)
-				return StageResult{OutputPath: "/out/" + pid}
+				return "/out/" + pid, nil
 			},
 		}
 	}
@@ -100,12 +100,12 @@ func TestParallelExecutor_RetryOnFailure(t *testing.T) {
 	jobs := []ParallelJob{
 		{
 			PerspectiveID: "retry-test",
-			Fn: func(ctx context.Context) StageResult {
+			Fn: func(ctx context.Context) (string, error) {
 				a := atomic.AddInt64(&attempts, 1)
 				if a == 1 {
-					return StageResult{Err: fmt.Errorf("transient error")}
+					return "", fmt.Errorf("transient error")
 				}
-				return StageResult{OutputPath: "/out/retry-test"}
+				return "/out/retry-test", nil
 			},
 		},
 	}
@@ -129,8 +129,8 @@ func TestParallelExecutor_RetryExhausted(t *testing.T) {
 	jobs := []ParallelJob{
 		{
 			PerspectiveID: "always-fail",
-			Fn: func(ctx context.Context) StageResult {
-				return StageResult{Err: fmt.Errorf("permanent error")}
+			Fn: func(ctx context.Context) (string, error) {
+				return "", fmt.Errorf("permanent error")
 			},
 		},
 	}
@@ -152,14 +152,14 @@ func TestParallelExecutor_MixedResults(t *testing.T) {
 	pe := &ParallelExecutor{Concurrency: 3, RetryLimit: 2}
 
 	jobs := []ParallelJob{
-		{PerspectiveID: "ok1", Fn: func(ctx context.Context) StageResult {
-			return StageResult{OutputPath: "/out/ok1"}
+		{PerspectiveID: "ok1", Fn: func(ctx context.Context) (string, error) {
+			return "/out/ok1", nil
 		}},
-		{PerspectiveID: "fail1", Fn: func(ctx context.Context) StageResult {
-			return StageResult{Err: fmt.Errorf("fail")}
+		{PerspectiveID: "fail1", Fn: func(ctx context.Context) (string, error) {
+			return "", fmt.Errorf("fail")
 		}},
-		{PerspectiveID: "ok2", Fn: func(ctx context.Context) StageResult {
-			return StageResult{OutputPath: "/out/ok2"}
+		{PerspectiveID: "ok2", Fn: func(ctx context.Context) (string, error) {
+			return "/out/ok2", nil
 		}},
 	}
 
@@ -205,18 +205,18 @@ func TestParallelExecutor_ContextCancellation(t *testing.T) {
 	jobs := []ParallelJob{
 		{
 			PerspectiveID: "blocker",
-			Fn: func(ctx context.Context) StageResult {
+			Fn: func(ctx context.Context) (string, error) {
 				atomic.AddInt64(&started, 1)
 				// Block long enough for cancellation
 				time.Sleep(200 * time.Millisecond)
-				return StageResult{OutputPath: "/out/blocker"}
+				return "/out/blocker", nil
 			},
 		},
 		{
 			PerspectiveID: "waiter",
-			Fn: func(ctx context.Context) StageResult {
+			Fn: func(ctx context.Context) (string, error) {
 				atomic.AddInt64(&started, 1)
-				return StageResult{OutputPath: "/out/waiter"}
+				return "/out/waiter", nil
 			},
 		},
 	}
@@ -234,13 +234,6 @@ func TestParallelExecutor_ContextCancellation(t *testing.T) {
 		t.Fatalf("Results len = %d, want 2", len(pr.Results))
 	}
 
-	// At least one result should have an error from cancellation or both complete
-	totalErrors := 0
-	for _, r := range pr.Results {
-		if r.Err != nil {
-			totalErrors++
-		}
-	}
 	// We don't assert exact counts because timing-dependent,
 	// but verify all results are populated
 	if pr.Succeeded+pr.Failed != 2 {
@@ -263,11 +256,11 @@ func TestParallelExecutor_OnJobCompleteCallback(t *testing.T) {
 	}
 
 	jobs := []ParallelJob{
-		{PerspectiveID: "ok", Fn: func(ctx context.Context) StageResult {
-			return StageResult{OutputPath: "/out/ok"}
+		{PerspectiveID: "ok", Fn: func(ctx context.Context) (string, error) {
+			return "/out/ok", nil
 		}},
-		{PerspectiveID: "fail", Fn: func(ctx context.Context) StageResult {
-			return StageResult{Err: fmt.Errorf("fail")}
+		{PerspectiveID: "fail", Fn: func(ctx context.Context) (string, error) {
+			return "", fmt.Errorf("fail")
 		}},
 	}
 
@@ -295,7 +288,7 @@ func TestParallelExecutor_DefaultConcurrency(t *testing.T) {
 		pid := fmt.Sprintf("p%d", i)
 		jobs[i] = ParallelJob{
 			PerspectiveID: pid,
-			Fn: func(ctx context.Context) StageResult {
+			Fn: func(ctx context.Context) (string, error) {
 				cur := atomic.AddInt64(&active, 1)
 				for {
 					old := atomic.LoadInt64(&maxActive)
@@ -305,7 +298,7 @@ func TestParallelExecutor_DefaultConcurrency(t *testing.T) {
 				}
 				time.Sleep(30 * time.Millisecond)
 				atomic.AddInt64(&active, -1)
-				return StageResult{OutputPath: "/out/" + pid}
+				return "/out/" + pid, nil
 			},
 		}
 	}
@@ -327,11 +320,11 @@ func TestParallelExecutor_ConcurrencyCappedToJobCount(t *testing.T) {
 	pe := &ParallelExecutor{Concurrency: 100}
 
 	jobs := []ParallelJob{
-		{PerspectiveID: "p1", Fn: func(ctx context.Context) StageResult {
-			return StageResult{OutputPath: "/out/p1"}
+		{PerspectiveID: "p1", Fn: func(ctx context.Context) (string, error) {
+			return "/out/p1", nil
 		}},
-		{PerspectiveID: "p2", Fn: func(ctx context.Context) StageResult {
-			return StageResult{OutputPath: "/out/p2"}
+		{PerspectiveID: "p2", Fn: func(ctx context.Context) (string, error) {
+			return "/out/p2", nil
 		}},
 	}
 
@@ -345,11 +338,11 @@ func TestParallelExecutor_PerspectiveIDPreservedInResults(t *testing.T) {
 	pe := &ParallelExecutor{Concurrency: 2}
 
 	jobs := []ParallelJob{
-		{PerspectiveID: "security", Fn: func(ctx context.Context) StageResult {
-			return StageResult{OutputPath: "/findings/security"}
+		{PerspectiveID: "security", Fn: func(ctx context.Context) (string, error) {
+			return "/findings/security", nil
 		}},
-		{PerspectiveID: "performance", Fn: func(ctx context.Context) StageResult {
-			return StageResult{Err: fmt.Errorf("timeout")}
+		{PerspectiveID: "performance", Fn: func(ctx context.Context) (string, error) {
+			return "", fmt.Errorf("timeout")
 		}},
 	}
 
@@ -375,19 +368,19 @@ func TestParallelExecutor_JobTimeoutEnforced(t *testing.T) {
 	jobs := []ParallelJob{
 		{
 			PerspectiveID: "fast",
-			Fn: func(ctx context.Context) StageResult {
-				return StageResult{OutputPath: "/out/fast"}
+			Fn: func(ctx context.Context) (string, error) {
+				return "/out/fast", nil
 			},
 		},
 		{
 			PerspectiveID: "slow",
-			Fn: func(ctx context.Context) StageResult {
+			Fn: func(ctx context.Context) (string, error) {
 				// Simulate a long-running subprocess that respects context
 				select {
 				case <-ctx.Done():
-					return StageResult{Err: fmt.Errorf("timed out: %w", ctx.Err())}
+					return "", fmt.Errorf("timed out: %w", ctx.Err())
 				case <-time.After(5 * time.Second):
-					return StageResult{OutputPath: "/out/slow"}
+					return "/out/slow", nil
 				}
 			},
 		},
@@ -433,24 +426,24 @@ func TestParallelExecutor_JobTimeoutPerAttempt(t *testing.T) {
 	jobs := []ParallelJob{
 		{
 			PerspectiveID: "retry-timeout",
-			Fn: func(ctx context.Context) StageResult {
+			Fn: func(ctx context.Context) (string, error) {
 				a := atomic.AddInt64(&attempts, 1)
 				if a == 1 {
 					// First attempt: sleep just under timeout, then fail
 					time.Sleep(50 * time.Millisecond)
-					return StageResult{Err: fmt.Errorf("transient error")}
+					return "", fmt.Errorf("transient error")
 				}
 				// Second attempt: check that we have a fresh deadline
 				deadline, ok := ctx.Deadline()
 				if !ok {
-					return StageResult{Err: fmt.Errorf("no deadline on retry context")}
+					return "", fmt.Errorf("no deadline on retry context")
 				}
 				remaining := time.Until(deadline)
 				// Should have close to full JobTimeout remaining (200ms), not just leftover from first attempt
 				if remaining < 100*time.Millisecond {
-					return StageResult{Err: fmt.Errorf("retry deadline too short: %v remaining", remaining)}
+					return "", fmt.Errorf("retry deadline too short: %v remaining", remaining)
 				}
-				return StageResult{OutputPath: "/out/retry-timeout"}
+				return "/out/retry-timeout", nil
 			},
 		},
 	}
@@ -479,17 +472,17 @@ func TestParallelExecutor_JobTimeoutDefaultApplied(t *testing.T) {
 	jobs := []ParallelJob{
 		{
 			PerspectiveID: "check-default",
-			Fn: func(ctx context.Context) StageResult {
+			Fn: func(ctx context.Context) (string, error) {
 				deadline, ok := ctx.Deadline()
 				if !ok {
-					return StageResult{Err: fmt.Errorf("expected deadline from JobTimeout")}
+					return "", fmt.Errorf("expected deadline from JobTimeout")
 				}
 				remaining := time.Until(deadline)
 				// DefaultJobTimeout is 12 minutes, so remaining should be well above 10 minutes
 				if remaining < 10*time.Minute {
-					return StageResult{Err: fmt.Errorf("default timeout too short: %v", remaining)}
+					return "", fmt.Errorf("default timeout too short: %v", remaining)
 				}
-				return StageResult{OutputPath: "/out/check-default"}
+				return "/out/check-default", nil
 			},
 		},
 	}
@@ -515,27 +508,27 @@ func TestParallelExecutor_TimeoutWithConcurrencyLimit(t *testing.T) {
 	jobs := []ParallelJob{
 		{
 			PerspectiveID: "first",
-			Fn: func(ctx context.Context) StageResult {
+			Fn: func(ctx context.Context) (string, error) {
 				startTimes.Store("first", time.Now())
 				time.Sleep(100 * time.Millisecond) // Takes 100ms
-				return StageResult{OutputPath: "/out/first"}
+				return "/out/first", nil
 			},
 		},
 		{
 			PerspectiveID: "second",
-			Fn: func(ctx context.Context) StageResult {
+			Fn: func(ctx context.Context) (string, error) {
 				startTimes.Store("second", time.Now())
 				// Check that we have close to a full timeout
 				deadline, ok := ctx.Deadline()
 				if !ok {
-					return StageResult{Err: fmt.Errorf("no deadline")}
+					return "", fmt.Errorf("no deadline")
 				}
 				remaining := time.Until(deadline)
 				// Should have close to 300ms, not 200ms (300ms - first's 100ms)
 				if remaining < 200*time.Millisecond {
-					return StageResult{Err: fmt.Errorf("queued job got reduced timeout: %v", remaining)}
+					return "", fmt.Errorf("queued job got reduced timeout: %v", remaining)
 				}
-				return StageResult{OutputPath: "/out/second"}
+				return "/out/second", nil
 			},
 		},
 	}
@@ -564,12 +557,12 @@ func TestParallelExecutor_AllJobsTimeoutGracefully(t *testing.T) {
 		pid := fmt.Sprintf("timeout-%d", i)
 		jobs[i] = ParallelJob{
 			PerspectiveID: pid,
-			Fn: func(ctx context.Context) StageResult {
+			Fn: func(ctx context.Context) (string, error) {
 				select {
 				case <-ctx.Done():
-					return StageResult{Err: fmt.Errorf("timed out: %w", ctx.Err())}
+					return "", fmt.Errorf("timed out: %w", ctx.Err())
 				case <-time.After(10 * time.Second):
-					return StageResult{OutputPath: "/should-not-reach"}
+					return "/should-not-reach", nil
 				}
 			},
 		}

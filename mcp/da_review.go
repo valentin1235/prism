@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/heechul/prism-mcp/internal/engine"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
@@ -342,7 +343,7 @@ func handleDAReview(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 	}
 
 	// Call LLM with DA system prompt separated from user message
-	rawOutput, err := queryLLMWithSystemPrompt(ctx, daPrompt, userPrompt.String())
+	rawOutput, err := engine.QueryLLMWithSystemPrompt(ctx, daPrompt, userPrompt.String())
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("DA review LLM call failed: %v", err)), nil
 	}

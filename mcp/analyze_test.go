@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	taskpkg "github.com/heechul/prism-mcp/internal/task"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
@@ -28,7 +29,7 @@ func makeStatusRequest(taskID string) mcp.CallToolRequest {
 }
 
 func TestHandleTaskStatusMissingID(t *testing.T) {
-	taskStore = NewTaskStore()
+	taskStore = taskpkg.NewTaskStore()
 
 	result, err := handleTaskStatus(context.Background(), makeStatusRequest(""))
 	if err != nil {
@@ -40,7 +41,7 @@ func TestHandleTaskStatusMissingID(t *testing.T) {
 }
 
 func TestHandleTaskStatusNotFound(t *testing.T) {
-	taskStore = NewTaskStore()
+	taskStore = taskpkg.NewTaskStore()
 
 	// Table-driven test for various unknown/lost/malformed task_ids
 	tests := []struct {
@@ -98,7 +99,7 @@ func TestHandleTaskStatusNotFound(t *testing.T) {
 }
 
 func TestHandleTaskStatusWhitespaceOnly(t *testing.T) {
-	taskStore = NewTaskStore()
+	taskStore = taskpkg.NewTaskStore()
 
 	// Whitespace-only task_id should be treated as missing (empty after trim)
 	result, err := handleTaskStatus(context.Background(), makeStatusRequest("   "))
@@ -115,7 +116,7 @@ func TestHandleTaskStatusWhitespaceOnly(t *testing.T) {
 }
 
 func TestHandleTaskStatusRemovedTask(t *testing.T) {
-	taskStore = NewTaskStore()
+	taskStore = taskpkg.NewTaskStore()
 
 	// Create a task, then remove it (simulates lost state or cleanup)
 	task := taskStore.Create("ctx-removed", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
@@ -153,12 +154,12 @@ func TestHandleTaskStatusRemovedTask(t *testing.T) {
 func TestHandleTaskStatusServerRestart(t *testing.T) {
 	// Simulate server restart: old task_id from previous session
 	// is polled against a fresh (empty) TaskStore
-	taskStore = NewTaskStore()
+	taskStore = taskpkg.NewTaskStore()
 	oldTask := taskStore.Create("ctx-old", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
 	oldTaskID := oldTask.ID
 
 	// "Restart" — replace the store with a fresh one
-	taskStore = NewTaskStore()
+	taskStore = taskpkg.NewTaskStore()
 
 	// Polling the old task_id should return "not found"
 	result, err := handleTaskStatus(context.Background(), makeStatusRequest(oldTaskID))
@@ -175,7 +176,7 @@ func TestHandleTaskStatusServerRestart(t *testing.T) {
 }
 
 func TestHandleTaskStatusQueued(t *testing.T) {
-	taskStore = NewTaskStore()
+	taskStore = taskpkg.NewTaskStore()
 	task := taskStore.Create("ctx-test", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
 
 	result, err := handleTaskStatus(context.Background(), makeStatusRequest(task.ID))
@@ -188,7 +189,7 @@ func TestHandleTaskStatusQueued(t *testing.T) {
 
 	// Parse response
 	text := result.Content[0].(mcp.TextContent).Text
-	var snap TaskSnapshot
+	var snap taskpkg.TaskSnapshot
 	if err := json.Unmarshal([]byte(text), &snap); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
 	}
@@ -196,7 +197,7 @@ func TestHandleTaskStatusQueued(t *testing.T) {
 	if snap.ID != task.ID {
 		t.Errorf("expected ID %s, got %s", task.ID, snap.ID)
 	}
-	if snap.Status != TaskStatusQueued {
+	if snap.Status != taskpkg.TaskStatusQueued {
 		t.Errorf("expected status queued, got %s", snap.Status)
 	}
 	if len(snap.Stages) != 4 {
@@ -205,10 +206,10 @@ func TestHandleTaskStatusQueued(t *testing.T) {
 }
 
 func TestHandleTaskStatusRunning(t *testing.T) {
-	taskStore = NewTaskStore()
+	taskStore = taskpkg.NewTaskStore()
 	task := taskStore.Create("ctx-running", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
-	task.SetStatus(TaskStatusRunning)
-	task.StartStage(StageScope, "analyzing seed")
+	task.SetStatus(taskpkg.TaskStatusRunning)
+	task.StartStage(taskpkg.StageScope, "analyzing seed")
 
 	result, err := handleTaskStatus(context.Background(), makeStatusRequest(task.ID))
 	if err != nil {
@@ -216,16 +217,16 @@ func TestHandleTaskStatusRunning(t *testing.T) {
 	}
 
 	text := result.Content[0].(mcp.TextContent).Text
-	var snap TaskSnapshot
+	var snap taskpkg.TaskSnapshot
 	if err := json.Unmarshal([]byte(text), &snap); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
 	}
 
-	if snap.Status != TaskStatusRunning {
+	if snap.Status != taskpkg.TaskStatusRunning {
 		t.Errorf("expected running, got %s", snap.Status)
 	}
 	// First stage (scope) should be running
-	if snap.Stages[0].Status != StageStatusRunning {
+	if snap.Stages[0].Status != taskpkg.StageStatusRunning {
 		t.Errorf("expected scope stage running, got %s", snap.Stages[0].Status)
 	}
 	if snap.Stages[0].Detail != "analyzing seed" {
@@ -234,7 +235,7 @@ func TestHandleTaskStatusRunning(t *testing.T) {
 }
 
 func TestHandleTaskStatusCompleted(t *testing.T) {
-	taskStore = NewTaskStore()
+	taskStore = taskpkg.NewTaskStore()
 	task := taskStore.Create("ctx-done", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
 	task.SetReportPath("/tmp/reports/final.md")
 
@@ -244,12 +245,12 @@ func TestHandleTaskStatusCompleted(t *testing.T) {
 	}
 
 	text := result.Content[0].(mcp.TextContent).Text
-	var snap TaskSnapshot
+	var snap taskpkg.TaskSnapshot
 	if err := json.Unmarshal([]byte(text), &snap); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
 	}
 
-	if snap.Status != TaskStatusCompleted {
+	if snap.Status != taskpkg.TaskStatusCompleted {
 		t.Errorf("expected completed, got %s", snap.Status)
 	}
 	if snap.ReportPath != "/tmp/reports/final.md" {
@@ -258,7 +259,7 @@ func TestHandleTaskStatusCompleted(t *testing.T) {
 }
 
 func TestHandleTaskStatusFailed(t *testing.T) {
-	taskStore = NewTaskStore()
+	taskStore = taskpkg.NewTaskStore()
 	task := taskStore.Create("ctx-fail", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
 	task.SetError("scope analysis failed")
 
@@ -268,12 +269,12 @@ func TestHandleTaskStatusFailed(t *testing.T) {
 	}
 
 	text := result.Content[0].(mcp.TextContent).Text
-	var snap TaskSnapshot
+	var snap taskpkg.TaskSnapshot
 	if err := json.Unmarshal([]byte(text), &snap); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
 	}
 
-	if snap.Status != TaskStatusFailed {
+	if snap.Status != taskpkg.TaskStatusFailed {
 		t.Errorf("expected failed, got %s", snap.Status)
 	}
 	if snap.Error != "scope analysis failed" {
@@ -282,15 +283,15 @@ func TestHandleTaskStatusFailed(t *testing.T) {
 }
 
 func TestHandleTaskStatusParallelProgress(t *testing.T) {
-	taskStore = NewTaskStore()
+	taskStore = taskpkg.NewTaskStore()
 	task := taskStore.Create("ctx-parallel", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
-	task.SetStatus(TaskStatusRunning)
-	task.CompleteStage(StageScope, "done")
-	task.StartStage(StageSpecialist, "running 5 specialists")
-	task.SetStageParallel(StageSpecialist, 5)
-	task.IncrStageCompleted(StageSpecialist)
-	task.IncrStageCompleted(StageSpecialist)
-	task.IncrStageFailed(StageSpecialist)
+	task.SetStatus(taskpkg.TaskStatusRunning)
+	task.CompleteStage(taskpkg.StageScope, "done")
+	task.StartStage(taskpkg.StageSpecialist, "running 5 specialists")
+	task.SetStageParallel(taskpkg.StageSpecialist, 5)
+	task.IncrStageCompleted(taskpkg.StageSpecialist)
+	task.IncrStageCompleted(taskpkg.StageSpecialist)
+	task.IncrStageFailed(taskpkg.StageSpecialist)
 
 	result, err := handleTaskStatus(context.Background(), makeStatusRequest(task.ID))
 	if err != nil {
@@ -298,7 +299,7 @@ func TestHandleTaskStatusParallelProgress(t *testing.T) {
 	}
 
 	text := result.Content[0].(mcp.TextContent).Text
-	var snap TaskSnapshot
+	var snap taskpkg.TaskSnapshot
 	if err := json.Unmarshal([]byte(text), &snap); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
 	}

@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/heechul/prism-mcp/internal/engine"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
@@ -300,7 +301,7 @@ Rules:
 
 Respond with ONLY the question, nothing else.`, session.Topic, findingsBlock(session))
 
-	return queryLLM(ctx, prompt)
+	return engine.QueryLLM(ctx, prompt)
 }
 
 func generateFollowUpQuestion(ctx context.Context, session *InterviewSession) (string, error) {
@@ -328,5 +329,5 @@ Rules:
 
 Respond with ONLY the question (or INTERVIEW_COMPLETE), nothing else.`, session.Topic, findingsBlock(session), history.String())
 
-	return queryLLM(ctx, prompt)
+	return engine.QueryLLM(ctx, prompt)
 }

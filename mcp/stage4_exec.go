@@ -9,6 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/heechul/prism-mcp/internal/engine"
+	taskpkg "github.com/heechul/prism-mcp/internal/task"
 )
 
 // SynthesisContext holds all data needed to build the synthesis prompt.
@@ -339,10 +342,8 @@ func buildSynthesisUserPrompt(sctx SynthesisContext) string {
 //
 // Unlike specialist and interview stages which run in parallel, synthesis is a single
 // sequential subprocess that consumes all prior stage outputs.
-func runSynthesisSession(ctx context.Context, task *AnalysisTask, cfg AnalysisConfig, perspectives []Perspective, reportPath string) error {
-	task.mu.RLock()
-	stateDir := task.StateDir
-	task.mu.RUnlock()
+func runSynthesisSession(ctx context.Context, task *taskpkg.AnalysisTask, cfg AnalysisConfig, perspectives []Perspective, reportPath string) error {
+	stateDir := task.GetStateDir()
 
 	// Load all synthesis context from disk
 	sctx, err := LoadSynthesisContext(cfg, perspectives)
@@ -360,12 +361,12 @@ func runSynthesisSession(ctx context.Context, task *AnalysisTask, cfg AnalysisCo
 	userPrompt := buildSynthesisUserPrompt(sctx)
 
 	// Update progress detail
-	task.UpdateStageDetail(StageSynthesis, "invoking synthesis subprocess")
+	task.UpdateStageDetail(taskpkg.StageSynthesis, "invoking synthesis subprocess")
 
 	// Run single claude CLI subprocess for synthesis
 	// Uses --print mode with system prompt, single turn, no tool access needed
 	// (all data is provided inline in the system prompt)
-	rawReport, err := queryLLMScopedWithSystemPrompt(
+	rawReport, err := engine.QueryLLMScopedWithSystemPrompt(
 		ctx,
 		stateDir,
 		cfg.Model,
@@ -383,7 +384,7 @@ func runSynthesisSession(ctx context.Context, task *AnalysisTask, cfg AnalysisCo
 	log.Printf("[%s] Synthesis: subprocess completed, output length=%d", task.ID, len(rawReport))
 
 	// Update progress
-	task.UpdateStageDetail(StageSynthesis, "validating report sections")
+	task.UpdateStageDetail(taskpkg.StageSynthesis, "validating report sections")
 
 	// Validate that the report contains required sections.
 	// Derive expected sections from the template when available;

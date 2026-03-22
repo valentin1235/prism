@@ -1,4 +1,4 @@
-package main
+package engine
 
 import (
 	"context"
@@ -8,8 +8,8 @@ import (
 	"strings"
 )
 
-// filterEnv returns os.Environ() with the specified keys removed.
-func filterEnv(keys ...string) []string {
+// FilterEnv returns os.Environ() with the specified keys removed.
+func FilterEnv(keys ...string) []string {
 	env := os.Environ()
 	filtered := make([]string, 0, len(env))
 	for _, e := range env {
@@ -28,26 +28,26 @@ func filterEnv(keys ...string) []string {
 }
 
 // ---------------------------------------------------------------------------
-// Legacy wrappers — delegate to QuerySync from claude_sdk.go
+// Legacy wrappers — delegate to QuerySync from claude.go
 // ---------------------------------------------------------------------------
 
-// queryLLM calls the claude CLI as a subprocess.
-func queryLLM(ctx context.Context, prompt string) (string, error) {
+// QueryLLM calls the claude CLI as a subprocess.
+func QueryLLM(ctx context.Context, prompt string) (string, error) {
 	return QuerySync(ctx, prompt, ClaudeOptions{
 		MaxTurns: 1,
 	})
 }
 
-// queryLLMWithSystemPrompt calls the claude CLI with a separate system prompt.
-func queryLLMWithSystemPrompt(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
+// QueryLLMWithSystemPrompt calls the claude CLI with a separate system prompt.
+func QueryLLMWithSystemPrompt(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
 	return QuerySync(ctx, userPrompt, ClaudeOptions{
 		SystemPrompt: systemPrompt,
 		MaxTurns:     1,
 	})
 }
 
-// queryLLMScoped calls the claude CLI with task-scoped isolation.
-func queryLLMScoped(ctx context.Context, stateDir, model, prompt string) (string, error) {
+// QueryLLMScoped calls the claude CLI with task-scoped isolation.
+func QueryLLMScoped(ctx context.Context, stateDir, model, prompt string) (string, error) {
 	return QuerySync(ctx, prompt, ClaudeOptions{
 		Model:    model,
 		Cwd:      stateDir,
@@ -55,9 +55,9 @@ func queryLLMScoped(ctx context.Context, stateDir, model, prompt string) (string
 	})
 }
 
-// queryLLMScopedWithSystemPrompt calls the claude CLI with task-scoped isolation
+// QueryLLMScopedWithSystemPrompt calls the claude CLI with task-scoped isolation
 // and a separate system prompt.
-func queryLLMScopedWithSystemPrompt(ctx context.Context, stateDir, model, systemPrompt, userPrompt string) (string, error) {
+func QueryLLMScopedWithSystemPrompt(ctx context.Context, stateDir, model, systemPrompt, userPrompt string) (string, error) {
 	return QuerySync(ctx, userPrompt, ClaudeOptions{
 		Model:        model,
 		SystemPrompt: systemPrompt,
@@ -66,9 +66,9 @@ func queryLLMScopedWithSystemPrompt(ctx context.Context, stateDir, model, system
 	})
 }
 
-// queryLLMScopedWithSchema calls the claude CLI with --json-schema for structured
+// QueryLLMScopedWithSchema calls the claude CLI with --json-schema for structured
 // output. Single-turn, no tool access.
-func queryLLMScopedWithSchema(ctx context.Context, stateDir, model, jsonSchema, prompt string) (string, error) {
+func QueryLLMScopedWithSchema(ctx context.Context, stateDir, model, jsonSchema, prompt string) (string, error) {
 	return QuerySync(ctx, prompt, ClaudeOptions{
 		Model:      model,
 		JSONSchema: jsonSchema,
@@ -77,9 +77,9 @@ func queryLLMScopedWithSchema(ctx context.Context, stateDir, model, jsonSchema, 
 	})
 }
 
-// queryLLMScopedWithToolsAndSchema calls the claude CLI with tool access and
+// QueryLLMScopedWithToolsAndSchema calls the claude CLI with tool access and
 // --json-schema for structured output. Multi-turn mode — timeout controls duration.
-func queryLLMScopedWithToolsAndSchema(ctx context.Context, stateDir, model, jsonSchema, systemPrompt, userPrompt string, _ int) (string, error) {
+func QueryLLMScopedWithToolsAndSchema(ctx context.Context, stateDir, model, jsonSchema, systemPrompt, userPrompt string, _ int) (string, error) {
 	return QuerySync(ctx, userPrompt, ClaudeOptions{
 		Model:          model,
 		SystemPrompt:   systemPrompt,
@@ -90,11 +90,11 @@ func queryLLMScopedWithToolsAndSchema(ctx context.Context, stateDir, model, json
 	})
 }
 
-// extractJSON extracts a valid JSON object from output that may contain
+// ExtractJSON extracts a valid JSON object from output that may contain
 // surrounding text (markdown fences, explanatory text, etc.).
 // With --json-schema + stream-json, structured_output should be clean JSON,
 // but this provides robustness for edge cases.
-func extractJSON(s string) (string, error) {
+func ExtractJSON(s string) (string, error) {
 	s = strings.TrimSpace(s)
 
 	// Fast path: output is already valid JSON

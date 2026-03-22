@@ -1,6 +1,6 @@
-package main
+package engine
 
-// claude_sdk.go — Go abstraction mirroring Python claude_agent_sdk.
+// claude.go — Go abstraction mirroring Python claude_agent_sdk.
 //
 // Python SDK pattern:
 //   async for message in query(prompt=prompt, options=ClaudeAgentOptions(...)):
@@ -264,7 +264,7 @@ func buildCLIArgs(opts ClaudeOptions) []string {
 }
 
 func buildCLIEnv(opts ClaudeOptions) []string {
-	env := filterEnv("CLAUDECODE")
+	env := FilterEnv("CLAUDECODE")
 	for k, v := range opts.Env {
 		env = append(env, k+"="+v)
 	}

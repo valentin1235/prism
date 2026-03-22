@@ -1,4 +1,4 @@
-package main
+package parallel
 
 import (
 	"context"
@@ -15,14 +15,15 @@ const DefaultConcurrencyLimit = 4
 
 // ParallelJob represents a single unit of work for the parallel executor.
 // Each job wraps a function that spawns a claude CLI subprocess and returns
-// a StageResult. The PerspectiveID is used for logging and result correlation.
+// an output path and potential error. The PerspectiveID is used for logging
+// and result correlation.
 type ParallelJob struct {
 	// PerspectiveID identifies the perspective this job belongs to.
 	PerspectiveID string
 
 	// Fn is the work function to execute. It receives a context for cancellation
-	// and returns a StageResult with output path and potential error.
-	Fn func(ctx context.Context) StageResult
+	// and returns an output path and potential error.
+	Fn func(ctx context.Context) (outputPath string, err error)
 }
 
 // DefaultJobTimeout is the default per-process timeout for claude CLI subprocesses.
@@ -40,7 +41,7 @@ const DefaultJobTimeout = 12 * time.Minute
 //   - Automatic retry (once) on failure per job
 //   - Progress callback for real-time status updates
 //   - Context propagation for cancellation
-//   - stdout/stderr captured by underlying queryLLM* functions
+//   - stdout/stderr captured by underlying QueryLLM* functions
 type ParallelExecutor struct {
 	// Concurrency is the maximum number of concurrent jobs.
 	// Defaults to DefaultConcurrencyLimit if <= 0.
@@ -63,9 +64,16 @@ type ParallelExecutor struct {
 	JobTimeout time.Duration
 }
 
+// JobResult holds the outcome of a single parallel job.
+type JobResult struct {
+	PerspectiveID string
+	OutputPath    string
+	Err           error
+}
+
 // ParallelResults holds the collected results from a parallel execution run.
 type ParallelResults struct {
-	Results   []StageResult
+	Results   []JobResult
 	Succeeded int
 	Failed    int
 }
@@ -103,7 +111,7 @@ func (pe *ParallelExecutor) Execute(ctx context.Context, jobs []ParallelJob) Par
 		concurrency = n
 	}
 
-	results := make([]StageResult, n)
+	results := make([]JobResult, n)
 	sem := make(chan struct{}, concurrency)
 	var wg sync.WaitGroup
 
@@ -116,7 +124,7 @@ func (pe *ParallelExecutor) Execute(ctx context.Context, jobs []ParallelJob) Par
 			select {
 			case sem <- struct{}{}:
 			case <-ctx.Done():
-				results[idx] = StageResult{
+				results[idx] = JobResult{
 					PerspectiveID: j.PerspectiveID,
 					Err:           fmt.Errorf("context cancelled before start: %w", ctx.Err()),
 				}
@@ -127,7 +135,7 @@ func (pe *ParallelExecutor) Execute(ctx context.Context, jobs []ParallelJob) Par
 			}
 			defer func() { <-sem }() // Release semaphore slot
 
-			var result StageResult
+			var result JobResult
 			var attempts int
 
 			for attempt := 1; attempt <= retryLimit; attempt++ {
@@ -135,7 +143,7 @@ func (pe *ParallelExecutor) Execute(ctx context.Context, jobs []ParallelJob) Par
 
 				// Check parent context before each attempt
 				if ctx.Err() != nil {
-					result = StageResult{
+					result = JobResult{
 						PerspectiveID: j.PerspectiveID,
 						Err:           fmt.Errorf("context cancelled: %w", ctx.Err()),
 					}
@@ -146,9 +154,13 @@ func (pe *ParallelExecutor) Execute(ctx context.Context, jobs []ParallelJob) Par
 				// Each retry gets a fresh timeout — a timeout on attempt 1 doesn't
 				// reduce the time available for attempt 2.
 				attemptCtx, attemptCancel := context.WithTimeout(ctx, jobTimeout)
-				result = j.Fn(attemptCtx)
+				outputPath, err := j.Fn(attemptCtx)
 				attemptCancel() // release timer resources immediately
-				result.PerspectiveID = j.PerspectiveID
+				result = JobResult{
+					PerspectiveID: j.PerspectiveID,
+					OutputPath:    outputPath,
+					Err:           err,
+				}
 
 				if result.Err == nil {
 					break // Success

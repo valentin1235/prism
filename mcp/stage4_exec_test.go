@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	taskpkg "github.com/heechul/prism-mcp/internal/task"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
@@ -645,20 +646,16 @@ func TestReportSavedToReportsDir(t *testing.T) {
 	}
 
 	// Create a task with reportDir set
-	task := newAnalysisTask("analyze-abc123", "claude-sonnet-4-6", stateDir, reportDir, "")
+	task := taskpkg.NewAnalysisTask("analyze-abc123", "claude-sonnet-4-6", stateDir, reportDir, "")
 
 	// Verify the expected report path
-	task.mu.RLock()
-	rd := task.ReportDir
-	task.mu.RUnlock()
-
-	expectedReportPath := filepath.Join(rd, "report.md")
+	expectedReportPath := filepath.Join(task.GetReportDir(), "report.md")
 	if !strings.Contains(expectedReportPath, filepath.Join("reports", "analyze-abc123", "report.md")) {
 		t.Errorf("report path should be under reports/analyze-{id}/, got: %s", expectedReportPath)
 	}
 
-	// Simulate what runSynthesisStage does: build reportPath from task.ReportDir
-	reportPath := filepath.Join(rd, "report.md")
+	// Simulate what runSynthesisStage does: build reportPath from task.GetReportDir()
+	reportPath := filepath.Join(task.GetReportDir(), "report.md")
 
 	// Write a mock report to verify the path is writable
 	mockReport := "# Analysis Report\n## Executive Summary\nTest report content."
@@ -681,7 +678,7 @@ func TestReportSavedToReportsDir(t *testing.T) {
 	// SetReportPath and verify snapshot
 	task.SetReportPath(reportPath)
 	snap := task.Snapshot()
-	if snap.Status != TaskStatusCompleted {
+	if snap.Status != taskpkg.TaskStatusCompleted {
 		t.Errorf("expected completed status, got %s", snap.Status)
 	}
 	if snap.ReportPath != reportPath {
@@ -820,7 +817,7 @@ func TestReportDirCreatedByHandleAnalyze(t *testing.T) {
 	prismBaseDir = tmpDir
 	defer func() { prismBaseDir = origBase }()
 
-	taskStore = NewTaskStore()
+	taskStore = taskpkg.NewTaskStore()
 
 	// Create the base directories
 	os.MkdirAll(filepath.Join(tmpDir, "state"), 0755)
@@ -858,7 +855,7 @@ func TestReportDirCreatedByHandleAnalyze(t *testing.T) {
 
 	// Parse response to get task ID
 	text := result.Content[0].(mcp.TextContent).Text
-	var snap TaskSnapshot
+	var snap taskpkg.TaskSnapshot
 	if err := json.Unmarshal([]byte(text), &snap); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
 	}

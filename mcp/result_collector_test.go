@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/heechul/prism-mcp/internal/parallel"
 )
 
 func TestCollectSpecialistResults_AllSuccess(t *testing.T) {
@@ -1401,16 +1403,16 @@ func TestSkipLogic_JSONRoundTrip(t *testing.T) {
 // TestSkipLogic_ParallelExecutorWrapsRetryError verifies that ParallelExecutor
 // wraps the error with "all attempts failed" when retry is exhausted.
 func TestSkipLogic_ParallelExecutorWrapsRetryError(t *testing.T) {
-	pe := &ParallelExecutor{
+	pe := &parallel.ParallelExecutor{
 		Concurrency: 1,
 		RetryLimit:  2,
 	}
 
-	jobs := []ParallelJob{
+	jobs := []parallel.ParallelJob{
 		{
 			PerspectiveID: "wrap-test",
-			Fn: func(ctx context.Context) StageResult {
-				return StageResult{Err: fmt.Errorf("original error")}
+			Fn: func(ctx context.Context) (string, error) {
+				return "", fmt.Errorf("original error")
 			},
 		},
 	}

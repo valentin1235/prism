@@ -1,4 +1,4 @@
-package main
+package task
 
 import (
 	"context"
@@ -106,9 +106,9 @@ type AnalysisTask struct {
 	Cancel context.CancelFunc `json:"-"`
 }
 
-// newAnalysisTask creates a new task with all stages initialized to pending.
+// NewAnalysisTask creates a new task with all stages initialized to pending.
 // sessionID is optional — when non-empty, the task ID becomes "analyze-{sessionID}".
-func newAnalysisTask(contextID, model, stateDir, reportDir, sessionID string) *AnalysisTask {
+func NewAnalysisTask(contextID, model, stateDir, reportDir, sessionID string) *AnalysisTask {
 	now := time.Now().UTC()
 	stages := make(map[StageName]*StageProgress, 4)
 	for _, name := range AllStages() {
@@ -261,6 +261,27 @@ func (t *AnalysisTask) UpdateDirs(contextID, stateDir, reportDir string) {
 	t.UpdatedAt = time.Now().UTC()
 }
 
+// GetID returns the task ID under a read lock.
+func (t *AnalysisTask) GetID() string {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.ID
+}
+
+// GetStateDir returns the task state directory under a read lock.
+func (t *AnalysisTask) GetStateDir() string {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.StateDir
+}
+
+// GetReportDir returns the task report directory under a read lock.
+func (t *AnalysisTask) GetReportDir() string {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.ReportDir
+}
+
 // Snapshot returns a read-only copy of the task for safe external access.
 // All pointer fields are deep-copied to ensure true immutability.
 func (t *AnalysisTask) Snapshot() TaskSnapshot {
@@ -324,7 +345,7 @@ func NewTaskStore() *TaskStore {
 
 // Create adds a new task to the store and returns it.
 func (s *TaskStore) Create(contextID, model, stateDir, reportDir, sessionID string) *AnalysisTask {
-	task := newAnalysisTask(contextID, model, stateDir, reportDir, sessionID)
+	task := NewAnalysisTask(contextID, model, stateDir, reportDir, sessionID)
 	s.mu.Lock()
 	s.tasks[task.ID] = task
 	s.mu.Unlock()

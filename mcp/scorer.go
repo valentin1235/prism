@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/heechul/prism-mcp/internal/engine"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
@@ -47,7 +48,7 @@ weighted_total: <weighted average>
 pass: <true if weighted_total > 0.8, false otherwise>
 summary: <one-line assessment in same language as topic>`, session.Topic, findingsSection, history.String())
 
-	return queryLLM(ctx, prompt)
+	return engine.QueryLLM(ctx, prompt)
 }
 
 func handleScore(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {

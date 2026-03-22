@@ -1,7 +1,9 @@
-package main
+package task
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -9,7 +11,10 @@ import (
 
 func TestGenerateTaskID(t *testing.T) {
 	id := generateTaskID("")
-	if !strings.HasPrefix(id, "analyze-") {
+	if len(id) < 8 {
+		t.Errorf("expected prefix 'analyze-' with suffix, got %q", id)
+	}
+	if id[:8] != "analyze-" {
 		t.Errorf("expected prefix 'analyze-', got %q", id)
 	}
 	// "analyze-" (8) + 12 hex chars = 20
@@ -37,7 +42,7 @@ func TestGenerateTaskIDWithSessionID(t *testing.T) {
 
 	// Empty session_id should generate random ID
 	id = generateTaskID("")
-	if !strings.HasPrefix(id, "analyze-") {
+	if id[:8] != "analyze-" {
 		t.Errorf("expected prefix 'analyze-', got %q", id)
 	}
 	if id == "analyze-" {
@@ -81,7 +86,7 @@ func TestStageStatusIsTerminal(t *testing.T) {
 }
 
 func TestNewAnalysisTask(t *testing.T) {
-	task := newAnalysisTask("ctx-123", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
+	task := NewAnalysisTask("ctx-123", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
 
 	if task.Status != TaskStatusQueued {
 		t.Errorf("expected status queued, got %s", task.Status)
@@ -108,7 +113,7 @@ func TestNewAnalysisTask(t *testing.T) {
 }
 
 func TestTaskLifecycle(t *testing.T) {
-	task := newAnalysisTask("ctx-1", "model", "/state", "/reports", "")
+	task := NewAnalysisTask("ctx-1", "model", "/state", "/reports", "")
 
 	// Start task
 	task.SetStatus(TaskStatusRunning)
@@ -155,7 +160,7 @@ func TestTaskLifecycle(t *testing.T) {
 }
 
 func TestTaskSetError(t *testing.T) {
-	task := newAnalysisTask("ctx-err", "model", "/state", "/reports", "")
+	task := NewAnalysisTask("ctx-err", "model", "/state", "/reports", "")
 	task.SetStatus(TaskStatusRunning)
 	task.SetError("something went wrong")
 
@@ -285,7 +290,7 @@ func TestCrossTaskIsolation(t *testing.T) {
 }
 
 func TestSnapshotImmutability(t *testing.T) {
-	task := newAnalysisTask("ctx-immut", "model", "/state", "/reports", "")
+	task := NewAnalysisTask("ctx-immut", "model", "/state", "/reports", "")
 	task.SetStatus(TaskStatusRunning)
 	task.StartStage(StageScope, "running scope")
 
@@ -365,7 +370,7 @@ func TestConcurrentCrossTaskOperations(t *testing.T) {
 }
 
 func TestSnapshotStageOrdering(t *testing.T) {
-	task := newAnalysisTask("ctx-order", "model", "/state", "/reports", "")
+	task := NewAnalysisTask("ctx-order", "model", "/state", "/reports", "")
 	snap := task.Snapshot()
 
 	expected := AllStages()
@@ -375,6 +380,252 @@ func TestSnapshotStageOrdering(t *testing.T) {
 	for i, name := range expected {
 		if snap.Stages[i].Name != name {
 			t.Errorf("stage %d: expected %s, got %s", i, name, snap.Stages[i].Name)
+		}
+	}
+}
+
+// TestParallelTaskDirectoryIsolation verifies that concurrent analysis tasks
+// create completely independent state directories with no path overlap.
+func TestParallelTaskDirectoryIsolation(t *testing.T) {
+	store := NewTaskStore()
+	const numTasks = 20
+
+	tmpDir := t.TempDir()
+	stateBase := filepath.Join(tmpDir, "state")
+	reportBase := filepath.Join(tmpDir, "reports")
+
+	var wg sync.WaitGroup
+	tasks := make([]*AnalysisTask, numTasks)
+	errors := make([]error, numTasks)
+
+	// Create tasks concurrently — simulates parallel handleAnalyze calls
+	for i := 0; i < numTasks; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			task := store.Create("", "claude-sonnet-4-6", "", "", "")
+			contextID := task.ID
+			stateDir := filepath.Join(stateBase, contextID)
+			reportDir := filepath.Join(reportBase, contextID)
+			task.UpdateDirs(contextID, stateDir, reportDir)
+
+			if err := os.MkdirAll(stateDir, 0755); err != nil {
+				errors[idx] = fmt.Errorf("task %d state dir: %w", idx, err)
+				return
+			}
+			if err := os.MkdirAll(reportDir, 0755); err != nil {
+				errors[idx] = fmt.Errorf("task %d report dir: %w", idx, err)
+				return
+			}
+
+			// Write a task-specific marker file to verify isolation
+			marker := filepath.Join(stateDir, "marker.txt")
+			if err := os.WriteFile(marker, []byte(task.ID), 0644); err != nil {
+				errors[idx] = fmt.Errorf("task %d marker: %w", idx, err)
+				return
+			}
+
+			tasks[idx] = task
+		}(i)
+	}
+	wg.Wait()
+
+	// Check for errors
+	for i, err := range errors {
+		if err != nil {
+			t.Fatalf("task %d failed: %v", i, err)
+		}
+	}
+
+	// Verify all tasks got unique directories
+	seenDirs := make(map[string]string)
+	for i, task := range tasks {
+		if task == nil {
+			t.Fatalf("task %d is nil", i)
+		}
+		snap := task.Snapshot()
+		if prev, exists := seenDirs[snap.ContextID]; exists {
+			t.Errorf("directory collision: task %d shares context_id %s with %s", i, snap.ContextID, prev)
+		}
+		seenDirs[snap.ContextID] = snap.ID
+
+		// Verify marker file contains this task's ID (not another task's)
+		stateDir := filepath.Join(stateBase, snap.ContextID)
+		data, err := os.ReadFile(filepath.Join(stateDir, "marker.txt"))
+		if err != nil {
+			t.Fatalf("task %d: cannot read marker: %v", i, err)
+		}
+		if string(data) != snap.ID {
+			t.Errorf("task %d: marker contains %q, expected %q — cross-task contamination", i, string(data), snap.ID)
+		}
+	}
+}
+
+// TestConcurrentPipelineSimulation simulates multiple analysis pipelines
+// running concurrently, each with its own state directory and task,
+// verifying no cross-contamination.
+func TestConcurrentPipelineSimulation(t *testing.T) {
+	store := NewTaskStore()
+	tmpDir := t.TempDir()
+	const numPipelines = 10
+	const numSpecialists = 5
+
+	var wg sync.WaitGroup
+	pipelineErrors := make([][]error, numPipelines)
+
+	for p := 0; p < numPipelines; p++ {
+		pipelineErrors[p] = make([]error, 0)
+		wg.Add(1)
+		go func(pIdx int) {
+			defer wg.Done()
+
+			// Create task (mimics handleAnalyze)
+			task := store.Create("", "claude-sonnet-4-6", "", "", "")
+			stateDir := filepath.Join(tmpDir, "state", task.ID)
+			reportDir := filepath.Join(tmpDir, "reports", task.ID)
+			task.UpdateDirs(task.ID, stateDir, reportDir)
+
+			if err := os.MkdirAll(stateDir, 0755); err != nil {
+				pipelineErrors[pIdx] = append(pipelineErrors[pIdx], err)
+				return
+			}
+			if err := os.MkdirAll(reportDir, 0755); err != nil {
+				pipelineErrors[pIdx] = append(pipelineErrors[pIdx], err)
+				return
+			}
+
+			// Simulate pipeline stages
+			task.SetStatus(TaskStatusRunning)
+
+			// Stage 1: Scope (sequential)
+			task.StartStage(StageScope, "seed analysis")
+			scopeFile := filepath.Join(stateDir, "seed-analysis.json")
+			if err := os.WriteFile(scopeFile, []byte(fmt.Sprintf(`{"task":"%s"}`, task.ID)), 0644); err != nil {
+				pipelineErrors[pIdx] = append(pipelineErrors[pIdx], err)
+				return
+			}
+			task.CompleteStage(StageScope, "done")
+
+			// Stage 2: Specialists (parallel within this pipeline)
+			task.StartStage(StageSpecialist, fmt.Sprintf("running %d specialists", numSpecialists))
+			task.SetStageParallel(StageSpecialist, numSpecialists)
+
+			var specWg sync.WaitGroup
+			for s := 0; s < numSpecialists; s++ {
+				specWg.Add(1)
+				go func(sIdx int) {
+					defer specWg.Done()
+					perspID := fmt.Sprintf("perspective-%d", sIdx)
+					perspDir := filepath.Join(stateDir, "perspectives", perspID)
+					if err := os.MkdirAll(perspDir, 0755); err != nil {
+						task.IncrStageFailed(StageSpecialist)
+						return
+					}
+					// Write findings specific to this specialist
+					findings := filepath.Join(perspDir, "findings.json")
+					content := fmt.Sprintf(`{"task":"%s","perspective":"%s"}`, task.ID, perspID)
+					if err := os.WriteFile(findings, []byte(content), 0644); err != nil {
+						task.IncrStageFailed(StageSpecialist)
+						return
+					}
+					task.IncrStageCompleted(StageSpecialist)
+				}(s)
+			}
+			specWg.Wait()
+			task.CompleteStage(StageSpecialist, "all done")
+
+			// Stage 3: Interview (parallel)
+			task.StartStage(StageInterview, "interviewing")
+			task.SetStageParallel(StageInterview, numSpecialists)
+			var intWg sync.WaitGroup
+			for s := 0; s < numSpecialists; s++ {
+				intWg.Add(1)
+				go func(sIdx int) {
+					defer intWg.Done()
+					perspID := fmt.Sprintf("perspective-%d", sIdx)
+					perspDir := filepath.Join(stateDir, "perspectives", perspID)
+					interview := filepath.Join(perspDir, "interview.json")
+					content := fmt.Sprintf(`{"task":"%s","perspective":"%s","rounds":[]}`, task.ID, perspID)
+					if err := os.WriteFile(interview, []byte(content), 0644); err != nil {
+						task.IncrStageFailed(StageInterview)
+						return
+					}
+					task.IncrStageCompleted(StageInterview)
+				}(s)
+			}
+			intWg.Wait()
+			task.CompleteStage(StageInterview, "all done")
+
+			// Stage 4: Synthesis
+			task.StartStage(StageSynthesis, "generating report")
+			reportFile := filepath.Join(reportDir, "report.md")
+			if err := os.WriteFile(reportFile, []byte(fmt.Sprintf("# Report for %s", task.ID)), 0644); err != nil {
+				pipelineErrors[pIdx] = append(pipelineErrors[pIdx], err)
+				return
+			}
+			task.CompleteStage(StageSynthesis, "done")
+			task.SetReportPath(reportFile)
+		}(p)
+	}
+	wg.Wait()
+
+	// Verify no errors
+	for p, errs := range pipelineErrors {
+		for _, err := range errs {
+			t.Errorf("pipeline %d: %v", p, err)
+		}
+	}
+
+	// Verify all tasks completed independently
+	list := store.List()
+	if len(list) != numPipelines {
+		t.Fatalf("expected %d tasks, got %d", numPipelines, len(list))
+	}
+
+	for _, snap := range list {
+		if snap.Status != TaskStatusCompleted {
+			t.Errorf("task %s: expected completed, got %s", snap.ID, snap.Status)
+		}
+		if snap.ReportPath == "" {
+			t.Errorf("task %s: missing report path", snap.ID)
+		}
+
+		// Verify report file contains this task's ID
+		data, err := os.ReadFile(snap.ReportPath)
+		if err != nil {
+			t.Errorf("task %s: cannot read report: %v", snap.ID, err)
+			continue
+		}
+		expected := fmt.Sprintf("# Report for %s", snap.ID)
+		if string(data) != expected {
+			t.Errorf("task %s: report contaminated — got %q, want %q", snap.ID, string(data), expected)
+		}
+
+		// Verify specialist findings contain correct task ID
+		stateDir := filepath.Join(tmpDir, "state", snap.ID)
+		for s := 0; s < numSpecialists; s++ {
+			perspID := fmt.Sprintf("perspective-%d", s)
+			findingsFile := filepath.Join(stateDir, "perspectives", perspID, "findings.json")
+			fData, err := os.ReadFile(findingsFile)
+			if err != nil {
+				t.Errorf("task %s persp %s: cannot read findings: %v", snap.ID, perspID, err)
+				continue
+			}
+			if !strings.Contains(string(fData), snap.ID) {
+				t.Errorf("task %s persp %s: findings contaminated — %q", snap.ID, perspID, string(fData))
+			}
+		}
+
+		// Verify specialist stage counters
+		specStage := snap.Stages[1] // specialist
+		if specStage.Total != numSpecialists {
+			t.Errorf("task %s: specialist total %d, want %d", snap.ID, specStage.Total, numSpecialists)
+		}
+		if specStage.Completed != numSpecialists {
+			t.Errorf("task %s: specialist completed %d, want %d", snap.ID, specStage.Completed, numSpecialists)
+		}
+		if specStage.Failed != 0 {
+			t.Errorf("task %s: specialist failed %d, want 0", snap.ID, specStage.Failed)
 		}
 	}
 }

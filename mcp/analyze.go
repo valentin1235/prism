@@ -10,12 +10,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/heechul/prism-mcp/internal/engine"
+	"github.com/heechul/prism-mcp/internal/parallel"
+	taskpkg "github.com/heechul/prism-mcp/internal/task"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
 // taskStore is the package-level in-memory store for analysis tasks.
 // Initialized in main() before server start.
-var taskStore *TaskStore
+var taskStore *taskpkg.TaskStore
 
 // prismBaseDir is the resolved ~/.prism directory.
 var prismBaseDir string
@@ -221,18 +224,18 @@ func handleTaskStatus(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 	}
 
 	// Enforce max poll iterations for non-terminal tasks.
-	// After MaxPollIterations (120) polls at 30-second intervals (60 minutes),
+	// After taskpkg.MaxPollIterations (120) polls at 30-second intervals (60 minutes),
 	// auto-cancel the task to prevent infinite polling.
 	snapshot := task.Snapshot()
 	if !snapshot.Status.IsTerminal() {
 		pollCount := task.IncrPollCount()
-		if pollCount > MaxPollIterations {
+		if pollCount > taskpkg.MaxPollIterations {
 			log.Printf("[%s] Poll limit exceeded (%d > %d) — cancelling task",
-				taskID, pollCount, MaxPollIterations)
+				taskID, pollCount, taskpkg.MaxPollIterations)
 			if task.Cancel != nil {
 				task.Cancel()
 			}
-			task.SetError(fmt.Sprintf("poll limit exceeded: %d polls (max %d) — task timed out after prolonged execution", pollCount, MaxPollIterations))
+			task.SetError(fmt.Sprintf("poll limit exceeded: %d polls (max %d) — task timed out after prolonged execution", pollCount, taskpkg.MaxPollIterations))
 			// Re-take snapshot after failure
 			snapshot = task.Snapshot()
 		}
@@ -269,15 +272,15 @@ func handleAnalyzeResult(ctx context.Context, request mcp.CallToolRequest) (*mcp
 	}
 
 	switch snapshot.Status {
-	case TaskStatusQueued, TaskStatusRunning:
+	case taskpkg.TaskStatusQueued, taskpkg.TaskStatusRunning:
 		return mcp.NewToolResultError(fmt.Sprintf("task %s is still %s — use prism_task_status to poll progress", taskID, snapshot.Status)), nil
-	case TaskStatusFailed:
+	case taskpkg.TaskStatusFailed:
 		errMsg := snapshot.Error
 		if errMsg == "" {
 			errMsg = "unknown error"
 		}
 		return mcp.NewToolResultError(fmt.Sprintf("task %s failed: %s", taskID, errMsg)), nil
-	case TaskStatusCompleted:
+	case taskpkg.TaskStatusCompleted:
 		// Continue to extract result below
 	default:
 		return mcp.NewToolResultError(fmt.Sprintf("task %s has unexpected status: %s", taskID, snapshot.Status)), nil
@@ -297,7 +300,7 @@ func handleAnalyzeResult(ctx context.Context, request mcp.CallToolRequest) (*mcp
 
 	resp := AnalyzeResultResponse{
 		TaskID:     taskID,
-		Status:     string(TaskStatusCompleted),
+		Status:     string(taskpkg.TaskStatusCompleted),
 		ReportPath: reportPath,
 		Summary:    summary,
 	}
@@ -481,7 +484,7 @@ type StageResult struct {
 //  2. Specialist: parallel finding sessions (one per perspective)
 //  3. Interview: parallel verification sessions (one per perspective)
 //  4. Synthesis: report generation from verified findings
-func runAnalysisPipeline(task *AnalysisTask) {
+func runAnalysisPipeline(task *taskpkg.AnalysisTask) {
 	// Ensure cancel is called when pipeline exits to release resources.
 	defer func() {
 		if task.Cancel != nil {
@@ -489,17 +492,15 @@ func runAnalysisPipeline(task *AnalysisTask) {
 		}
 	}()
 
-	task.SetStatus(TaskStatusRunning)
+	task.SetStatus(taskpkg.TaskStatusRunning)
 	log.Printf("[%s] Pipeline started", task.ID)
 
 	// --- Read config ---
-	task.mu.RLock()
-	stateDir := task.StateDir
-	task.mu.RUnlock()
+	stateDir := task.GetStateDir()
 
 	cfg, err := readAnalysisConfig(stateDir)
 	if err != nil {
-		task.FailStage(StageScope, fmt.Sprintf("config read error: %v", err))
+		task.FailStage(taskpkg.StageScope, fmt.Sprintf("config read error: %v", err))
 		task.SetError(fmt.Sprintf("failed to read config: %v", err))
 		log.Printf("[%s] Pipeline failed: %v", task.ID, err)
 		return
@@ -508,26 +509,26 @@ func runAnalysisPipeline(task *AnalysisTask) {
 	// ============================
 	// Stage 1: Scope
 	// ============================
-	task.StartStage(StageScope, "starting seed analysis")
+	task.StartStage(taskpkg.StageScope, "starting seed analysis")
 	log.Printf("[%s] Stage scope: started", task.ID)
 
 	perspectives, err := runScopeStage(task, cfg)
 	if err != nil {
-		task.FailStage(StageScope, fmt.Sprintf("scope failed: %v", err))
+		task.FailStage(taskpkg.StageScope, fmt.Sprintf("scope failed: %v", err))
 		task.SetError(fmt.Sprintf("scope stage failed: %v", err))
 		log.Printf("[%s] Stage scope: FAILED — %v", task.ID, err)
 		return
 	}
 
-	task.CompleteStage(StageScope, fmt.Sprintf("%d perspectives generated", len(perspectives)))
+	task.CompleteStage(taskpkg.StageScope, fmt.Sprintf("%d perspectives generated", len(perspectives)))
 	log.Printf("[%s] Stage scope: completed with %d perspectives", task.ID, len(perspectives))
 
 	// ============================
 	// Stage 2: Specialist (parallel)
 	// ============================
 	numPerspectives := len(perspectives)
-	task.StartStage(StageSpecialist, fmt.Sprintf("launching %d specialists", numPerspectives))
-	task.SetStageParallel(StageSpecialist, numPerspectives)
+	task.StartStage(taskpkg.StageSpecialist, fmt.Sprintf("launching %d specialists", numPerspectives))
+	task.SetStageParallel(taskpkg.StageSpecialist, numPerspectives)
 	log.Printf("[%s] Stage specialist: started with %d perspectives", task.ID, numPerspectives)
 
 	specialistResults := runSpecialistStage(task, cfg, perspectives)
@@ -536,9 +537,7 @@ func runAnalysisPipeline(task *AnalysisTask) {
 	collected := CollectSpecialistResults(task.ID, specialistResults, perspectives)
 
 	// Persist collected findings for downstream stages
-	task.mu.RLock()
-	collectStateDir := task.StateDir
-	task.mu.RUnlock()
+	collectStateDir := task.GetStateDir()
 
 	if err := WriteCollectedFindings(collectStateDir, collected); err != nil {
 		log.Printf("[%s] Warning: failed to persist collected findings: %v", task.ID, err)
@@ -547,7 +546,7 @@ func runAnalysisPipeline(task *AnalysisTask) {
 
 	// All specialists failed → abort
 	if collected.Succeeded == 0 {
-		task.FailStage(StageSpecialist, fmt.Sprintf("all %d specialists failed", collected.Failed))
+		task.FailStage(taskpkg.StageSpecialist, fmt.Sprintf("all %d specialists failed", collected.Failed))
 		task.SetError("all specialist analyses failed")
 		log.Printf("[%s] Stage specialist: FAILED — all %d failed", task.ID, collected.Failed)
 		return
@@ -559,7 +558,7 @@ func runAnalysisPipeline(task *AnalysisTask) {
 		detail += fmt.Sprintf(" (%d failed — partial)", collected.Failed)
 		log.Printf("[%s] Stage specialist: partial failure — %s", task.ID, collected.DegradationNotice())
 	}
-	task.CompleteStage(StageSpecialist, detail)
+	task.CompleteStage(taskpkg.StageSpecialist, detail)
 	log.Printf("[%s] Stage specialist: completed — %s", task.ID, detail)
 
 	// ============================
@@ -567,8 +566,8 @@ func runAnalysisPipeline(task *AnalysisTask) {
 	// ============================
 	// Only interview perspectives that produced findings
 	interviewCount := collected.Succeeded
-	task.StartStage(StageInterview, fmt.Sprintf("launching %d interviews", interviewCount))
-	task.SetStageParallel(StageInterview, interviewCount)
+	task.StartStage(taskpkg.StageInterview, fmt.Sprintf("launching %d interviews", interviewCount))
+	task.SetStageParallel(taskpkg.StageInterview, interviewCount)
 	log.Printf("[%s] Stage interview: started with %d verifiers", task.ID, interviewCount)
 
 	interviewResults := runInterviewStage(task, cfg, perspectives, specialistResults)
@@ -577,9 +576,7 @@ func runAnalysisPipeline(task *AnalysisTask) {
 	collectedVerifications := CollectInterviewResults(task.ID, interviewResults, perspectives)
 
 	// Persist collected verifications for synthesis stage
-	task.mu.RLock()
-	interviewStateDir := task.StateDir
-	task.mu.RUnlock()
+	interviewStateDir := task.GetStateDir()
 
 	if err := WriteCollectedVerifications(interviewStateDir, collectedVerifications); err != nil {
 		log.Printf("[%s] Warning: failed to persist collected verifications: %v", task.ID, err)
@@ -597,49 +594,47 @@ func runAnalysisPipeline(task *AnalysisTask) {
 	if collectedVerifications.PartialFailure {
 		log.Printf("[%s] Stage interview: partial failure — %s", task.ID, collectedVerifications.InterviewDegradationNotice())
 	}
-	task.CompleteStage(StageInterview, intDetail)
+	task.CompleteStage(taskpkg.StageInterview, intDetail)
 	log.Printf("[%s] Stage interview: completed — %s", task.ID, intDetail)
 
 	// ============================
 	// Stage 4: Synthesis
 	// ============================
-	task.StartStage(StageSynthesis, "generating report")
+	task.StartStage(taskpkg.StageSynthesis, "generating report")
 	log.Printf("[%s] Stage synthesis: started", task.ID)
 
 	reportPath, err := runSynthesisStage(task, cfg, perspectives, interviewResults)
 	if err != nil {
-		task.FailStage(StageSynthesis, fmt.Sprintf("synthesis failed: %v", err))
+		task.FailStage(taskpkg.StageSynthesis, fmt.Sprintf("synthesis failed: %v", err))
 		task.SetError(fmt.Sprintf("synthesis stage failed: %v", err))
 		log.Printf("[%s] Stage synthesis: FAILED — %v", task.ID, err)
 		return
 	}
 
-	task.CompleteStage(StageSynthesis, fmt.Sprintf("report at %s", reportPath))
+	task.CompleteStage(taskpkg.StageSynthesis, fmt.Sprintf("report at %s", reportPath))
 	task.SetReportPath(reportPath)
 	log.Printf("[%s] Pipeline completed — report: %s", task.ID, reportPath)
 }
 
 // runScopeStage executes the scope stage: seed analysis → DA review → perspective generation.
 // Returns the generated perspectives or an error.
-func runScopeStage(task *AnalysisTask, cfg AnalysisConfig) ([]Perspective, error) {
-	task.mu.RLock()
-	stateDir := task.StateDir
-	task.mu.RUnlock()
+func runScopeStage(task *taskpkg.AnalysisTask, cfg AnalysisConfig) ([]Perspective, error) {
+	stateDir := task.GetStateDir()
 
 	// Sub-step 1: Seed analysis
-	task.UpdateStageDetail(StageScope, "running seed analysis")
+	task.UpdateStageDetail(taskpkg.StageScope, "running seed analysis")
 	if err := runSeedAnalysis(task, cfg); err != nil {
 		return nil, fmt.Errorf("seed analysis: %w", err)
 	}
 
 	// Sub-step 2: DA review loop (up to 3 rounds)
-	task.UpdateStageDetail(StageScope, "seed complete, running DA review")
+	task.UpdateStageDetail(taskpkg.StageScope, "seed complete, running DA review")
 	if err := runDAReviewLoop(task, cfg); err != nil {
 		return nil, fmt.Errorf("DA review: %w", err)
 	}
 
 	// Sub-step 3: Perspective generation
-	task.UpdateStageDetail(StageScope, "DA review complete, generating perspectives")
+	task.UpdateStageDetail(taskpkg.StageScope, "DA review complete, generating perspectives")
 	if err := runPerspectiveGeneration(task, cfg); err != nil {
 		return nil, fmt.Errorf("perspective generation: %w", err)
 	}
@@ -657,7 +652,7 @@ func runScopeStage(task *AnalysisTask, cfg AnalysisConfig) ([]Perspective, error
 
 	// Sub-step 4: Merge injected perspectives (if perspective_injection provided)
 	if cfg.PerspectiveInjection != "" {
-		task.UpdateStageDetail(StageScope, "merging injected perspectives")
+		task.UpdateStageDetail(taskpkg.StageScope, "merging injected perspectives")
 		injected, err := loadInjectedPerspectives(cfg.PerspectiveInjection)
 		if err != nil {
 			// Non-fatal: log warning and continue with generated perspectives only
@@ -685,10 +680,8 @@ func runScopeStage(task *AnalysisTask, cfg AnalysisConfig) ([]Perspective, error
 // LoadSpecialistContext is called once via BuildAllSpecialistCommands, then
 // pre-built commands are passed to each runSpecialistSession.
 // Updates task parallel progress counters as specialists complete.
-func runSpecialistStage(task *AnalysisTask, cfg AnalysisConfig, perspectives []Perspective) []StageResult {
-	task.mu.RLock()
-	taskID := task.ID
-	task.mu.RUnlock()
+func runSpecialistStage(task *taskpkg.AnalysisTask, cfg AnalysisConfig, perspectives []Perspective) []StageResult {
+	taskID := task.GetID()
 
 	// Build all specialist commands once — loads shared context (seed summary,
 	// ontology scope, doc paths) a single time instead of per-perspective.
@@ -702,49 +695,45 @@ func runSpecialistStage(task *AnalysisTask, cfg AnalysisConfig, perspectives []P
 		return results
 	}
 
-	jobs := make([]ParallelJob, len(commands))
+	jobs := make([]parallel.ParallelJob, len(commands))
 	for i, c := range commands {
 		cmd := c // capture for closure
-		jobs[i] = ParallelJob{
+		jobs[i] = parallel.ParallelJob{
 			PerspectiveID: cmd.PerspectiveID,
-			Fn: func(ctx context.Context) StageResult {
+			Fn: func(ctx context.Context) (string, error) {
 				err := runSpecialistSession(ctx, task, cmd)
 				if err != nil {
-					return StageResult{Err: err}
+					return "", err
 				}
-				return StageResult{
-					OutputPath: cmd.OutputPath,
-				}
+				return cmd.OutputPath, nil
 			},
 		}
 	}
 
-	executor := &ParallelExecutor{
-		Concurrency: DefaultConcurrencyLimit,
+	executor := &parallel.ParallelExecutor{
+		Concurrency: parallel.DefaultConcurrencyLimit,
 		RetryLimit:  2, // 1 initial + 1 retry
-		JobTimeout:  DefaultJobTimeout,
+		JobTimeout:  parallel.DefaultJobTimeout,
 		OnJobComplete: func(perspectiveID string, success bool, attempts int) {
 			if success {
-				task.IncrStageCompleted(StageSpecialist)
+				task.IncrStageCompleted(taskpkg.StageSpecialist)
 				log.Printf("[%s] Specialist %s completed (attempts: %d)", taskID, perspectiveID, attempts)
 			} else {
-				task.IncrStageFailed(StageSpecialist)
+				task.IncrStageFailed(taskpkg.StageSpecialist)
 				log.Printf("[%s] Specialist %s failed after %d attempts", taskID, perspectiveID, attempts)
 			}
 		},
 	}
 
 	pr := executor.Execute(task.Ctx, jobs)
-	return pr.Results
+	return jobResultsToStageResults(pr.Results)
 }
 
 // runInterviewStage executes parallel verification sessions for perspectives
 // that produced findings. Uses ParallelExecutor for concurrency limiting.
 // Updates task parallel progress counters.
-func runInterviewStage(task *AnalysisTask, cfg AnalysisConfig, perspectives []Perspective, specialistResults []StageResult) []StageResult {
-	task.mu.RLock()
-	taskID := task.ID
-	task.mu.RUnlock()
+func runInterviewStage(task *taskpkg.AnalysisTask, cfg AnalysisConfig, perspectives []Perspective, specialistResults []StageResult) []StageResult {
+	taskID := task.GetID()
 
 	// Build all interview commands upfront — loads shared context once,
 	// reads specialist findings from disk for each perspective, and skips
@@ -762,48 +751,44 @@ func runInterviewStage(task *AnalysisTask, cfg AnalysisConfig, perspectives []Pe
 		return results
 	}
 
-	jobs := make([]ParallelJob, len(commands))
+	jobs := make([]parallel.ParallelJob, len(commands))
 	for i, cmd := range commands {
 		cmd := cmd // capture for closure
-		jobs[i] = ParallelJob{
+		jobs[i] = parallel.ParallelJob{
 			PerspectiveID: cmd.PerspectiveID,
-			Fn: func(ctx context.Context) StageResult {
+			Fn: func(ctx context.Context) (string, error) {
 				err := runInterviewSession(ctx, task, cmd)
 				if err != nil {
-					return StageResult{Err: err}
+					return "", err
 				}
-				return StageResult{
-					OutputPath: cmd.OutputPath,
-				}
+				return cmd.OutputPath, nil
 			},
 		}
 	}
 
-	executor := &ParallelExecutor{
-		Concurrency: DefaultConcurrencyLimit,
+	executor := &parallel.ParallelExecutor{
+		Concurrency: parallel.DefaultConcurrencyLimit,
 		RetryLimit:  2, // 1 initial + 1 retry
-		JobTimeout:  DefaultJobTimeout,
+		JobTimeout:  parallel.DefaultJobTimeout,
 		OnJobComplete: func(perspectiveID string, success bool, attempts int) {
 			if success {
-				task.IncrStageCompleted(StageInterview)
+				task.IncrStageCompleted(taskpkg.StageInterview)
 				log.Printf("[%s] Interview %s completed (attempts: %d)", taskID, perspectiveID, attempts)
 			} else {
-				task.IncrStageFailed(StageInterview)
+				task.IncrStageFailed(taskpkg.StageInterview)
 				log.Printf("[%s] Interview %s failed after %d attempts", taskID, perspectiveID, attempts)
 			}
 		},
 	}
 
 	pr := executor.Execute(task.Ctx, jobs)
-	return pr.Results
+	return jobResultsToStageResults(pr.Results)
 }
 
 // runSynthesisStage generates the final report from verified findings.
 // Returns the path to the generated report file.
-func runSynthesisStage(task *AnalysisTask, cfg AnalysisConfig, perspectives []Perspective, interviewResults []StageResult) (string, error) {
-	task.mu.RLock()
-	reportDir := task.ReportDir
-	task.mu.RUnlock()
+func runSynthesisStage(task *taskpkg.AnalysisTask, cfg AnalysisConfig, perspectives []Perspective, interviewResults []StageResult) (string, error) {
+	reportDir := task.GetReportDir()
 
 	reportPath := filepath.Join(reportDir, "report.md")
 
@@ -830,13 +815,13 @@ func runSynthesisStage(task *AnalysisTask, cfg AnalysisConfig, perspectives []Pe
 // The ctx parameter carries the per-job timeout set by the ParallelExecutor. This function
 // does NOT create its own timeout — the executor manages timeouts centrally to ensure
 // consistent behavior across all parallel jobs.
-func runInterviewSession(ctx context.Context, task *AnalysisTask, cmd InterviewCommand) error {
+func runInterviewSession(ctx context.Context, task *taskpkg.AnalysisTask, cmd InterviewCommand) error {
 	log.Printf("[%s] Interview %s: starting CLI subprocess (model=%s, maxTurns=%d, workDir=%s)",
 		task.ID, cmd.PerspectiveID, cmd.Model, cmd.MaxTurns, cmd.WorkDir)
 
 	// Run claude CLI with tool access and structured output.
 	// The ctx already carries a per-job timeout from the ParallelExecutor.
-	rawOutput, err := queryLLMScopedWithToolsAndSchema(
+	rawOutput, err := engine.QueryLLMScopedWithToolsAndSchema(
 		ctx,
 		cmd.WorkDir,
 		cmd.Model,
@@ -850,7 +835,7 @@ func runInterviewSession(ctx context.Context, task *AnalysisTask, cmd InterviewC
 	}
 
 	// Extract JSON from potentially wrapped output
-	jsonStr, err := extractJSON(rawOutput)
+	jsonStr, err := engine.ExtractJSON(rawOutput)
 	if err != nil {
 		return fmt.Errorf("extract interview %s JSON: %w (raw length: %d)", cmd.PerspectiveID, err, len(rawOutput))
 	}
@@ -888,7 +873,7 @@ func runInterviewSession(ctx context.Context, task *AnalysisTask, cmd InterviewC
 // synthesis prompt with the report template, and invokes a single claude CLI to produce
 // the final analysis report. The report is validated for required sections and written to disk.
 // Implemented in stage4_exec.go via runSynthesisSession.
-func runReportGeneration(task *AnalysisTask, cfg AnalysisConfig, perspectives []Perspective, reportPath string) error {
+func runReportGeneration(task *taskpkg.AnalysisTask, cfg AnalysisConfig, perspectives []Perspective, reportPath string) error {
 	// Synthesis timeout: 30 minutes
 	ctx, cancel := context.WithTimeout(task.Ctx, 30*time.Minute)
 	defer cancel()
@@ -934,4 +919,17 @@ func mergeInjectedPerspectives(generated, injected []Perspective) []Perspective 
 	}
 
 	return merged
+}
+
+// jobResultsToStageResults converts parallel.JobResult slice to StageResult slice.
+func jobResultsToStageResults(jobs []parallel.JobResult) []StageResult {
+	results := make([]StageResult, len(jobs))
+	for i, j := range jobs {
+		results[i] = StageResult{
+			PerspectiveID: j.PerspectiveID,
+			OutputPath:    j.OutputPath,
+			Err:           j.Err,
+		}
+	}
+	return results
 }

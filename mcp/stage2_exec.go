@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+
+	"github.com/heechul/prism-mcp/internal/engine"
+	taskpkg "github.com/heechul/prism-mcp/internal/task"
 )
 
 // runSpecialistSession runs a single specialist finding session via claude CLI subprocess.
@@ -17,13 +20,13 @@ import (
 // The ctx parameter carries the per-job timeout set by the ParallelExecutor. This function
 // does NOT create its own timeout — the executor manages timeouts centrally to ensure
 // consistent behavior across all parallel jobs.
-func runSpecialistSession(ctx context.Context, task *AnalysisTask, cmd SpecialistCommand) error {
+func runSpecialistSession(ctx context.Context, task *taskpkg.AnalysisTask, cmd SpecialistCommand) error {
 	log.Printf("[%s] Specialist %s: starting CLI subprocess (model=%s, maxTurns=%d, workDir=%s)",
 		task.ID, cmd.PerspectiveID, cmd.Model, cmd.MaxTurns, cmd.WorkDir)
 
 	// Run claude CLI with tool access and structured output.
 	// The ctx already carries a per-job timeout from the ParallelExecutor.
-	rawOutput, err := queryLLMScopedWithToolsAndSchema(
+	rawOutput, err := engine.QueryLLMScopedWithToolsAndSchema(
 		ctx,
 		cmd.WorkDir,
 		cmd.Model,
@@ -37,7 +40,7 @@ func runSpecialistSession(ctx context.Context, task *AnalysisTask, cmd Specialis
 	}
 
 	// Extract JSON from potentially wrapped output
-	jsonStr, err := extractJSON(rawOutput)
+	jsonStr, err := engine.ExtractJSON(rawOutput)
 	if err != nil {
 		return fmt.Errorf("extract specialist %s JSON: %w (raw length: %d)", cmd.PerspectiveID, err, len(rawOutput))
 	}

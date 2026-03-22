@@ -5,13 +5,16 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/heechul/prism-mcp/internal/engine"
+	taskpkg "github.com/heechul/prism-mcp/internal/task"
 )
 
 // --- Tests for extractJSON ---
 
 func TestExtractJSON_CleanJSON(t *testing.T) {
 	input := `{"topic":"test","da_passed":true,"research":{"summary":"s","findings":[],"key_areas":[],"mcp_queries":[]}}`
-	got, err := extractJSON(input)
+	got, err := engine.ExtractJSON(input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -22,7 +25,7 @@ func TestExtractJSON_CleanJSON(t *testing.T) {
 
 func TestExtractJSON_WithWhitespace(t *testing.T) {
 	input := `  {"key": "value"}  `
-	got, err := extractJSON(input)
+	got, err := engine.ExtractJSON(input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -33,7 +36,7 @@ func TestExtractJSON_WithWhitespace(t *testing.T) {
 
 func TestExtractJSON_MarkdownFences(t *testing.T) {
 	input := "```json\n{\"key\": \"value\"}\n```"
-	got, err := extractJSON(input)
+	got, err := engine.ExtractJSON(input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -52,7 +55,7 @@ func TestExtractJSON_SurroundingText(t *testing.T) {
 {"topic":"test","da_passed":true,"research":{"summary":"s","findings":[],"key_areas":[],"mcp_queries":[]}}
 
 That completes the analysis.`
-	got, err := extractJSON(input)
+	got, err := engine.ExtractJSON(input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -67,7 +70,7 @@ That completes the analysis.`
 
 func TestExtractJSON_NestedBraces(t *testing.T) {
 	input := `{"outer": {"inner": {"deep": "value"}}}`
-	got, err := extractJSON(input)
+	got, err := engine.ExtractJSON(input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -78,7 +81,7 @@ func TestExtractJSON_NestedBraces(t *testing.T) {
 
 func TestExtractJSON_StringsWithBraces(t *testing.T) {
 	input := `{"code": "func() { return }"}`
-	got, err := extractJSON(input)
+	got, err := engine.ExtractJSON(input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -93,14 +96,14 @@ func TestExtractJSON_StringsWithBraces(t *testing.T) {
 
 func TestExtractJSON_NoJSON(t *testing.T) {
 	input := "This is just plain text without any JSON"
-	_, err := extractJSON(input)
+	_, err := engine.ExtractJSON(input)
 	if err == nil {
 		t.Error("expected error for input without JSON")
 	}
 }
 
 func TestExtractJSON_EmptyInput(t *testing.T) {
-	_, err := extractJSON("")
+	_, err := engine.ExtractJSON("")
 	if err == nil {
 		t.Error("expected error for empty input")
 	}
@@ -108,7 +111,7 @@ func TestExtractJSON_EmptyInput(t *testing.T) {
 
 func TestExtractJSON_InvalidJSON(t *testing.T) {
 	input := `{not valid json}`
-	_, err := extractJSON(input)
+	_, err := engine.ExtractJSON(input)
 	if err == nil {
 		t.Error("expected error for invalid JSON")
 	}
@@ -116,7 +119,7 @@ func TestExtractJSON_InvalidJSON(t *testing.T) {
 
 func TestExtractJSON_Array(t *testing.T) {
 	input := `[{"id": 1}, {"id": 2}]`
-	got, err := extractJSON(input)
+	got, err := engine.ExtractJSON(input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -128,7 +131,7 @@ func TestExtractJSON_Array(t *testing.T) {
 func TestExtractJSON_ArrayWrappedInText(t *testing.T) {
 	input := "Here are the results:\n[{\"id\": 1}, {\"id\": 2}]\nDone."
 	expected := `[{"id": 1}, {"id": 2}]`
-	got, err := extractJSON(input)
+	got, err := engine.ExtractJSON(input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -140,7 +143,7 @@ func TestExtractJSON_ArrayWrappedInText(t *testing.T) {
 func TestExtractJSON_ArrayInMarkdownFences(t *testing.T) {
 	input := "```json\n[{\"key\": \"value\"}]\n```"
 	expected := `[{"key": "value"}]`
-	got, err := extractJSON(input)
+	got, err := engine.ExtractJSON(input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -152,7 +155,7 @@ func TestExtractJSON_ArrayInMarkdownFences(t *testing.T) {
 func TestExtractJSON_ObjectBeforeArray(t *testing.T) {
 	// When '{' comes before '[', should extract the object
 	input := `{"key": "value"}`
-	got, err := extractJSON(input)
+	got, err := engine.ExtractJSON(input)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -277,7 +280,7 @@ func TestRunPerspectiveGeneration_WritesAndValidatesOutput(t *testing.T) {
 
 func TestRunDAReviewLoop_SeedAnalysisFileRequired(t *testing.T) {
 	tmpDir := t.TempDir()
-	task := &AnalysisTask{
+	task := &taskpkg.AnalysisTask{
 		ID:       "analyze-test123",
 		StateDir: tmpDir,
 	}
@@ -390,7 +393,7 @@ func TestExtractJSON_PerspectivesOutput(t *testing.T) {
   "selection_summary": "Two test perspectives selected"
 }`
 
-	got, err := extractJSON(perspJSON)
+	got, err := engine.ExtractJSON(perspJSON)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -437,7 +440,7 @@ func TestExtractJSON_SeedAnalysisOutput(t *testing.T) {
   }
 }`
 
-	got, err := extractJSON(seedJSON)
+	got, err := engine.ExtractJSON(seedJSON)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

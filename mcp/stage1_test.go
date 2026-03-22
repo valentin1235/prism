@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	taskpkg "github.com/heechul/prism-mcp/internal/task"
 )
 
 func TestBuildSeedAnalystPrompt_BasicStructure(t *testing.T) {
@@ -346,7 +348,7 @@ func TestLoadStage1Config(t *testing.T) {
 	configBytes, _ := json.MarshalIndent(config, "", "  ")
 	os.WriteFile(filepath.Join(tmpDir, "config.json"), configBytes, 0644)
 
-	task := &AnalysisTask{StateDir: tmpDir}
+	task := &taskpkg.AnalysisTask{StateDir: tmpDir}
 	sc, err := LoadStage1Config(task)
 	if err != nil {
 		t.Fatalf("LoadStage1Config failed: %v", err)
@@ -370,7 +372,7 @@ func TestLoadStage1Config(t *testing.T) {
 }
 
 func TestLoadStage1Config_MissingFile(t *testing.T) {
-	task := &AnalysisTask{StateDir: "/nonexistent/path"}
+	task := &taskpkg.AnalysisTask{StateDir: "/nonexistent/path"}
 	_, err := LoadStage1Config(task)
 	if err == nil {
 		t.Error("LoadStage1Config should fail for missing config.json")

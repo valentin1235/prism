@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 
+	taskpkg "github.com/heechul/prism-mcp/internal/task"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -13,7 +14,7 @@ func main() {
 	}
 
 	// Initialize the task store for analysis orchestration
-	taskStore = NewTaskStore()
+	taskStore = taskpkg.NewTaskStore()
 
 	s := server.NewMCPServer(
 		"prism-mcp",
