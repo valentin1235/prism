@@ -143,6 +143,57 @@ func TestParseDAGaps_SelfAuditLogDoesNotInterfere(t *testing.T) {
 	if gaps[0].Type != "bias" {
 		t.Errorf("gap[0].Type = %q, want bias", gaps[0].Type)
 	}
+	// Verify description does NOT bleed into Self-Audit Log or Summary sections
+	if containsSubstr(gaps[0].Description, "Self-Audit") {
+		t.Errorf("gap[0].Description should not contain Self-Audit content, got: %s", truncate(gaps[0].Description, 200))
+	}
+	if containsSubstr(gaps[0].Description, "Overall confidence") {
+		t.Errorf("gap[0].Description should not contain Summary content, got: %s", truncate(gaps[0].Description, 200))
+	}
+}
+
+func TestParseDAGaps_LastGapDoesNotBleedIntoSections(t *testing.T) {
+	// Regression test: the last gap's description must NOT include
+	// ## Self-Audit Log or ## Summary content
+	gaps := ParseDAGaps(sampleNewFormatOutput)
+	if len(gaps) != 3 {
+		t.Fatalf("expected 3 gaps, got %d", len(gaps))
+	}
+	lastGap := gaps[2]
+	if containsSubstr(lastGap.Description, "Self-Audit") {
+		t.Errorf("last gap Description must not bleed into Self-Audit Log, got: %s", truncate(lastGap.Description, 200))
+	}
+	if containsSubstr(lastGap.Description, "Overall confidence") {
+		t.Errorf("last gap Description must not bleed into Summary, got: %s", truncate(lastGap.Description, 200))
+	}
+	if containsSubstr(lastGap.Description, "Top concerns") {
+		t.Errorf("last gap Description must not bleed into Summary, got: %s", truncate(lastGap.Description, 200))
+	}
+}
+
+func TestParseDAGaps_CaseInsensitiveType(t *testing.T) {
+	// LLMs may output [Bias] or [COVERAGE] instead of lowercase
+	input := `## Gaps
+
+### [Bias] Mixed-case bias entry
+Some description.
+
+### [COVERAGE] Uppercase coverage entry
+Another description.
+
+## Summary
+- **Overall confidence**: ` + "`HIGH`" + ` — All good
+`
+	gaps := ParseDAGaps(input)
+	if len(gaps) != 2 {
+		t.Fatalf("expected 2 gaps from mixed-case input, got %d", len(gaps))
+	}
+	if gaps[0].Type != "bias" {
+		t.Errorf("gap[0].Type = %q, want 'bias' (normalized to lowercase)", gaps[0].Type)
+	}
+	if gaps[1].Type != "coverage" {
+		t.Errorf("gap[1].Type = %q, want 'coverage' (normalized to lowercase)", gaps[1].Type)
+	}
 }
 
 func TestParseDAGaps_NoneIdentified(t *testing.T) {

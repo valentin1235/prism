@@ -103,14 +103,11 @@ var (
 	// GapKeywordRe detects gap type keywords in raw output for parse failure detection.
 	GapKeywordRe = regexp.MustCompile(`(?i)\b(bias|coverage)\b`)
 
-	// SeverityKeywordRe detects legacy severity keywords (kept for backward compat detection).
-	SeverityKeywordRe = regexp.MustCompile(`(?i)\b(CRITICAL|MAJOR)\b`)
+	// Gap entry: ### [bias] or ### [coverage] followed by description text (case-insensitive)
+	gapEntryRe = regexp.MustCompile(`(?mi)^###\s+\[(bias|coverage)\]\s*(.*)$`)
 
-	// Gap entry: ### [bias] or ### [coverage] followed by description text
-	gapEntryRe = regexp.MustCompile(`(?m)^###\s+\[(bias|coverage)\]\s*(.*)$`)
-
-	// Next ### header (for gap boundary detection)
-	nextGapRe = regexp.MustCompile(`(?m)^### `)
+	// Level-2 markdown header boundary (## ) for truncating last gap body
+	sectionHeaderRe = regexp.MustCompile(`(?m)^## `)
 
 	// Summary fields
 	summaryConfRe  = regexp.MustCompile("(?m)^-\\s+\\*\\*Overall confidence\\*\\*:\\s*`?(HIGH|MEDIUM|LOW)`?\\s*[—–-]?\\s*(.*)")
@@ -201,13 +198,17 @@ func ParseDAGaps(raw string) []DAGap {
 		gapType := strings.ToLower(raw[m[2]:m[3]])
 		title := strings.TrimSpace(raw[m[4]:m[5]])
 
-		// Determine the description text boundary (until next ### or end)
+		// Determine the description text boundary (until next gap entry or section header)
 		bodyStart := m[1]
 		var bodyEnd int
 		if i+1 < len(matches) {
 			bodyEnd = matches[i+1][0]
 		} else {
 			bodyEnd = len(raw)
+		}
+		// Truncate at next ## header to prevent bleeding into Self-Audit Log / Summary
+		if loc := sectionHeaderRe.FindStringIndex(raw[bodyStart:bodyEnd]); loc != nil {
+			bodyEnd = bodyStart + loc[0]
 		}
 		body := strings.TrimSpace(raw[bodyStart:bodyEnd])
 
