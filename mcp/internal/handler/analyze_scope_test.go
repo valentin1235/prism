@@ -1,3 +1,5 @@
+// NOTE: Tests in this file mutate package globals (PrismBaseDir, TaskStore)
+// and MUST NOT use t.Parallel().
 package handler
 
 import (
@@ -23,7 +25,7 @@ func setupTestBrownfieldDB(t *testing.T, repos []brownfield.Repo, defaultPaths [
 	dir := t.TempDir()
 
 	dbPath := filepath.Join(dir, "prism.db")
-	db, err := sql.Open("sqlite", dbPath)
+	db, err := sql.Open("sqlite", dbPath+"?_pragma=journal_mode(wal)")
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -286,7 +288,10 @@ func TestNoBrownfieldDBReturnsError(t *testing.T) {
 // TestBuildOntologyScopeFromPaths verifies the scope JSON construction.
 func TestBuildOntologyScopeFromPaths(t *testing.T) {
 	paths := []string{"/repo/a", "/repo/b", "/repo/c"}
-	scope := pipeline.BuildOntologyScopeFromPaths(paths)
+	scope, err := pipeline.BuildOntologyScopeFromPaths(paths)
+	if err != nil {
+		t.Fatalf("BuildOntologyScopeFromPaths: %v", err)
+	}
 
 	var parsed struct {
 		Sources []struct {

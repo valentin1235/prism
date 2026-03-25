@@ -88,7 +88,7 @@ func HandleAnalyze(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallT
 
 	// --- Resolve ontology scope: explicit param → brownfield defaults → error ---
 	if ontologyScope == "" {
-		resolved, err := resolveOntologyScopeFromBrownfield()
+		resolved, err := resolveOntologyScopeFromBrownfield(PrismBaseDir)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
@@ -447,17 +447,17 @@ func HandleCancelTask(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 	return mcp.NewToolResultText(string(resultBytes)), nil
 }
 
-// resolveOntologyScopeFromBrownfield opens the brownfield store, queries
-// default repos (is_default=1), and builds an ontology scope JSON string
-// from their paths. Returns an error if the store cannot be opened or no
-// defaults are configured.
-func resolveOntologyScopeFromBrownfield() (string, error) {
-	dbPath := filepath.Join(PrismBaseDir, "prism.db")
+// resolveOntologyScopeFromBrownfield opens the brownfield store at the given
+// base directory, queries default repos (is_default=1), and builds an ontology
+// scope JSON string from their paths. Returns an error if the store cannot be
+// opened or no defaults are configured.
+func resolveOntologyScopeFromBrownfield(baseDir string) (string, error) {
+	dbPath := filepath.Join(baseDir, "prism.db")
 	if _, err := os.Stat(dbPath); err != nil {
 		return "", fmt.Errorf("brownfield store를 먼저 설정해주세요: prism.db not found at %s", dbPath)
 	}
 
-	store, err := brownfield.NewStoreAt(dbPath)
+	store, err := brownfield.OpenStoreAt(dbPath)
 	if err != nil {
 		return "", fmt.Errorf("brownfield store를 먼저 설정해주세요: %v", err)
 	}
@@ -477,7 +477,10 @@ func resolveOntologyScopeFromBrownfield() (string, error) {
 		paths[i] = r.Path
 	}
 
-	scope := pipeline.BuildOntologyScopeFromPaths(paths)
+	scope, err := pipeline.BuildOntologyScopeFromPaths(paths)
+	if err != nil {
+		return "", fmt.Errorf("failed to build ontology scope: %v", err)
+	}
 	log.Printf("Resolved ontology scope from %d brownfield default repo(s)", len(defaults))
 	return scope, nil
 }

@@ -236,20 +236,15 @@ func (s *Store) DefaultRepos() ([]Repo, error) {
 	return repos, err
 }
 
-// NewStoreAt opens (or creates) the brownfield SQLite database at the given path.
-// Used by other packages that need to access the brownfield store without
-// relying on home directory resolution.
-func NewStoreAt(dbPath string) (*Store, error) {
+// OpenStoreAt opens an existing brownfield SQLite database at the given path
+// for read-only queries. Unlike NewStore, it skips DDL initialization since
+// the database is expected to already exist.
+func OpenStoreAt(dbPath string) (*Store, error) {
 	db, err := sql.Open("sqlite", dbPath+"?_pragma=journal_mode(wal)")
 	if err != nil {
 		return nil, fmt.Errorf("cannot open database: %w", err)
 	}
-	s := &Store{db: db}
-	if err := s.initialize(); err != nil {
-		db.Close()
-		return nil, err
-	}
-	return s, nil
+	return &Store{db: db}, nil
 }
 
 // Close closes the database connection.

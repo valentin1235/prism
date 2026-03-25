@@ -399,7 +399,7 @@ func LoadStage1Config(task *taskpkg.AnalysisTask) (Stage1Config, error) {
 // from a list of repository paths. Each path becomes a "doc" type source.
 // This is used when no explicit ontology_scope parameter is provided, but
 // brownfield default repositories are configured.
-func BuildOntologyScopeFromPaths(paths []string) string {
+func BuildOntologyScopeFromPaths(paths []string) (string, error) {
 	type accessInfo struct {
 		Tools        []string `json:"tools"`
 		Instructions string   `json:"instructions"`
@@ -442,8 +442,11 @@ func BuildOntologyScopeFromPaths(paths []string) string {
 		Totals:  totals{Doc: len(paths)},
 	}
 
-	data, _ := json.Marshal(s)
-	return string(data)
+	data, err := json.Marshal(s)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal ontology scope: %w", err)
+	}
+	return string(data), nil
 }
 
 // stringFromMap extracts a string value from a map, returning "" if missing or wrong type.
