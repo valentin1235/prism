@@ -29,7 +29,7 @@ Three categories of assertions, each verified against real execution artifacts:
 3. Resolve paths:
    - `{skill-dir}` = absolute path to this SKILL.md's parent directory
    - `{analyze-skill-path}` = resolve evals.json `analyze_skill_path` relative to `{skill-dir}` → absolute path
-   - `{ontology_instruction}` = if evals.json `config.skip_ontology` is true: `"Skip ontology scope mapping. Write N/A to ontology-scope.json."`, else: `"Execute ontology scope mapping normally."`
+   - Ontology scope is auto-resolved by the MCP server from brownfield defaults (no manual mapping needed)
 4. Create workspace: `~/.prism/state/{test-run-id}/`
 5. Create results directory: `{skill-dir}/test-results/{test-run-id}/`
 6. Show user: "Running {N} test cases. Estimated time: ~5-8 min per test case."

@@ -400,6 +400,9 @@ func LoadStage1Config(task *taskpkg.AnalysisTask) (Stage1Config, error) {
 // This is used when no explicit ontology_scope parameter is provided, but
 // brownfield default repositories are configured.
 func BuildOntologyScopeFromPaths(paths []string) (string, error) {
+	if len(paths) == 0 {
+		return "", fmt.Errorf("paths must not be empty")
+	}
 	type accessInfo struct {
 		Tools        []string `json:"tools"`
 		Instructions string   `json:"instructions"`

@@ -72,19 +72,15 @@ Extract the directory path from the first match (remove `/SKILL.md` suffix). Sto
 
 If Glob returns no results, fall back to `~/prism/skills/incident` as default path and verify it exists via `Bash(ls {path}/SKILL.md)`.
 
-### Step 1.2: Ontology Scope Mapping
+### Step 1.2: Session Setup
 
-> Read and execute `../analyze/protocols/ontology-scope-mapping.md` (relative to `{SKILL_DIR}`) with:
-- `{AVAILABILITY_MODE}` = `optional`
-- `{CALLER_CONTEXT}` = `"incident analysis"`
-- `{STATE_DIR}` = Generate a short-id via `Bash(uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-8)`, then `mkdir -p ~/.prism/state/analyze-{short-id}` and use that path. Store `{short-id}` for use as `session_id`.
+Generate a short-id via `Bash(uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-8)`, then `mkdir -p ~/.prism/state/analyze-{short-id}` and use that path. Store `{short-id}` for use as `session_id`.
 
-Resolve ontology scope to a JSON string in canonical `{"sources": [...]}` format. If `ONTOLOGY_AVAILABLE=false` → pass `null` as `ontology_scope`.
+> **Note:** Ontology scope is auto-resolved by the MCP server from brownfield default repos. No manual mapping needed.
 
 ### Phase 1 Exit Gate
 
 - [ ] `{SKILL_DIR}` resolved
-- [ ] Ontology scope resolved (JSON string or null)
 - [ ] `{short-id}` generated and `~/.prism/state/analyze-{short-id}/` directory created
 
 → **NEXT ACTION: Proceed to Phase 2 — Start Analysis.**
