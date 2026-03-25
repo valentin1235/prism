@@ -545,15 +545,12 @@ func RunDAReviewLoop(task *taskpkg.AnalysisTask, cfg AnalysisConfig) error {
 			return fmt.Errorf("read seed analysis for DA round %d: %w", round, err)
 		}
 
-		// Load DA system prompt
-		daPrompt, err := LoadDASystemPrompt()
-		if err != nil {
-			return fmt.Errorf("load DA system prompt: %w", err)
-		}
+		// Use seed-analysis-specialized DA prompt (Go-defined, no file I/O)
+		daPrompt := SeedAnalysisDAPrompt
 
 		// Build user prompt for DA review — full seed analysis content
 		userPrompt := fmt.Sprintf(
-			"Apply your full 4-phase protocol to critique this seed analysis. Evaluate the ENTIRE content holistically — assess all findings, coverage gaps, and potential biases across the complete analysis:\n\n%s",
+			"Apply your full 4-phase protocol to critique this seed analysis. Identify perspective biases and codebase coverage gaps:\n\n%s",
 			string(seedData),
 		)
 
@@ -565,33 +562,33 @@ func RunDAReviewLoop(task *taskpkg.AnalysisTask, cfg AnalysisConfig) error {
 			return fmt.Errorf("DA review LLM call round %d: %w", round, err)
 		}
 
-		// Parse DA findings from markdown output
-		findings := ParseDAFindings(rawOutput)
+		// Parse DA gaps from markdown output
+		gaps := ParseDAGaps(rawOutput)
 		overallConfidence, topConcerns, whatHoldsUp := ParseDASummary(rawOutput)
-		actionable := FilterActionableFindings(findings)
-		criticalCount, majorCount := CountSeverities(actionable)
-		pass := ShouldPassDA(criticalCount, majorCount)
+		biasCount, coverageCount := CountGapsByType(gaps)
+		pass := ShouldPassDAGaps(gaps)
 
-		// Detect parse failure: no findings extracted but severity keywords present
+		// Detect parse failure: no gaps extracted but gap keywords present
 		// in raw output. The DA likely produced non-standard markdown. Treat as
 		// not-passed to avoid false positive pass on parse failure.
 		var parseWarning string
-		if pass && len(findings) == 0 && SeverityKeywordRe.MatchString(rawOutput) {
+		if pass && len(gaps) == 0 && GapKeywordRe.MatchString(rawOutput) {
 			pass = false
-			parseWarning = "no findings parsed but CRITICAL/MAJOR keywords detected in raw output; treating as not-passed"
+			parseWarning = "no gaps parsed but bias/coverage keywords detected in raw output; treating as not-passed"
 			log.Printf("[%s] DA round %d: parse warning — %s", task.ID, round, parseWarning)
 		}
 
-		log.Printf("[%s] DA round %d: pass=%v critical=%d major=%d total_actionable=%d",
-			task.ID, round, pass, criticalCount, majorCount, len(actionable))
+		log.Printf("[%s] DA round %d: pass=%v bias=%d coverage=%d total_gaps=%d",
+			task.ID, round, pass, biasCount, coverageCount, len(gaps))
 
 		// Record round in history and flush to disk immediately
 		history.Rounds = append(history.Rounds, DAReviewRound{
 			Round:             round,
 			Pass:              pass,
-			CriticalCount:     criticalCount,
-			MajorCount:        majorCount,
-			Findings:          actionable,
+			GapCount:          len(gaps),
+			BiasCount:         biasCount,
+			CoverageCount:     coverageCount,
+			Gaps:              gaps,
 			OverallConfidence: overallConfidence,
 			TopConcerns:       topConcerns,
 			WhatHoldsUp:       whatHoldsUp,
@@ -610,16 +607,16 @@ func RunDAReviewLoop(task *taskpkg.AnalysisTask, cfg AnalysisConfig) error {
 			log.Printf("[%s] Warning: failed to write DA history after round %d: %v", task.ID, round, err)
 		}
 
-		// Last allowed round — stop regardless of findings
+		// Last allowed round — stop regardless of gaps
 		if round >= MaxDARounds {
-			log.Printf("[%s] DA review hard stop at round %d with %d actionable findings",
-				task.ID, round, len(actionable))
+			log.Printf("[%s] DA review hard stop at round %d with %d gaps",
+				task.ID, round, len(gaps))
 			break
 		}
 
-		// Actionable findings found — run supplementary research to address gaps
-		task.UpdateStageDetail(taskpkg.StageScope, fmt.Sprintf("DA round %d: re-researching %d issues", round, len(actionable)))
-		if err := runSupplementaryResearch(task, cfg, actionable); err != nil {
+		// Gaps found — run supplementary research to address them
+		task.UpdateStageDetail(taskpkg.StageScope, fmt.Sprintf("DA round %d: re-researching %d gaps", round, len(gaps)))
+		if err := runSupplementaryResearch(task, cfg, gaps); err != nil {
 			// Log but don't fail — continue with existing findings
 			log.Printf("[%s] Supplementary research failed round %d: %v — continuing with existing findings",
 				task.ID, round, err)
@@ -635,7 +632,7 @@ func RunDAReviewLoop(task *taskpkg.AnalysisTask, cfg AnalysisConfig) error {
 // runSupplementaryResearch runs a focused research subprocess to address
 // specific gaps identified by the DA review. New findings are merged into
 // the existing seed-analysis.json using MergeSeedAnalysis.
-func runSupplementaryResearch(task *taskpkg.AnalysisTask, cfg AnalysisConfig, findings []DAFinding) error {
+func runSupplementaryResearch(task *taskpkg.AnalysisTask, cfg AnalysisConfig, gaps []DAGap) error {
 	stateDir := task.GetStateDir()
 
 	// Build focused re-research system prompt
@@ -643,15 +640,9 @@ func runSupplementaryResearch(task *taskpkg.AnalysisTask, cfg AnalysisConfig, fi
 	sb.WriteString("You are conducting SUPPLEMENTARY RESEARCH to address specific gaps identified by a Devil's Advocate review.\n\n")
 	sb.WriteString("ORIGINAL TOPIC:\n")
 	sb.WriteString(cfg.Topic)
-	sb.WriteString("\n\nThe DA review found these issues that need investigation:\n\n")
-	for i, f := range findings {
-		sb.WriteString(fmt.Sprintf("%d. [%s] %s\n", i+1, f.Severity, f.Title))
-		if f.Concern != "" {
-			sb.WriteString(fmt.Sprintf("   Concern: %s\n", f.Concern))
-		}
-		if f.FalsificationTest != "" {
-			sb.WriteString(fmt.Sprintf("   Falsification test: %s\n", f.FalsificationTest))
-		}
+	sb.WriteString("\n\nThe DA review found these gaps that need investigation:\n\n")
+	for i, g := range gaps {
+		sb.WriteString(fmt.Sprintf("%d. [%s] %s\n", i+1, g.Type, g.Description))
 	}
 	sb.WriteString("\nInvestigate ONLY these specific gaps. Use tools (Grep, Read, Glob, Bash) to find concrete evidence.\n")
 	sb.WriteString("Output your additional findings as structured JSON following the same schema.\n")

@@ -433,18 +433,20 @@ func TestWriteDAHistory_RoundTrip(t *testing.T) {
 			{
 				Round:             1,
 				Pass:              false,
-				CriticalCount:     1,
-				MajorCount:        0,
-				Findings:          []DAFinding{{Severity: "CRITICAL", Title: "Missing coverage"}},
+				GapCount:          1,
+				BiasCount:         0,
+				CoverageCount:     1,
+				Gaps:              []DAGap{{Type: "coverage", Description: "Missing coverage in auth module"}},
 				OverallConfidence: "LOW",
 				TopConcerns:       "gap in API layer",
 			},
 			{
 				Round:             2,
 				Pass:              true,
-				CriticalCount:     0,
-				MajorCount:        0,
-				Findings:          []DAFinding{},
+				GapCount:          0,
+				BiasCount:         0,
+				CoverageCount:     0,
+				Gaps:              []DAGap{},
 				OverallConfidence: "HIGH",
 				WhatHoldsUp:       "all areas covered",
 			},
@@ -482,19 +484,22 @@ func TestWriteDAHistory_RoundTrip(t *testing.T) {
 	if r1.Pass {
 		t.Error("round 1 should not pass")
 	}
-	if r1.CriticalCount != 1 {
-		t.Errorf("round 1 critical_count = %d, want 1", r1.CriticalCount)
+	if r1.GapCount != 1 {
+		t.Errorf("round 1 gap_count = %d, want 1", r1.GapCount)
 	}
-	if len(r1.Findings) != 1 {
-		t.Errorf("round 1 findings count = %d, want 1", len(r1.Findings))
+	if r1.CoverageCount != 1 {
+		t.Errorf("round 1 coverage_count = %d, want 1", r1.CoverageCount)
+	}
+	if len(r1.Gaps) != 1 {
+		t.Errorf("round 1 gaps count = %d, want 1", len(r1.Gaps))
 	}
 	// Round 2 checks
 	r2 := loaded.Rounds[1]
 	if !r2.Pass {
 		t.Error("round 2 should pass")
 	}
-	if r2.CriticalCount != 0 || r2.MajorCount != 0 {
-		t.Error("round 2 should have zero critical and major counts")
+	if r2.GapCount != 0 {
+		t.Error("round 2 should have zero gap count")
 	}
 }
 
@@ -504,9 +509,9 @@ func TestWriteDAHistory_HardStop(t *testing.T) {
 		FinalPassed: false,
 		TotalRounds: 3,
 		Rounds: []DAReviewRound{
-			{Round: 1, Pass: false, CriticalCount: 2},
-			{Round: 2, Pass: false, CriticalCount: 1},
-			{Round: 3, Pass: false, CriticalCount: 1},
+			{Round: 1, Pass: false, GapCount: 2, BiasCount: 1, CoverageCount: 1},
+			{Round: 2, Pass: false, GapCount: 1, CoverageCount: 1},
+			{Round: 3, Pass: false, GapCount: 1, BiasCount: 1},
 		},
 	}
 

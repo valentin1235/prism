@@ -53,7 +53,7 @@ func HandleDAReview(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 			Round:     round,
 			MaxRounds: pipeline.MaxDARounds,
 			HardStop:  true,
-			Findings:  []pipeline.DAFinding{},
+			Gaps:      []pipeline.DAGap{},
 			RawOutput: fmt.Sprintf("hard stop: round %d exceeds maximum of %d rounds", round, pipeline.MaxDARounds),
 		}
 		resultJSON, _ := json.MarshalIndent(hardStopResult, "", "  ")
@@ -72,15 +72,12 @@ func HandleDAReview(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 		return mcp.NewToolResultError(fmt.Sprintf("invalid JSON in seed analysis: %v", err)), nil
 	}
 
-	// Load DA system prompt
-	daPrompt, err := pipeline.LoadDASystemPrompt()
-	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("failed to load DA system prompt: %v", err)), nil
-	}
+	// Use seed-analysis-specialized DA prompt (Go-defined, no file I/O)
+	daPrompt := pipeline.SeedAnalysisDAPrompt
 
 	// Build user prompt with the COMPLETE seed analysis content.
 	var userPrompt strings.Builder
-	userPrompt.WriteString("Apply your full 4-phase protocol to critique this seed analysis. Evaluate the ENTIRE content holistically — assess all findings, coverage gaps, and potential biases across the complete analysis:\n\n")
+	userPrompt.WriteString("Apply your full 4-phase protocol to critique this seed analysis. Identify perspective biases and codebase coverage gaps:\n\n")
 	userPrompt.WriteString(string(seedData))
 
 	if extraContext != "" {
@@ -94,33 +91,31 @@ func HandleDAReview(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 		return mcp.NewToolResultError(fmt.Sprintf("DA review LLM call failed: %v", err)), nil
 	}
 
-	// Parse findings from markdown
-	findings := pipeline.ParseDAFindings(rawOutput)
+	// Parse gaps from markdown
+	gaps := pipeline.ParseDAGaps(rawOutput)
 	overallConfidence, topConcerns, whatHoldsUp := pipeline.ParseDASummary(rawOutput)
 
 	// Detect parse failure
 	var parseWarning string
-	if len(findings) == 0 && pipeline.SeverityKeywordRe.MatchString(rawOutput) {
-		parseWarning = "WARNING: No findings were parsed from DA output, but severity keywords (CRITICAL/MAJOR) were detected in the raw output. The DA likely produced findings in a non-standard format. Check raw_output for details."
+	if len(gaps) == 0 && pipeline.GapKeywordRe.MatchString(rawOutput) {
+		parseWarning = "WARNING: No gaps were parsed from DA output, but bias/coverage keywords were detected in the raw output. The DA likely produced gaps in a non-standard format. Check raw_output for details."
 	}
 
-	// Filter to only actionable (CRITICAL/MAJOR) findings, discard MINOR/INFO
-	actionable := pipeline.FilterActionableFindings(findings)
+	// Count by gap type
+	biasCount, coverageCount := pipeline.CountGapsByType(gaps)
 
-	// Count by severity using shared helper
-	criticalCount, majorCount := pipeline.CountSeverities(actionable)
-
-	// Pass (signals early loop termination) when critical_count + major_count == 0
-	pass := pipeline.ShouldPassDA(criticalCount, majorCount)
+	// Pass (signals early loop termination) when no gaps found
+	pass := pipeline.ShouldPassDAGaps(gaps)
 
 	// On the final allowed round, hard_stop signals the caller to exit regardless of pass
 	hardStop := round >= pipeline.MaxDARounds
 
 	result := pipeline.DAReviewResult{
 		Pass:              pass,
-		CriticalCount:     criticalCount,
-		MajorCount:        majorCount,
-		Findings:          actionable,
+		GapCount:          len(gaps),
+		BiasCount:         biasCount,
+		CoverageCount:     coverageCount,
+		Gaps:              gaps,
 		Round:             round,
 		MaxRounds:         pipeline.MaxDARounds,
 		HardStop:          hardStop,

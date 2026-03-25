@@ -12,55 +12,27 @@ import (
 )
 
 const sampleDAOutput = `## Pre-Commitment Predictions
-- **Input type**: Analysis
+- **Input type**: Seed analysis
 - **Domain**: Software architecture
 - **Initial stance**: The seed analysis identifies performance bottlenecks in the API layer.
-- **Predicted biases**: Confirmation bias, anchoring on initial data
+- **Predicted biases**: Confirmation bias toward database-centric framing
 - **Predicted blind spots**: User experience impact, operational costs
 
-## Challenged Framings
+## Identified Gaps
 
-### Performance Bottleneck Framing
-- **Claim**: "The primary bottleneck is in the database query layer"
-- **Concern**: This framing assumes the bottleneck is singular and located in the DB layer, potentially ignoring network latency, serialization overhead, or client-side rendering as contributing factors.
-- **Confidence**: ` + "`HIGH`" + `
-- **Severity**: ` + "`CRITICAL`" + `
-- **Falsification test**: Profile end-to-end request latency and compare DB query time vs total response time across 100 representative requests.
+### [bias] Performance bottleneck framing is too narrow
+The analysis frames the bottleneck as singular and located in the DB layer, potentially ignoring network latency, serialization overhead, or client-side rendering as contributing factors.
 
-### Scaling Strategy Assumption
-- **Claim**: "Horizontal scaling will resolve throughput issues"
-- **Concern**: The analysis frames scaling as purely horizontal without considering vertical optimization or architectural changes that could reduce the need to scale.
-- **Confidence**: ` + "`MEDIUM`" + `
-- **Severity**: ` + "`MAJOR`" + `
-- **Falsification test**: Compare cost-per-request for horizontal scaling vs query optimization on the top 10 slowest endpoints.
+### [coverage] Missing end-user impact assessment
+The analysis focuses on server-side metrics without considering user-perceived latency. Missing this perspective means optimizations might improve server metrics without meaningfully improving user experience.
 
-## Missing Perspectives
-
-### End-User Impact Assessment
-- **Claim**: The analysis focuses on server-side metrics without considering user-perceived latency.
-- **Concern**: Missing the end-user perspective means optimizations might improve server metrics without meaningfully improving user experience.
-- **Confidence**: ` + "`HIGH`" + `
-- **Severity**: ` + "`MAJOR`" + `
-- **Falsification test**: Collect Real User Monitoring (RUM) data and correlate with server-side metrics to verify they track together.
-
-## Bias Indicators
-
-None identified.
-
-## Alternative Framings
-
-### Cost-Efficiency Reframing
-- **Claim**: "We need to optimize for throughput"
-- **Concern**: Reframing from throughput to cost-per-transaction might reveal that some "slow" paths are actually cost-efficient and acceptable, while some "fast" paths are wastefully over-provisioned.
-- **Confidence**: ` + "`MEDIUM`" + `
-- **Severity**: ` + "`MINOR`" + `
-- **Falsification test**: Calculate cost-per-transaction for each endpoint and compare against business value delivered.
+### [bias] Scaling strategy assumes horizontal only
+The analysis frames scaling as purely horizontal without considering vertical optimization or architectural changes that could reduce the need to scale.
 
 ## Self-Audit Log
-- Performance Bottleneck Framing: kept — specific to this analysis, falsification test is concrete
-- Scaling Strategy Assumption: downgraded from CRITICAL to MAJOR — steelman test shows horizontal scaling is a reasonable default
-- End-User Impact Assessment: kept — genuinely missing from the analysis
-- Cost-Efficiency Reframing: kept — offers actionable alternative perspective
+- Performance bottleneck framing: kept — specific to this analysis, bias is concrete
+- Missing end-user impact: kept — genuinely missing from the analysis
+- Scaling strategy: kept — represents real perspective skew
 
 ## Summary
 - **Overall confidence**: ` + "`MEDIUM`" + ` — The analysis provides concrete data but frames the problem narrowly
@@ -69,62 +41,35 @@ None identified.
 - **What holds up**: The data collection methodology is sound, and the identified queries are genuinely slow based on the evidence presented.
 `
 
-func TestParseDAFindings(t *testing.T) {
-	findings := pipeline.ParseDAFindings(sampleDAOutput)
+func TestParseDAGaps(t *testing.T) {
+	gaps := pipeline.ParseDAGaps(sampleDAOutput)
 
-	if len(findings) != 4 {
-		t.Fatalf("expected 4 findings, got %d", len(findings))
-	}
-
-	// Check first finding (Challenged Framings - CRITICAL)
-	f := findings[0]
-	if f.Section != "Challenged Framings" {
-		t.Errorf("finding[0].Section = %q, want %q", f.Section, "Challenged Framings")
-	}
-	if f.Title != "Performance Bottleneck Framing" {
-		t.Errorf("finding[0].Title = %q, want %q", f.Title, "Performance Bottleneck Framing")
-	}
-	if f.Severity != "CRITICAL" {
-		t.Errorf("finding[0].Severity = %q, want %q", f.Severity, "CRITICAL")
-	}
-	if f.Confidence != "HIGH" {
-		t.Errorf("finding[0].Confidence = %q, want %q", f.Confidence, "HIGH")
-	}
-	if f.Claim == "" {
-		t.Error("finding[0].Claim should not be empty")
-	}
-	if f.Concern == "" {
-		t.Error("finding[0].Concern should not be empty")
-	}
-	if f.FalsificationTest == "" {
-		t.Error("finding[0].FalsificationTest should not be empty")
+	if len(gaps) != 3 {
+		t.Fatalf("expected 3 gaps, got %d", len(gaps))
 	}
 
-	// Check second finding (Challenged Framings - MAJOR)
-	f = findings[1]
-	if f.Section != "Challenged Framings" {
-		t.Errorf("finding[1].Section = %q, want %q", f.Section, "Challenged Framings")
+	// Check first gap (bias)
+	g := gaps[0]
+	if g.Type != "bias" {
+		t.Errorf("gap[0].Type = %q, want %q", g.Type, "bias")
 	}
-	if f.Severity != "MAJOR" {
-		t.Errorf("finding[1].Severity = %q, want %q", f.Severity, "MAJOR")
-	}
-
-	// Check third finding (Missing Perspectives)
-	f = findings[2]
-	if f.Section != "Missing Perspectives" {
-		t.Errorf("finding[2].Section = %q, want %q", f.Section, "Missing Perspectives")
-	}
-	if f.Title != "End-User Impact Assessment" {
-		t.Errorf("finding[2].Title = %q, want %q", f.Title, "End-User Impact Assessment")
+	if g.Description == "" {
+		t.Error("gap[0].Description should not be empty")
 	}
 
-	// Check fourth finding (Alternative Framings - MINOR)
-	f = findings[3]
-	if f.Section != "Alternative Framings" {
-		t.Errorf("finding[3].Section = %q, want %q", f.Section, "Alternative Framings")
+	// Check second gap (coverage)
+	g = gaps[1]
+	if g.Type != "coverage" {
+		t.Errorf("gap[1].Type = %q, want %q", g.Type, "coverage")
 	}
-	if f.Severity != "MINOR" {
-		t.Errorf("finding[3].Severity = %q, want %q", f.Severity, "MINOR")
+	if g.Description == "" {
+		t.Error("gap[1].Description should not be empty")
+	}
+
+	// Check third gap (bias)
+	g = gaps[2]
+	if g.Type != "bias" {
+		t.Errorf("gap[2].Type = %q, want %q", g.Type, "bias")
 	}
 }
 
@@ -142,191 +87,96 @@ func TestParseDASummary(t *testing.T) {
 	}
 }
 
-func TestParseDAFindings_EmptySections(t *testing.T) {
-	input := `## Challenged Framings
+func TestParseDAGaps_NoGaps(t *testing.T) {
+	input := `## Pre-Commitment Predictions
+- **Input type**: Seed analysis
 
-None identified.
+## Identified Gaps
 
-## Missing Perspectives
-
-None identified.
-
-## Bias Indicators
-
-None identified.
-
-## Alternative Framings
-
-None identified.
+No gaps identified.
 
 ## Summary
 - **Overall confidence**: ` + "`HIGH`" + ` — The analysis is sound
 - **Top concerns**: None significant
 - **What holds up**: Everything
 `
-	findings := pipeline.ParseDAFindings(input)
-	if len(findings) != 0 {
-		t.Errorf("expected 0 findings for empty sections, got %d", len(findings))
+	gaps := pipeline.ParseDAGaps(input)
+	if len(gaps) != 0 {
+		t.Errorf("expected 0 gaps for no-gap output, got %d", len(gaps))
 	}
 }
 
-func TestParseDAFindings_NoSections(t *testing.T) {
-	findings := pipeline.ParseDAFindings("No structured output here")
-	if len(findings) != 0 {
-		t.Errorf("expected 0 findings for unstructured input, got %d", len(findings))
+func TestParseDAGaps_NoSections(t *testing.T) {
+	gaps := pipeline.ParseDAGaps("No structured output here")
+	if len(gaps) != 0 {
+		t.Errorf("expected 0 gaps for unstructured input, got %d", len(gaps))
 	}
 }
 
 func TestDAReviewResult_PassAndCounts(t *testing.T) {
-	findings := pipeline.ParseDAFindings(sampleDAOutput)
+	gaps := pipeline.ParseDAGaps(sampleDAOutput)
+	biasCount, coverageCount := pipeline.CountGapsByType(gaps)
+	pass := pipeline.ShouldPassDAGaps(gaps)
 
-	var criticalCount, majorCount int
-	for _, f := range findings {
-		switch f.Severity {
-		case "CRITICAL":
-			criticalCount++
-		case "MAJOR":
-			majorCount++
-		}
+	if biasCount != 2 {
+		t.Errorf("bias_count = %d, want 2", biasCount)
 	}
-	pass := criticalCount == 0 && majorCount == 0
-
-	if criticalCount != 1 {
-		t.Errorf("critical_count = %d, want 1", criticalCount)
-	}
-	if majorCount != 2 {
-		t.Errorf("major_count = %d, want 2", majorCount)
+	if coverageCount != 1 {
+		t.Errorf("coverage_count = %d, want 1", coverageCount)
 	}
 	if pass {
-		t.Error("pass should be false when CRITICAL/MAJOR findings exist")
+		t.Error("pass should be false when gaps exist")
 	}
 }
 
-func TestDAReviewResult_PassWhenOnlyMinor(t *testing.T) {
-	// Only MINOR findings should result in pass=true
-	input := `## Challenged Framings
+func TestDAReviewResult_PassWhenNoGaps(t *testing.T) {
+	input := `## Pre-Commitment Predictions
+- **Input type**: Seed analysis
 
-None identified.
+## Identified Gaps
 
-## Missing Perspectives
-
-None identified.
-
-## Bias Indicators
-
-None identified.
-
-## Alternative Framings
-
-### Minor Suggestion
-- **Claim**: Something minor
-- **Concern**: Not critical
-- **Confidence**: ` + "`LOW`" + `
-- **Severity**: ` + "`MINOR`" + `
-- **Falsification test**: Check it
-
-## Summary
-- **Overall confidence**: ` + "`HIGH`" + ` — Mostly good
-- **Top concerns**: Minor issues only
-- **What holds up**: Main analysis
-`
-	findings := pipeline.ParseDAFindings(input)
-
-	var criticalCount, majorCount int
-	for _, f := range findings {
-		switch f.Severity {
-		case "CRITICAL":
-			criticalCount++
-		case "MAJOR":
-			majorCount++
-		}
-	}
-	pass := criticalCount == 0 && majorCount == 0
-
-	if len(findings) != 1 {
-		t.Fatalf("expected 1 finding, got %d", len(findings))
-	}
-	if criticalCount != 0 {
-		t.Errorf("critical_count = %d, want 0", criticalCount)
-	}
-	if majorCount != 0 {
-		t.Errorf("major_count = %d, want 0", majorCount)
-	}
-	if !pass {
-		t.Error("pass should be true when only MINOR findings exist")
-	}
-}
-
-func TestDAReviewResult_PassWhenNoFindings(t *testing.T) {
-	input := `## Challenged Framings
-
-None identified.
-
-## Missing Perspectives
-
-None identified.
-
-## Bias Indicators
-
-None identified.
-
-## Alternative Framings
-
-None identified.
+No gaps identified.
 
 ## Summary
 - **Overall confidence**: ` + "`HIGH`" + ` — All good
 - **Top concerns**: None
 - **What holds up**: Everything
 `
-	findings := pipeline.ParseDAFindings(input)
+	gaps := pipeline.ParseDAGaps(input)
+	pass := pipeline.ShouldPassDAGaps(gaps)
 
-	var criticalCount, majorCount int
-	for _, f := range findings {
-		switch f.Severity {
-		case "CRITICAL":
-			criticalCount++
-		case "MAJOR":
-			majorCount++
-		}
-	}
-	pass := criticalCount == 0 && majorCount == 0
-
-	if len(findings) != 0 {
-		t.Errorf("expected 0 findings, got %d", len(findings))
+	if len(gaps) != 0 {
+		t.Errorf("expected 0 gaps, got %d", len(gaps))
 	}
 	if !pass {
-		t.Error("pass should be true when no findings")
+		t.Error("pass should be true when no gaps")
 	}
 }
 
-func TestDAFinding_RequiredFields(t *testing.T) {
-	// AC 4: Each finding in the array must contain section, severity, title, and concern fields
-	findings := pipeline.ParseDAFindings(sampleDAOutput)
+func TestDAGap_RequiredFields(t *testing.T) {
+	// Each gap must contain type (bias/coverage) and description fields
+	gaps := pipeline.ParseDAGaps(sampleDAOutput)
 
-	if len(findings) == 0 {
-		t.Fatal("expected findings to be non-empty for this test")
+	if len(gaps) == 0 {
+		t.Fatal("expected gaps to be non-empty for this test")
 	}
 
-	for i, f := range findings {
-		if f.Section == "" {
-			t.Errorf("finding[%d].Section is empty", i)
+	for i, g := range gaps {
+		if g.Type == "" {
+			t.Errorf("gap[%d].Type is empty", i)
 		}
-		if f.Title == "" {
-			t.Errorf("finding[%d].Title is empty", i)
+		if g.Type != "bias" && g.Type != "coverage" {
+			t.Errorf("gap[%d].Type = %q, want 'bias' or 'coverage'", i, g.Type)
 		}
-		if f.Severity == "" {
-			t.Errorf("finding[%d].Severity is empty", i)
-		}
-		if f.Concern == "" {
-			t.Errorf("finding[%d].Concern is empty", i)
+		if g.Description == "" {
+			t.Errorf("gap[%d].Description is empty", i)
 		}
 	}
 
 	// Verify these fields appear in JSON output too
 	result := pipeline.DAReviewResult{
-		Pass:     true,
-		Findings: findings,
+		Pass: true,
+		Gaps: gaps,
 	}
 	data, err := json.Marshal(result)
 	if err != nil {
@@ -338,216 +188,126 @@ func TestDAFinding_RequiredFields(t *testing.T) {
 		t.Fatalf("failed to unmarshal: %v", err)
 	}
 
-	findingsArr, ok := parsed["findings"].([]interface{})
+	gapsArr, ok := parsed["gaps"].([]interface{})
 	if !ok {
-		t.Fatal("findings is not an array")
+		t.Fatal("gaps is not an array")
 	}
 
-	requiredFields := []string{"section", "severity", "title", "concern"}
-	for i, item := range findingsArr {
-		finding, ok := item.(map[string]interface{})
+	requiredFields := []string{"type", "description"}
+	for i, item := range gapsArr {
+		gap, ok := item.(map[string]interface{})
 		if !ok {
-			t.Fatalf("finding[%d] is not an object", i)
+			t.Fatalf("gap[%d] is not an object", i)
 		}
 		for _, field := range requiredFields {
-			val, exists := finding[field]
+			val, exists := gap[field]
 			if !exists {
-				t.Errorf("finding[%d] missing required field %q", i, field)
+				t.Errorf("gap[%d] missing required field %q", i, field)
 			}
 			strVal, ok := val.(string)
 			if !ok {
-				t.Errorf("finding[%d].%s is not a string", i, field)
+				t.Errorf("gap[%d].%s is not a string", i, field)
 			}
 			if strVal == "" {
-				t.Errorf("finding[%d].%s is empty", i, field)
+				t.Errorf("gap[%d].%s is empty", i, field)
 			}
 		}
 	}
 }
 
-func TestFilterActionableFindings_DiscardMinorAndInfo(t *testing.T) {
-	findings := []pipeline.DAFinding{
-		{Section: "Challenged Framings", Title: "Critical Issue", Severity: "CRITICAL", Concern: "Big problem"},
-		{Section: "Missing Perspectives", Title: "Major Gap", Severity: "MAJOR", Concern: "Important gap"},
-		{Section: "Alternative Framings", Title: "Minor Note", Severity: "MINOR", Concern: "Small thing"},
-		{Section: "Bias Indicators", Title: "Info Item", Severity: "INFO", Concern: "FYI"},
-		{Section: "Challenged Framings", Title: "No Severity", Severity: "", Concern: "Unknown"},
+func TestCountGapsByType(t *testing.T) {
+	gaps := []pipeline.DAGap{
+		{Type: "bias", Description: "Framing too narrow"},
+		{Type: "coverage", Description: "Missing auth module"},
+		{Type: "bias", Description: "Confirmation bias"},
+		{Type: "coverage", Description: "Missing tests dir"},
 	}
 
-	actionable := pipeline.FilterActionableFindings(findings)
+	biasCount, coverageCount := pipeline.CountGapsByType(gaps)
 
-	if len(actionable) != 2 {
-		t.Fatalf("expected 2 actionable findings, got %d", len(actionable))
+	if biasCount != 2 {
+		t.Errorf("biasCount = %d, want 2", biasCount)
 	}
-	if actionable[0].Severity != "CRITICAL" {
-		t.Errorf("actionable[0].Severity = %q, want CRITICAL", actionable[0].Severity)
-	}
-	if actionable[1].Severity != "MAJOR" {
-		t.Errorf("actionable[1].Severity = %q, want MAJOR", actionable[1].Severity)
+	if coverageCount != 2 {
+		t.Errorf("coverageCount = %d, want 2", coverageCount)
 	}
 }
 
-func TestFilterActionableFindings_AllMinor(t *testing.T) {
-	findings := []pipeline.DAFinding{
-		{Section: "Alternative Framings", Title: "Minor1", Severity: "MINOR", Concern: "small"},
-		{Section: "Bias Indicators", Title: "Minor2", Severity: "MINOR", Concern: "small too"},
-	}
-
-	actionable := pipeline.FilterActionableFindings(findings)
-
-	if len(actionable) != 0 {
-		t.Errorf("expected 0 actionable findings for all-MINOR input, got %d", len(actionable))
+func TestCountGapsByType_Empty(t *testing.T) {
+	biasCount, coverageCount := pipeline.CountGapsByType(nil)
+	if biasCount != 0 || coverageCount != 0 {
+		t.Errorf("expected 0/0 for nil input, got %d/%d", biasCount, coverageCount)
 	}
 }
 
-func TestFilterActionableFindings_Empty(t *testing.T) {
-	actionable := pipeline.FilterActionableFindings(nil)
-	if actionable != nil {
-		t.Errorf("expected nil for nil input, got %v", actionable)
+func TestShouldPassDAGaps_NoGaps(t *testing.T) {
+	if !pipeline.ShouldPassDAGaps(nil) {
+		t.Error("should pass when gaps is nil")
 	}
-
-	actionable = pipeline.FilterActionableFindings([]pipeline.DAFinding{})
-	if actionable != nil {
-		t.Errorf("expected nil for empty input, got %v", actionable)
+	if !pipeline.ShouldPassDAGaps([]pipeline.DAGap{}) {
+		t.Error("should pass when gaps is empty")
 	}
 }
 
-func TestFilterActionableFindings_PreservesOrder(t *testing.T) {
-	findings := []pipeline.DAFinding{
-		{Title: "Major1", Severity: "MAJOR"},
-		{Title: "Minor1", Severity: "MINOR"},
-		{Title: "Critical1", Severity: "CRITICAL"},
-		{Title: "Minor2", Severity: "MINOR"},
-		{Title: "Major2", Severity: "MAJOR"},
-	}
-
-	actionable := pipeline.FilterActionableFindings(findings)
-
-	if len(actionable) != 3 {
-		t.Fatalf("expected 3, got %d", len(actionable))
-	}
-	if actionable[0].Title != "Major1" || actionable[1].Title != "Critical1" || actionable[2].Title != "Major2" {
-		t.Errorf("order not preserved: got %q, %q, %q", actionable[0].Title, actionable[1].Title, actionable[2].Title)
+func TestShouldPassDAGaps_WithGaps(t *testing.T) {
+	gaps := []pipeline.DAGap{{Type: "bias", Description: "some bias"}}
+	if pipeline.ShouldPassDAGaps(gaps) {
+		t.Error("should NOT pass when gaps exist")
 	}
 }
 
-func TestFilterActionableFindings_IntegrationWithParsedOutput(t *testing.T) {
-	// The sample DA output has: 1 CRITICAL, 2 MAJOR, 1 MINOR
-	allFindings := pipeline.ParseDAFindings(sampleDAOutput)
-	actionable := pipeline.FilterActionableFindings(allFindings)
+func TestCountGapsByType_IntegrationWithParsedOutput(t *testing.T) {
+	// The sample DA output has: 2 bias, 1 coverage
+	gaps := pipeline.ParseDAGaps(sampleDAOutput)
+	biasCount, coverageCount := pipeline.CountGapsByType(gaps)
 
-	if len(allFindings) != 4 {
-		t.Fatalf("expected 4 total findings, got %d", len(allFindings))
+	if len(gaps) != 3 {
+		t.Fatalf("expected 3 total gaps, got %d", len(gaps))
 	}
-	if len(actionable) != 3 {
-		t.Fatalf("expected 3 actionable findings (1 CRITICAL + 2 MAJOR), got %d", len(actionable))
+	if biasCount != 2 {
+		t.Errorf("expected 2 bias gaps, got %d", biasCount)
 	}
-
-	// Verify MINOR finding was filtered out
-	for _, f := range actionable {
-		if f.Severity == "MINOR" {
-			t.Errorf("MINOR finding should have been filtered: %q", f.Title)
-		}
+	if coverageCount != 1 {
+		t.Errorf("expected 1 coverage gap, got %d", coverageCount)
 	}
 }
 
-// === Skip/No-Op Behavior Tests (Sub-AC 3 of AC 8) ===
-// When DA review finds no CRITICAL or MAJOR issues, seed-analysis.json
-// must remain unchanged. These tests verify the no-op signal contract.
+// === Skip/No-Op Behavior Tests ===
+// When DA review finds no gaps, seed-analysis.json must remain unchanged.
 
-func TestSkipNoOp_OnlyMinorFindings_SignalsNoChange(t *testing.T) {
-	// Scenario: DA finds issues but ALL are MINOR severity.
-	// Contract: pass=true, actionable findings empty → caller must NOT modify seed-analysis.json
-	input := `## Challenged Framings
+func TestSkipNoOp_ZeroGaps_SignalsNoChange(t *testing.T) {
+	// Scenario: DA finds absolutely nothing wrong.
+	// Contract: pass=true, empty gaps → caller must NOT modify seed-analysis.json
+	gaps := pipeline.ParseDAGaps(`## Pre-Commitment Predictions
+- **Input type**: Seed analysis
 
-None identified.
+## Identified Gaps
 
-## Missing Perspectives
-
-None identified.
-
-## Bias Indicators
-
-### Minor Confirmation Bias
-- **Claim**: Slight leaning toward one framework
-- **Concern**: Could consider alternative frameworks
-- **Confidence**: ` + "`LOW`" + `
-- **Severity**: ` + "`MINOR`" + `
-- **Falsification test**: Compare with two other frameworks
-
-## Alternative Framings
-
-### Minor Reframe
-- **Claim**: Could view from ops angle
-- **Concern**: Ops perspective adds marginal value
-- **Confidence**: ` + "`LOW`" + `
-- **Severity**: ` + "`MINOR`" + `
-- **Falsification test**: Ask ops team
+No gaps identified.
 
 ## Summary
 - **Overall confidence**: ` + "`HIGH`" + ` — Analysis is solid
-- **Top concerns**: Minor only
-- **What holds up**: Core analysis
-`
-	allFindings := pipeline.ParseDAFindings(input)
-	actionable := pipeline.FilterActionableFindings(allFindings)
-	criticalCount, majorCount := pipeline.CountSeverities(actionable)
-	pass := pipeline.ShouldPassDA(criticalCount, majorCount)
-
-	// 2 MINOR findings parsed, but none are actionable
-	if len(allFindings) != 2 {
-		t.Fatalf("expected 2 total findings, got %d", len(allFindings))
-	}
-	if len(actionable) != 0 {
-		t.Errorf("expected 0 actionable findings (skip/no-op), got %d", len(actionable))
-	}
-	if criticalCount != 0 || majorCount != 0 {
-		t.Errorf("counts should be 0/0, got critical=%d major=%d", criticalCount, majorCount)
-	}
-	if !pass {
-		t.Error("pass must be true when only MINOR findings exist — seed-analysis.json should be left unchanged")
-	}
-}
-
-func TestSkipNoOp_ZeroFindings_SignalsNoChange(t *testing.T) {
-	// Scenario: DA finds absolutely nothing wrong.
-	// Contract: pass=true, empty findings → caller must NOT modify seed-analysis.json
-	allFindings := pipeline.ParseDAFindings(`## Challenged Framings
-
-None identified.
-
-## Missing Perspectives
-
-None identified.
-
-## Bias Indicators
-
-None identified.
-
-## Alternative Framings
-
-None identified.
 `)
-	actionable := pipeline.FilterActionableFindings(allFindings)
-	pass := pipeline.ShouldPassDA(pipeline.CountSeverities(actionable))
+	pass := pipeline.ShouldPassDAGaps(gaps)
 
-	if len(allFindings) != 0 {
-		t.Errorf("expected 0 total findings, got %d", len(allFindings))
+	if len(gaps) != 0 {
+		t.Errorf("expected 0 gaps, got %d", len(gaps))
 	}
 	if !pass {
-		t.Error("pass must be true when no findings at all — seed-analysis.json should be left unchanged")
+		t.Error("pass must be true when no gaps at all — seed-analysis.json should be left unchanged")
 	}
 }
 
-func TestSkipNoOp_ResultJSON_EmptyFindingsOnPass(t *testing.T) {
+func TestSkipNoOp_ResultJSON_EmptyGapsOnPass(t *testing.T) {
 	// Verify the full JSON result shape for the no-op/skip case.
-	// When pass=true, findings must be null/empty, signaling no changes needed.
+	// When pass=true, gaps must be null/empty, signaling no changes needed.
 	result := pipeline.DAReviewResult{
 		Pass:              true,
-		CriticalCount:     0,
-		MajorCount:        0,
-		Findings:          nil,
-		OverallConfidence:  "HIGH",
+		GapCount:          0,
+		BiasCount:         0,
+		CoverageCount:     0,
+		Gaps:              nil,
+		OverallConfidence: "HIGH",
 		TopConcerns:       "None significant",
 		WhatHoldsUp:       "Everything",
 		RawOutput:         "full DA output",
@@ -567,183 +327,110 @@ func TestSkipNoOp_ResultJSON_EmptyFindingsOnPass(t *testing.T) {
 	if pass, ok := parsed["pass"].(bool); !ok || !pass {
 		t.Error("pass must be true in no-op result")
 	}
-	// Both counts zero
-	if cc := int(parsed["critical_count"].(float64)); cc != 0 {
-		t.Errorf("critical_count should be 0, got %d", cc)
+	// All counts zero
+	if gc := int(parsed["gap_count"].(float64)); gc != 0 {
+		t.Errorf("gap_count should be 0, got %d", gc)
 	}
-	if mc := int(parsed["major_count"].(float64)); mc != 0 {
-		t.Errorf("major_count should be 0, got %d", mc)
-	}
-	// findings is null (nil slice marshals to null in Go)
-	if parsed["findings"] != nil {
-		t.Errorf("findings should be null when no actionable findings exist, got %v", parsed["findings"])
+	// gaps is null (nil slice marshals to null in Go)
+	if parsed["gaps"] != nil {
+		t.Errorf("gaps should be null when no gaps exist, got %v", parsed["gaps"])
 	}
 }
 
-func TestSkipNoOp_NegativeCase_CriticalPreventsSkip(t *testing.T) {
-	// Negative: even one CRITICAL means NOT a no-op — seed-analysis.json must be updated
-	findings := []pipeline.DAFinding{
-		{Section: "Challenged Framings", Title: "Critical Gap", Severity: "CRITICAL", Concern: "Serious issue"},
-		{Section: "Alternative Framings", Title: "Minor Note", Severity: "MINOR", Concern: "Trivial"},
+func TestSkipNoOp_NegativeCase_BiasGapPreventsSkip(t *testing.T) {
+	// Negative: even one gap means NOT a no-op — seed-analysis.json must be updated
+	gaps := []pipeline.DAGap{
+		{Type: "bias", Description: "Framing too narrow"},
 	}
-	actionable := pipeline.FilterActionableFindings(findings)
-	pass := pipeline.ShouldPassDA(pipeline.CountSeverities(actionable))
+	pass := pipeline.ShouldPassDAGaps(gaps)
 
 	if pass {
-		t.Error("pass must be false when CRITICAL finding exists — seed-analysis.json needs updates")
-	}
-	if len(actionable) != 1 {
-		t.Errorf("expected 1 actionable finding, got %d", len(actionable))
+		t.Error("pass must be false when bias gap exists — seed-analysis.json needs updates")
 	}
 }
 
-func TestSkipNoOp_NegativeCase_MajorPreventsSkip(t *testing.T) {
-	// Negative: even one MAJOR means NOT a no-op — seed-analysis.json must be updated
-	findings := []pipeline.DAFinding{
-		{Section: "Missing Perspectives", Title: "Important Gap", Severity: "MAJOR", Concern: "Significant gap"},
-		{Section: "Bias Indicators", Title: "Small Bias", Severity: "MINOR", Concern: "Negligible"},
+func TestSkipNoOp_NegativeCase_CoverageGapPreventsSkip(t *testing.T) {
+	// Negative: even one coverage gap means NOT a no-op
+	gaps := []pipeline.DAGap{
+		{Type: "coverage", Description: "Missing auth module analysis"},
 	}
-	actionable := pipeline.FilterActionableFindings(findings)
-	pass := pipeline.ShouldPassDA(pipeline.CountSeverities(actionable))
+	pass := pipeline.ShouldPassDAGaps(gaps)
 
 	if pass {
-		t.Error("pass must be false when MAJOR finding exists — seed-analysis.json needs updates")
-	}
-	if len(actionable) != 1 {
-		t.Errorf("expected 1 actionable finding, got %d", len(actionable))
+		t.Error("pass must be false when coverage gap exists — seed-analysis.json needs updates")
 	}
 }
 
-// AC 6: Loop terminates early when critical_count + major_count equals 0
-func TestShouldPassDA_EarlyTermination(t *testing.T) {
+// Loop terminates early when no gaps found
+func TestShouldPassDAGaps_EarlyTermination(t *testing.T) {
 	tests := []struct {
-		name          string
-		criticalCount int
-		majorCount    int
-		wantPass      bool
+		name     string
+		gaps     []pipeline.DAGap
+		wantPass bool
 	}{
-		{"zero critical zero major terminates early", 0, 0, true},
-		{"one critical zero major continues loop", 1, 0, false},
-		{"zero critical one major continues loop", 0, 1, false},
-		{"one critical one major continues loop", 1, 1, false},
-		{"three critical two major continues loop", 3, 2, false},
+		{"no gaps terminates early", nil, true},
+		{"empty gaps terminates early", []pipeline.DAGap{}, true},
+		{"bias gap continues loop", []pipeline.DAGap{{Type: "bias", Description: "test"}}, false},
+		{"coverage gap continues loop", []pipeline.DAGap{{Type: "coverage", Description: "test"}}, false},
+		{"both types continues loop", []pipeline.DAGap{{Type: "bias", Description: "a"}, {Type: "coverage", Description: "b"}}, false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := pipeline.ShouldPassDA(tt.criticalCount, tt.majorCount)
+			got := pipeline.ShouldPassDAGaps(tt.gaps)
 			if got != tt.wantPass {
-				t.Errorf("pipeline.ShouldPassDA(%d, %d) = %v, want %v",
-					tt.criticalCount, tt.majorCount, got, tt.wantPass)
+				t.Errorf("pipeline.ShouldPassDAGaps() = %v, want %v", got, tt.wantPass)
 			}
 		})
 	}
 }
 
-// AC 6: pipeline.CountSeverities correctly tallies CRITICAL and MAJOR from findings
-func TestCountSeverities(t *testing.T) {
-	tests := []struct {
-		name         string
-		findings     []pipeline.DAFinding
-		wantCritical int
-		wantMajor    int
-	}{
-		{
-			"mixed severities",
-			[]pipeline.DAFinding{
-				{Severity: "CRITICAL"},
-				{Severity: "MAJOR"},
-				{Severity: "MINOR"},
-				{Severity: "CRITICAL"},
-			},
-			2, 1,
-		},
-		{
-			"no findings yields zero counts",
-			nil,
-			0, 0,
-		},
-		{
-			"only minor yields zero counts",
-			[]pipeline.DAFinding{{Severity: "MINOR"}, {Severity: "MINOR"}},
-			0, 0,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			c, m := pipeline.CountSeverities(tt.findings)
-			if c != tt.wantCritical || m != tt.wantMajor {
-				t.Errorf("pipeline.CountSeverities() = (%d, %d), want (%d, %d)",
-					c, m, tt.wantCritical, tt.wantMajor)
-			}
-		})
-	}
-}
-
-// AC 6: End-to-end early termination - parse DA output, count, and verify pass
+// End-to-end early termination - parse DA output, count, and verify pass
 func TestEarlyTermination_EndToEnd(t *testing.T) {
-	// Case 1: DA output with CRITICAL/MAJOR → pass=false, loop continues
-	allFindings := pipeline.ParseDAFindings(sampleDAOutput)
-	actionable := pipeline.FilterActionableFindings(allFindings)
-	crit, maj := pipeline.CountSeverities(actionable)
-	pass := pipeline.ShouldPassDA(crit, maj)
+	// Case 1: DA output with gaps → pass=false, loop continues
+	gaps := pipeline.ParseDAGaps(sampleDAOutput)
+	pass := pipeline.ShouldPassDAGaps(gaps)
 
 	if pass {
-		t.Error("should NOT terminate early when CRITICAL/MAJOR findings exist")
+		t.Error("should NOT terminate early when gaps exist")
 	}
-	if crit+maj == 0 {
-		t.Error("critical_count + major_count should be > 0 for sample with issues")
+	if len(gaps) == 0 {
+		t.Error("gap count should be > 0 for sample with issues")
 	}
 
-	// Case 2: DA output with only MINOR/none → pass=true, loop terminates early
-	cleanInput := `## Challenged Framings
+	// Case 2: DA output with no gaps → pass=true, loop terminates early
+	cleanInput := `## Pre-Commitment Predictions
+- **Input type**: Seed analysis
 
-None identified.
+## Identified Gaps
 
-## Missing Perspectives
-
-None identified.
-
-## Bias Indicators
-
-### Minor Nitpick
-- **Claim**: Something
-- **Concern**: Very minor
-- **Confidence**: ` + "`LOW`" + `
-- **Severity**: ` + "`MINOR`" + `
-- **Falsification test**: Check
-
-## Alternative Framings
-
-None identified.
+No gaps identified.
 
 ## Summary
 - **Overall confidence**: ` + "`HIGH`" + ` — All good
 - **Top concerns**: None significant
 - **What holds up**: Everything
 `
-	cleanFindings := pipeline.ParseDAFindings(cleanInput)
-	cleanActionable := pipeline.FilterActionableFindings(cleanFindings)
-	cleanCrit, cleanMaj := pipeline.CountSeverities(cleanActionable)
-	cleanPass := pipeline.ShouldPassDA(cleanCrit, cleanMaj)
+	cleanGaps := pipeline.ParseDAGaps(cleanInput)
+	cleanPass := pipeline.ShouldPassDAGaps(cleanGaps)
 
 	if !cleanPass {
-		t.Error("should terminate early when critical_count + major_count == 0")
+		t.Error("should terminate early when no gaps found")
 	}
-	if cleanCrit+cleanMaj != 0 {
-		t.Errorf("critical_count + major_count = %d, want 0", cleanCrit+cleanMaj)
+	if len(cleanGaps) != 0 {
+		t.Errorf("gap count = %d, want 0", len(cleanGaps))
 	}
 }
 
-// AC 6: Verify pass field in JSON output matches early termination logic
+// Verify pass field in JSON output matches early termination logic
 func TestEarlyTermination_JSONPassField(t *testing.T) {
-	// When counts are zero, the JSON pass field must be true (signals early termination)
+	// When no gaps, the JSON pass field must be true (signals early termination)
 	result := pipeline.DAReviewResult{
-		Pass:          pipeline.ShouldPassDA(0, 0),
-		CriticalCount: 0,
-		MajorCount:    0,
-		Findings:      []pipeline.DAFinding{},
+		Pass:          true,
+		GapCount:      0,
+		BiasCount:     0,
+		CoverageCount: 0,
+		Gaps:          []pipeline.DAGap{},
 	}
 
 	data, err := json.Marshal(result)
@@ -759,10 +446,10 @@ func TestEarlyTermination_JSONPassField(t *testing.T) {
 		t.Fatal("pass field missing or not boolean")
 	}
 	if !passVal {
-		t.Error("pass must be true when critical_count + major_count == 0 (early termination)")
+		t.Error("pass must be true when no gaps (early termination)")
 	}
-	if int(parsed["critical_count"].(float64))+int(parsed["major_count"].(float64)) != 0 {
-		t.Error("critical_count + major_count should be 0")
+	if int(parsed["gap_count"].(float64)) != 0 {
+		t.Error("gap_count should be 0")
 	}
 }
 
@@ -781,7 +468,7 @@ func TestHardStop_RoundMetadataInJSON(t *testing.T) {
 		Round:     2,
 		MaxRounds: pipeline.MaxDARounds,
 		HardStop:  false,
-		Findings:  []pipeline.DAFinding{},
+		Gaps:      []pipeline.DAGap{},
 	}
 
 	data, err := json.Marshal(result)
@@ -815,7 +502,7 @@ func TestHardStop_TrueOnFinalRound(t *testing.T) {
 		Round:     pipeline.MaxDARounds,
 		MaxRounds: pipeline.MaxDARounds,
 		HardStop:  true,
-		Findings:  []pipeline.DAFinding{{Section: "Missing Perspectives", Title: "Gap", Severity: "CRITICAL", Concern: "big gap"}},
+		Gaps:      []pipeline.DAGap{{Type: "coverage", Description: "big gap in auth module"}},
 	}
 
 	data, _ := json.Marshal(result)
@@ -848,7 +535,7 @@ func TestHardStop_ExceedingMaxRoundsResult(t *testing.T) {
 		Round:     4,
 		MaxRounds: pipeline.MaxDARounds,
 		HardStop:  true,
-		Findings:  []pipeline.DAFinding{},
+		Gaps:      []pipeline.DAGap{},
 		RawOutput: "hard stop: round 4 exceeds maximum of 3 rounds",
 	}
 
@@ -862,9 +549,9 @@ func TestHardStop_ExceedingMaxRoundsResult(t *testing.T) {
 	if parsed["pass"].(bool) {
 		t.Error("pass must be false on hard stop")
 	}
-	findings := parsed["findings"].([]interface{})
-	if len(findings) != 0 {
-		t.Errorf("findings should be empty on hard stop, got %d", len(findings))
+	gaps := parsed["gaps"].([]interface{})
+	if len(gaps) != 0 {
+		t.Errorf("gaps should be empty on hard stop, got %d", len(gaps))
 	}
 }
 
@@ -1223,13 +910,15 @@ func TestThreeRoundFailure_HardStopResult(t *testing.T) {
 	// This is the signal for the seed analyst to exit the loop.
 	result := pipeline.DAReviewResult{
 		Pass:          false,
-		CriticalCount: 1,
-		MajorCount:    1,
+		GapCount:      2,
+		BiasCount:     1,
+		CoverageCount: 1,
 		Round:         pipeline.MaxDARounds,
 		MaxRounds:     pipeline.MaxDARounds,
 		HardStop:      pipeline.MaxDARounds >= pipeline.MaxDARounds, // true
-		Findings: []pipeline.DAFinding{
-			{Section: "Missing Perspectives", Title: "Still Missing", Severity: "CRITICAL", Concern: "gap remains"},
+		Gaps: []pipeline.DAGap{
+			{Type: "coverage", Description: "gap remains in auth module"},
+			{Type: "bias", Description: "still biased toward backend"},
 		},
 	}
 
@@ -1266,7 +955,7 @@ func TestThreeRoundFailure_ExceedsMaxReturnsEmpty(t *testing.T) {
 		Round:     pipeline.MaxDARounds + 1,
 		MaxRounds: pipeline.MaxDARounds,
 		HardStop:  true,
-		Findings:  []pipeline.DAFinding{},
+		Gaps:      []pipeline.DAGap{},
 		RawOutput: fmt.Sprintf("hard stop: round %d exceeds maximum of %d rounds", pipeline.MaxDARounds+1, pipeline.MaxDARounds),
 	}
 
@@ -1276,22 +965,23 @@ func TestThreeRoundFailure_ExceedsMaxReturnsEmpty(t *testing.T) {
 	if !result.HardStop {
 		t.Error("hard_stop must be true")
 	}
-	if len(result.Findings) != 0 {
-		t.Error("findings must be empty for exceeded max rounds")
+	if len(result.Gaps) != 0 {
+		t.Error("gaps must be empty for exceeded max rounds")
 	}
 }
 
 func TestDAReviewResult_JSONStructure(t *testing.T) {
 	// Verify the pipeline.DAReviewResult marshals to expected JSON shape
 	result := pipeline.DAReviewResult{
-		Pass:             false,
-		CriticalCount:    1,
-		MajorCount:       2,
-		Findings:         []pipeline.DAFinding{{Section: "Challenged Framings", Title: "Test", Severity: "CRITICAL"}},
+		Pass:              false,
+		GapCount:          2,
+		BiasCount:         1,
+		CoverageCount:     1,
+		Gaps:              []pipeline.DAGap{{Type: "bias", Description: "Framing too narrow"}, {Type: "coverage", Description: "Missing auth module"}},
 		OverallConfidence: "MEDIUM",
-		TopConcerns:      "some concerns",
-		WhatHoldsUp:      "some things",
-		RawOutput:        "raw",
+		TopConcerns:       "some concerns",
+		WhatHoldsUp:       "some things",
+		RawOutput:         "raw",
 	}
 
 	data, err := json.Marshal(result)
@@ -1308,24 +998,30 @@ func TestDAReviewResult_JSONStructure(t *testing.T) {
 	if _, ok := parsed["pass"].(bool); !ok {
 		t.Error("pass field missing or not boolean")
 	}
-	if _, ok := parsed["critical_count"].(float64); !ok {
-		t.Error("critical_count field missing or not number")
+	if _, ok := parsed["gap_count"].(float64); !ok {
+		t.Error("gap_count field missing or not number")
 	}
-	if _, ok := parsed["major_count"].(float64); !ok {
-		t.Error("major_count field missing or not number")
+	if _, ok := parsed["bias_count"].(float64); !ok {
+		t.Error("bias_count field missing or not number")
 	}
-	if _, ok := parsed["findings"].([]interface{}); !ok {
-		t.Error("findings field missing or not array")
+	if _, ok := parsed["coverage_count"].(float64); !ok {
+		t.Error("coverage_count field missing or not number")
+	}
+	if _, ok := parsed["gaps"].([]interface{}); !ok {
+		t.Error("gaps field missing or not array")
 	}
 
 	// Check values
 	if parsed["pass"].(bool) != false {
 		t.Error("pass should be false")
 	}
-	if int(parsed["critical_count"].(float64)) != 1 {
-		t.Errorf("critical_count = %v, want 1", parsed["critical_count"])
+	if int(parsed["gap_count"].(float64)) != 2 {
+		t.Errorf("gap_count = %v, want 2", parsed["gap_count"])
 	}
-	if int(parsed["major_count"].(float64)) != 2 {
-		t.Errorf("major_count = %v, want 2", parsed["major_count"])
+	if int(parsed["bias_count"].(float64)) != 1 {
+		t.Errorf("bias_count = %v, want 1", parsed["bias_count"])
+	}
+	if int(parsed["coverage_count"].(float64)) != 1 {
+		t.Errorf("coverage_count = %v, want 1", parsed["coverage_count"])
 	}
 }

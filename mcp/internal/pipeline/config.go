@@ -48,15 +48,11 @@ type StageResult struct {
 	Err           error  // nil on success
 }
 
-// DAFinding represents a single finding extracted from DA markdown output.
-type DAFinding struct {
-	Section           string `json:"section"`
-	Title             string `json:"title"`
-	Claim             string `json:"claim"`
-	Concern           string `json:"concern"`
-	Confidence        string `json:"confidence"`
-	Severity          string `json:"severity"`
-	FalsificationTest string `json:"falsification_test"`
+// DAGap represents a single gap identified by the DA in seed analysis validation.
+// Type is either "bias" (perspective skew) or "coverage" (overlooked codebase area).
+type DAGap struct {
+	Type        string `json:"type"`        // "bias" or "coverage"
+	Description string `json:"description"` // human-readable description of the gap
 }
 
 // MaxDARounds is the hard limit for the DA review loop.
@@ -65,31 +61,33 @@ const MaxDARounds = 3
 
 // DAReviewResult is the structured result returned by prism_da_review.
 type DAReviewResult struct {
-	Pass              bool        `json:"pass"`
-	CriticalCount     int         `json:"critical_count"`
-	MajorCount        int         `json:"major_count"`
-	Findings          []DAFinding `json:"findings"`
-	Round             int         `json:"round"`
-	MaxRounds         int         `json:"max_rounds"`
-	HardStop          bool        `json:"hard_stop"`
-	ParseWarning      string      `json:"parse_warning,omitempty"`
-	OverallConfidence string      `json:"overall_confidence"`
-	TopConcerns       string      `json:"top_concerns"`
-	WhatHoldsUp       string      `json:"what_holds_up"`
-	RawOutput         string      `json:"raw_output"`
+	Pass              bool     `json:"pass"`
+	GapCount          int      `json:"gap_count"`
+	BiasCount         int      `json:"bias_count"`
+	CoverageCount     int      `json:"coverage_count"`
+	Gaps              []DAGap  `json:"gaps"`
+	Round             int      `json:"round"`
+	MaxRounds         int      `json:"max_rounds"`
+	HardStop          bool     `json:"hard_stop"`
+	ParseWarning      string   `json:"parse_warning,omitempty"`
+	OverallConfidence string   `json:"overall_confidence"`
+	TopConcerns       string   `json:"top_concerns"`
+	WhatHoldsUp       string   `json:"what_holds_up"`
+	RawOutput         string   `json:"raw_output"`
 }
 
 // DAReviewRound captures the result of a single DA review round for history tracking.
 type DAReviewRound struct {
-	Round             int         `json:"round"`
-	Pass              bool        `json:"pass"`
-	CriticalCount     int         `json:"critical_count"`
-	MajorCount        int         `json:"major_count"`
-	Findings          []DAFinding `json:"findings"`
-	OverallConfidence string      `json:"overall_confidence,omitempty"`
-	TopConcerns       string      `json:"top_concerns,omitempty"`
-	WhatHoldsUp       string      `json:"what_holds_up,omitempty"`
-	ParseWarning      string      `json:"parse_warning,omitempty"`
+	Round             int      `json:"round"`
+	Pass              bool     `json:"pass"`
+	GapCount          int      `json:"gap_count"`
+	BiasCount         int      `json:"bias_count"`
+	CoverageCount     int      `json:"coverage_count"`
+	Gaps              []DAGap  `json:"gaps"`
+	OverallConfidence string   `json:"overall_confidence,omitempty"`
+	TopConcerns       string   `json:"top_concerns,omitempty"`
+	WhatHoldsUp       string   `json:"what_holds_up,omitempty"`
+	ParseWarning      string   `json:"parse_warning,omitempty"`
 }
 
 // DAReviewHistory stores the complete DA review history for a session.
@@ -100,23 +98,17 @@ type DAReviewHistory struct {
 }
 
 // Package-level compiled regexes for DA markdown parsing.
-// Hoisted from ParseDAFindings/ParseDASummary to avoid recompilation on every call.
+// Hoisted from ParseDAGaps/ParseDASummary to avoid recompilation on every call.
 var (
-	// SeverityKeywordRe detects severity keywords in raw output for parse failure detection.
-	SeverityKeywordRe = regexp.MustCompile(`(?i)\b(CRITICAL|MAJOR)\b`)
+	// GapKeywordRe detects gap type keywords in raw output for parse failure detection.
+	GapKeywordRe = regexp.MustCompile(`(?i)\b(bias|coverage)\b`)
 
-	// Section headers: ## Challenged Framings, ## Missing Perspectives, etc.
-	sectionRe = regexp.MustCompile(`(?m)^## (Challenged Framings|Missing Perspectives|Bias Indicators|Alternative Framings)\s*$`)
-	// Finding titles: ### [title]
-	findingTitleRe = regexp.MustCompile(`(?m)^### (.+)$`)
-	// Fields within findings
-	claimRe         = regexp.MustCompile(`(?m)^-\s+\*\*Claim\*\*:\s*(.+)$`)
-	concernRe       = regexp.MustCompile(`(?m)^-\s+\*\*Concern\*\*:\s*(.+)$`)
-	confidenceRe    = regexp.MustCompile("(?m)^-\\s+\\*\\*Confidence\\*\\*:\\s*`?(HIGH|MEDIUM|LOW)`?")
-	severityRe      = regexp.MustCompile("(?m)^-\\s+\\*\\*Severity\\*\\*:\\s*`?(CRITICAL|MAJOR|MINOR)`?")
-	falsificationRe = regexp.MustCompile(`(?m)^-\s+\*\*Falsification test\*\*:\s*(.+)$`)
-	// Next ## header (for section boundary detection)
-	nextHeaderRe = regexp.MustCompile(`(?m)^## `)
+	// Gap entry: ### [bias] or ### [coverage] followed by description text (case-insensitive)
+	gapEntryRe = regexp.MustCompile(`(?mi)^###\s+\[(bias|coverage)\]\s*(.*)$`)
+
+	// Level-2 markdown header boundary (## ) for truncating last gap body
+	sectionHeaderRe = regexp.MustCompile(`(?m)^## `)
+
 	// Summary fields
 	summaryConfRe  = regexp.MustCompile("(?m)^-\\s+\\*\\*Overall confidence\\*\\*:\\s*`?(HIGH|MEDIUM|LOW)`?\\s*[—–-]?\\s*(.*)")
 	summaryTopRe   = regexp.MustCompile(`(?m)^-\s+\*\*Top concerns\*\*:\s*(.+)`)
@@ -124,6 +116,9 @@ var (
 )
 
 // LoadDASystemPrompt reads the devils-advocate.md from the agents directory.
+// Deprecated: Both call sites now use SeedAnalysisDAPrompt (da_prompt.go) instead.
+// Retained because GetRepoRoot() uses devils-advocate.md as a repo root marker file,
+// and external callers may still reference this function.
 func LoadDASystemPrompt() (string, error) {
 	// Resolve path relative to the binary's expected location
 	// The agents dir is at the repo root, sibling to mcp/
@@ -188,84 +183,48 @@ func GetRepoRoot() string {
 	return cwd
 }
 
-// ParseDAFindings extracts structured findings from DA markdown output using regex.
+// ParseDAGaps extracts structured gaps from DA markdown output using regex.
+// Expected format: ### [bias] Title\nDescription text or ### [coverage] Title\nDescription text
 // All regex patterns are compiled once at package level for performance.
-func ParseDAFindings(raw string) []DAFinding {
-	var findings []DAFinding
+func ParseDAGaps(raw string) []DAGap {
+	var gaps []DAGap
 
-	// Find all section positions
-	sectionMatches := sectionRe.FindAllStringSubmatchIndex(raw, -1)
-	if len(sectionMatches) == 0 {
-		return findings
+	matches := gapEntryRe.FindAllStringSubmatchIndex(raw, -1)
+	if len(matches) == 0 {
+		return gaps
 	}
 
-	for i, sm := range sectionMatches {
-		sectionName := raw[sm[2]:sm[3]]
+	for i, m := range matches {
+		gapType := strings.ToLower(raw[m[2]:m[3]])
+		title := strings.TrimSpace(raw[m[4]:m[5]])
 
-		// Determine section text boundaries
-		sectionStart := sm[1]
-		var sectionEnd int
-		if i+1 < len(sectionMatches) {
-			sectionEnd = sectionMatches[i+1][0]
+		// Determine the description text boundary (until next gap entry or section header)
+		bodyStart := m[1]
+		var bodyEnd int
+		if i+1 < len(matches) {
+			bodyEnd = matches[i+1][0]
 		} else {
-			// Find the next ## header that isn't one of the 4 sections
-			remaining := raw[sectionStart:]
-			loc := nextHeaderRe.FindStringIndex(remaining)
-			if loc != nil {
-				sectionEnd = sectionStart + loc[0]
-			} else {
-				sectionEnd = len(raw)
-			}
+			bodyEnd = len(raw)
+		}
+		// Truncate at next ## header to prevent bleeding into Self-Audit Log / Summary
+		if loc := sectionHeaderRe.FindStringIndex(raw[bodyStart:bodyEnd]); loc != nil {
+			bodyEnd = bodyStart + loc[0]
+		}
+		body := strings.TrimSpace(raw[bodyStart:bodyEnd])
+
+		// Combine title and body into description
+		description := title
+		if body != "" {
+			description = title + ": " + body
 		}
 
-		sectionText := raw[sectionStart:sectionEnd]
-
-		// Skip "None identified." sections
-		if strings.Contains(sectionText, "None identified") {
-			continue
-		}
-
-		// Find findings within this section
-		titleMatches := findingTitleRe.FindAllStringSubmatchIndex(sectionText, -1)
-		for j, tm := range titleMatches {
-			title := sectionText[tm[2]:tm[3]]
-
-			// Get finding text
-			findingStart := tm[1]
-			var findingEnd int
-			if j+1 < len(titleMatches) {
-				findingEnd = titleMatches[j+1][0]
-			} else {
-				findingEnd = len(sectionText)
-			}
-			findingText := sectionText[findingStart:findingEnd]
-
-			finding := DAFinding{
-				Section: sectionName,
-				Title:   strings.TrimSpace(title),
-			}
-
-			if m := claimRe.FindStringSubmatch(findingText); len(m) > 1 {
-				finding.Claim = strings.TrimSpace(m[1])
-			}
-			if m := concernRe.FindStringSubmatch(findingText); len(m) > 1 {
-				finding.Concern = strings.TrimSpace(m[1])
-			}
-			if m := confidenceRe.FindStringSubmatch(findingText); len(m) > 1 {
-				finding.Confidence = m[1]
-			}
-			if m := severityRe.FindStringSubmatch(findingText); len(m) > 1 {
-				finding.Severity = m[1]
-			}
-			if m := falsificationRe.FindStringSubmatch(findingText); len(m) > 1 {
-				finding.FalsificationTest = strings.TrimSpace(m[1])
-			}
-
-			findings = append(findings, finding)
-		}
+		gaps = append(gaps, DAGap{
+			Type:        gapType,
+			Description: description,
+		})
 	}
 
-	return findings
+	return gaps
 }
 
 // ParseDASummary extracts summary fields from DA markdown output.
@@ -283,35 +242,23 @@ func ParseDASummary(raw string) (overallConfidence, topConcerns, whatHoldsUp str
 	return
 }
 
-// CountSeverities counts CRITICAL and MAJOR findings in the given slice.
-func CountSeverities(findings []DAFinding) (criticalCount, majorCount int) {
-	for _, f := range findings {
-		switch f.Severity {
-		case "CRITICAL":
-			criticalCount++
-		case "MAJOR":
-			majorCount++
+// CountGapsByType counts bias and coverage gaps in the given slice.
+func CountGapsByType(gaps []DAGap) (biasCount, coverageCount int) {
+	for _, g := range gaps {
+		switch g.Type {
+		case "bias":
+			biasCount++
+		case "coverage":
+			coverageCount++
 		}
 	}
 	return
 }
 
-// ShouldPassDA returns true when there are no CRITICAL or MAJOR findings,
+// ShouldPassDAGaps returns true when there are no gaps,
 // signaling that the DA review loop can terminate early.
-func ShouldPassDA(criticalCount, majorCount int) bool {
-	return criticalCount == 0 && majorCount == 0
-}
-
-// FilterActionableFindings returns only CRITICAL and MAJOR severity findings,
-// discarding MINOR, INFO, and any unrecognized severity levels.
-func FilterActionableFindings(findings []DAFinding) []DAFinding {
-	var actionable []DAFinding
-	for _, f := range findings {
-		if f.Severity == "CRITICAL" || f.Severity == "MAJOR" {
-			actionable = append(actionable, f)
-		}
-	}
-	return actionable
+func ShouldPassDAGaps(gaps []DAGap) bool {
+	return len(gaps) == 0
 }
 
 // JobResultsToStageResults converts parallel.JobResult slice to StageResult slice.
