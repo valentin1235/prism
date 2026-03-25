@@ -395,6 +395,57 @@ func LoadStage1Config(task *taskpkg.AnalysisTask) (Stage1Config, error) {
 	return sc, nil
 }
 
+// BuildOntologyScopeFromPaths constructs a canonical ontology-scope.json string
+// from a list of repository paths. Each path becomes a "doc" type source.
+// This is used when no explicit ontology_scope parameter is provided, but
+// brownfield default repositories are configured.
+func BuildOntologyScopeFromPaths(paths []string) string {
+	type accessInfo struct {
+		Tools        []string `json:"tools"`
+		Instructions string   `json:"instructions"`
+	}
+	type source struct {
+		ID       int        `json:"id"`
+		Type     string     `json:"type"`
+		Path     string     `json:"path"`
+		Domain   string     `json:"domain"`
+		Summary  string     `json:"summary"`
+		Status   string     `json:"status"`
+		Access   accessInfo `json:"access"`
+	}
+	type totals struct {
+		Doc int `json:"doc"`
+	}
+	type scope struct {
+		Sources []source `json:"sources"`
+		Totals  totals   `json:"totals"`
+	}
+
+	sources := make([]source, len(paths))
+	for i, p := range paths {
+		sources[i] = source{
+			ID:      i + 1,
+			Type:    "doc",
+			Path:    p,
+			Domain:  filepath.Base(p),
+			Summary: "Brownfield default repository",
+			Status:  "available",
+			Access: accessInfo{
+				Tools:        []string{"prism_docs_list", "prism_docs_read", "prism_docs_search"},
+				Instructions: "Use prism_docs_* tools. Pass directory path as argument.",
+			},
+		}
+	}
+
+	s := scope{
+		Sources: sources,
+		Totals:  totals{Doc: len(paths)},
+	}
+
+	data, _ := json.Marshal(s)
+	return string(data)
+}
+
 // stringFromMap extracts a string value from a map, returning "" if missing or wrong type.
 func stringFromMap(m map[string]interface{}, key string) string {
 	v, ok := m[key]

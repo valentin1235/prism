@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/heechul/prism-mcp/internal/brownfield"
 	"github.com/heechul/prism-mcp/internal/pipeline"
 	taskpkg "github.com/heechul/prism-mcp/internal/task"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -83,6 +84,15 @@ func HandleAnalyze(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallT
 		if _, err := os.Stat(inputContext); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("input_context file not found: %s", inputContext)), nil
 		}
+	}
+
+	// --- Resolve ontology scope: explicit param → brownfield defaults → error ---
+	if ontologyScope == "" {
+		resolved, err := resolveOntologyScopeFromBrownfield()
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		ontologyScope = resolved
 	}
 
 	// Validate report_template file exists if provided
@@ -435,4 +445,39 @@ func HandleCancelTask(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 	}
 
 	return mcp.NewToolResultText(string(resultBytes)), nil
+}
+
+// resolveOntologyScopeFromBrownfield opens the brownfield store, queries
+// default repos (is_default=1), and builds an ontology scope JSON string
+// from their paths. Returns an error if the store cannot be opened or no
+// defaults are configured.
+func resolveOntologyScopeFromBrownfield() (string, error) {
+	dbPath := filepath.Join(PrismBaseDir, "prism.db")
+	if _, err := os.Stat(dbPath); err != nil {
+		return "", fmt.Errorf("brownfield store를 먼저 설정해주세요: prism.db not found at %s", dbPath)
+	}
+
+	store, err := brownfield.NewStoreAt(dbPath)
+	if err != nil {
+		return "", fmt.Errorf("brownfield store를 먼저 설정해주세요: %v", err)
+	}
+	defer store.Close()
+
+	defaults, err := store.DefaultRepos()
+	if err != nil {
+		return "", fmt.Errorf("brownfield store를 먼저 설정해주세요: %v", err)
+	}
+
+	if len(defaults) == 0 {
+		return "", fmt.Errorf("ontology_scope이 지정되지 않았고 brownfield default repository도 설정되지 않았습니다. prism:brownfield defaults를 먼저 설정해주세요")
+	}
+
+	paths := make([]string, len(defaults))
+	for i, r := range defaults {
+		paths[i] = r.Path
+	}
+
+	scope := pipeline.BuildOntologyScopeFromPaths(paths)
+	log.Printf("Resolved ontology scope from %d brownfield default repo(s)", len(defaults))
+	return scope, nil
 }

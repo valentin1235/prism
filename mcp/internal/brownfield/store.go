@@ -229,6 +229,29 @@ func (s *Store) UpdateDesc(path, desc string) error {
 	return nil
 }
 
+// DefaultRepos returns all repos with is_default=1.
+// Returns an empty slice (not error) if no defaults are set.
+func (s *Store) DefaultRepos() ([]Repo, error) {
+	repos, _, err := s.List(0, 0, true)
+	return repos, err
+}
+
+// NewStoreAt opens (or creates) the brownfield SQLite database at the given path.
+// Used by other packages that need to access the brownfield store without
+// relying on home directory resolution.
+func NewStoreAt(dbPath string) (*Store, error) {
+	db, err := sql.Open("sqlite", dbPath+"?_pragma=journal_mode(wal)")
+	if err != nil {
+		return nil, fmt.Errorf("cannot open database: %w", err)
+	}
+	s := &Store{db: db}
+	if err := s.initialize(); err != nil {
+		db.Close()
+		return nil, err
+	}
+	return s, nil
+}
+
 // Close closes the database connection.
 func (s *Store) Close() error {
 	return s.db.Close()
