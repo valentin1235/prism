@@ -1,7 +1,7 @@
 ---
 name: analyze
-description: Runs multi-perspective analysis via MCP server orchestration. Thin wrapper that handles user interaction (ontology scope mapping) then delegates all processing to prism_analyze MCP tool. General-purpose analysis engine — any topic can be analyzed against ontology documents.
-version: 6.0.0
+description: Runs multi-perspective analysis via MCP server orchestration. Thin wrapper that collects user input then delegates all processing to prism_analyze MCP tool. Ontology scope is automatically resolved from brownfield default repositories. General-purpose analysis engine — any topic can be analyzed.
+version: 7.0.0
 user-invocable: true
 allowed-tools: Read, Glob, Grep, Bash, Write, ToolSearch, AskUserQuestion, WebFetch, WebSearch, mcp__prism__prism_analyze, mcp__prism__prism_task_status, mcp__prism__prism_analyze_result, mcp__prism__prism_cancel_task, mcp__prism__prism_docs_roots, mcp__prism__prism_docs_list, mcp__prism__prism_docs_read, mcp__prism__prism_docs_search
 ---
@@ -11,11 +11,20 @@ allowed-tools: Read, Glob, Grep, Bash, Write, ToolSearch, AskUserQuestion, WebFe
 General-purpose analysis engine. Any topic is seeded, researched, and analyzed from dynamically generated perspectives with Socratic verification.
 
 All analysis processing is orchestrated by the MCP server internally. This skill is a thin wrapper that:
-1. Collects user input and resolves ontology scope (user interaction required)
-2. Calls `prism_analyze` to start the analysis pipeline
+1. Collects user input (topic description)
+2. Calls `prism_analyze` to start the analysis pipeline (ontology scope is auto-resolved from brownfield defaults by the MCP server)
 3. Polls `prism_task_status` for progress updates
 4. Retrieves results via `prism_analyze_result` when complete
 5. Presents the final report to the user
+
+## Ontology Scope Resolution (Automatic)
+
+The MCP server automatically resolves ontology scope using this priority:
+1. **Explicit `ontology_scope` parameter** — if provided via config, used as-is
+2. **Brownfield default repositories** — all repos with `is_default=1` in `prism.db` are merged into scope sources
+3. **Error** — if neither is available, the server returns an error asking the user to set up brownfield defaults first
+
+No user interaction is required for ontology scope mapping. Use `prism:brownfield` to configure default repositories before running analysis.
 
 ## Config-Based Customization
 
@@ -29,19 +38,18 @@ Wrapper skills (e.g., `/prd`) can customize analyze behavior by providing a conf
   "input_context": "Path to input file (e.g., PRD file path)",
   "report_template": "Path to custom report template (overrides default)",
   "seed_hints": "Additional guidance for seed analyst (e.g., 'Focus on policy domain extraction')",
-  "ontology_mode": "required|optional (default: optional)",
   "session_id": "Pre-generated session ID (optional — task_id becomes analyze-{session_id})",
   "model": "Claude model override (default: claude-sonnet-4-6)"
 }
 ```
 
-If no config is provided, analyze runs with defaults (topic from user input, default report template, optional ontology).
+If no config is provided, analyze runs with defaults (topic from user input, default report template, auto-resolved ontology scope from brownfield defaults).
 
 ---
 
-## Phase 1: Problem Intake & Ontology Scope
+## Phase 1: Problem Intake
 
-Main session handles intake and ontology scope mapping — these require user interaction.
+Main session handles intake — collecting the analysis topic from the user.
 
 ### Step 1.1: Parse Arguments & Config
 
@@ -51,19 +59,9 @@ Check if `$ARGUMENTS` contains `--config <path>`:
 
 Store the resolved description and config values.
 
-### Step 1.2: Ontology Scope Mapping
-
-> Read and execute `protocols/ontology-scope-mapping.md` with:
-- `{AVAILABILITY_MODE}` = config's `ontology_mode` if present, otherwise `optional`
-- `{CALLER_CONTEXT}` = `"analysis"`
-- `{STATE_DIR}` = Generate a short-id via `Bash(uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-8)`, then `mkdir -p ~/.prism/state/analyze-{short-id}` and use that path. Pass this `{short-id}` as `session_id` to `prism_analyze` so directories align. If `config.session_id` is provided, use it instead of generating a new one.
-
-Resolve ontology scope to a JSON string in canonical `{"sources": [...]}` format. If `ONTOLOGY_AVAILABLE=false` → pass `null` as `ontology_scope`.
-
 ### Phase 1 Exit Gate
 
 - [ ] Description collected
-- [ ] Ontology scope resolved (JSON string or null)
 
 → **NEXT ACTION: Proceed to Phase 2 — Start Analysis.**
 
@@ -76,10 +74,10 @@ Resolve ontology scope to a JSON string in canonical `{"sources": [...]}` format
 ```
 mcp__prism__prism_analyze(
   topic: "{resolved description}",
-  session_id: "{short-id from Step 1.2, or config.session_id if provided}",
+  session_id: "{config.session_id if provided, otherwise omit}",
   model: "{config.model if provided, otherwise omit to use server default}",
   input_context: "{config.input_context if provided}",
-  ontology_scope: "{ontology scope JSON string or omit if null}",
+  ontology_scope: "{config.ontology_scope if provided, otherwise omit — server auto-resolves from brownfield defaults}",
   seed_hints: "{config.seed_hints if provided}",
   report_template: "{config.report_template if provided}"
 )
@@ -183,8 +181,8 @@ Response includes:
 ## Pipeline Summary
 
 ```
-Phase 1 [intake + ontology scope — user interaction in main session]
-→ Phase 2 [prism_analyze call — starts MCP server pipeline]
+Phase 1 [intake — collect topic from user]
+→ Phase 2 [prism_analyze call — starts MCP server pipeline, scope auto-resolved]
 → Phase 3 [poll prism_task_status — display progress]
 → Phase 4 [prism_analyze_result — present report]
 ```

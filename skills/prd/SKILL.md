@@ -66,7 +66,6 @@ Write the following JSON to `~/.prism/state/prd-{short-id}/analyze-config.json`:
   "topic": "PRD policy conflict analysis: {PRD title} — multi-perspective analysis of whether this PRD conflicts with or has ambiguities against existing codebase policies",
   "input_context": "{PRD file absolute path}",
   "seed_hints": "First, Read the PRD file at {PRD file absolute path}. Extract policy domains from a PM (product manager) perspective. Focus on business policy conflicts, rule contradictions, undefined edge cases, and ambiguous requirements — NOT engineering implementation details. Classify each functional requirement as either conflicting with existing policy documents or covering a new area not addressed by existing policies. Generated perspectives should focus on policy/business domains, not engineering/architecture domains.",
-  "ontology_mode": "required",
   "session_id": "{short-id}"
 }
 ```

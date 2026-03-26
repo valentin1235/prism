@@ -3,7 +3,6 @@
   "analyze_skill_path": "../analyze",
   "config": {
     "parallel": false,
-    "skip_ontology": true,
     "auto_approve": true
   },
   "evals": [

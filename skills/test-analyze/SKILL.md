@@ -29,7 +29,7 @@ Three categories of assertions, each verified against real execution artifacts:
 3. Resolve paths:
    - `{skill-dir}` = absolute path to this SKILL.md's parent directory
    - `{analyze-skill-path}` = resolve evals.json `analyze_skill_path` relative to `{skill-dir}` → absolute path
-   - `{ontology_instruction}` = if evals.json `config.skip_ontology` is true: `"Skip ontology scope mapping. Write N/A to ontology-scope.json."`, else: `"Execute ontology scope mapping normally."`
+   - Ontology scope is auto-resolved by the MCP server from brownfield defaults (no manual mapping needed)
 4. Create workspace: `~/.prism/state/{test-run-id}/`
 5. Create results directory: `{skill-dir}/test-results/{test-run-id}/`
 6. Show user: "Running {N} test cases. Estimated time: ~5-8 min per test case."
@@ -47,7 +47,6 @@ Spawn a background agent that executes the full `prism:analyze` workflow. The ag
 - Use the test case's `target_codebase` as the code to analyze
 - Use state directory: `~/.prism/state/{test-run-id}/{eval-id}/`
 - Auto-approve Phase 0.6 (skip AskUserQuestion — add instruction: "Auto-approve all perspectives without asking the user")
-- Skip Phase 0.3 ontology if `skip_ontology: true`
 - Execute Phase 2B verification using real `prism_interview` + `prism_score` MCP calls
 - Write all artifacts (seed-analysis.json, perspectives.json, context.json, findings.json, etc.)
 
@@ -68,7 +67,6 @@ CRITICAL RULES:
 - Follow SKILL.md phases exactly (Phase 0 → 4)
 - Use TeamCreate + Task to spawn real sub-agents for each role
 - Phase 0.6: Auto-approve perspectives (do NOT call AskUserQuestion)
-- Phase 0.3: {ontology_instruction}
 - Phase 2B: MUST call prism_interview and prism_score MCP tools for real verification
 - Write ALL JSON artifacts to the state directory
 - After Phase 3, write the final report to the state directory as report.md
