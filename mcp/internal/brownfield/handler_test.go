@@ -152,8 +152,25 @@ func TestHandlerSetDefaultsEmpty(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := extractText(result)
-	if !strings.Contains(text, "at least one valid index") {
-		t.Errorf("expected error for empty indices, got: %s", text)
+	if !strings.Contains(text, "All defaults cleared") {
+		t.Errorf("expected defaults cleared message, got: %s", text)
+	}
+}
+
+func TestHandlerSetDefaultsEmptyString(t *testing.T) {
+	newTestHandlerStore(t)
+
+	req := makeRequest(map[string]any{
+		"action":  "set_defaults",
+		"indices": "",
+	})
+	result, err := HandleBrownfield(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := extractText(result)
+	if !strings.Contains(text, "All defaults cleared") {
+		t.Errorf("expected defaults cleared message, got: %s", text)
 	}
 }
 
