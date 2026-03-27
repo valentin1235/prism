@@ -657,7 +657,6 @@ func runSupplementaryResearch(task *taskpkg.AnalysisTask, cfg AnalysisConfig, ga
 	sb.WriteString("\nInvestigate ONLY these specific gaps. Use tools (Grep, Read, Glob, Bash) to find concrete evidence.\n")
 	sb.WriteString("Output your additional findings as structured JSON following the same schema.\n")
 
-
 	// Run focused research subprocess (5-minute timeout, 8 max turns)
 	ctx, cancel := context.WithTimeout(task.Ctx, 5*time.Minute)
 	defer cancel()

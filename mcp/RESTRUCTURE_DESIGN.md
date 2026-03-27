@@ -32,7 +32,7 @@ mcp/
 │   │   │
 │   │   ├── scope.go                     #   Stage 1: runSeedAnalysis, BuildSeedAnalystPrompt,
 │   │   │                                #            BuildPerspectiveGeneratorPrompt,
-│   │   │                                #            LoadOntologyDocPaths, schema 상수들
+│   │   │                                #            schema 상수들
 │   │   ├── specialist.go                #   Stage 2: BuildAllSpecialistCommands,
 │   │   │                                #            BuildSpecialistCommand, SpecialistCommand,
 │   │   │                                #            LoadSpecialistContext, SpecialistContext
@@ -61,8 +61,7 @@ mcp/
 │       ├── interview.go                 #   handleInterview, handleScore,
 │       │                                #   InterviewSession, QA, InterviewResponse, scoreSession
 │       ├── review.go                    #   handleDAReview, DAFinding, DAReviewResult
-│       └── docs.go                      #   initFilesystem, handleListRoots, handleListDir,
-│                                        #   handleReadFile, handleSearchFiles, allowedDirs
+│       └── (docs.go removed — replaced by brownfield SQLite)
 ```
 
 ### 테스트 파일 배치 (관례: 동일 디렉토리)
@@ -285,7 +284,6 @@ handleAnalyze        → HandleAnalyze          (handler)
 handleInterview      → HandleInterview        (handler)
 handleDAReview       → HandleDAReview         (handler)
 handleScore          → HandleScore            (handler)
-initFilesystem       → InitFilesystem         (handler)
 scoreSession         → ScoreSession           (handler, 또는 handler 내부 유지 시 불필요)
 ```
 
