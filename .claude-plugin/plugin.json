@@ -1,6 +1,6 @@
 {
   "name": "prism",
-  "version": "2.11.1",
+  "version": "2.11.2",
   "description": "Multi-perspective agent team analysis — general-purpose analysis engine with dynamic perspective generation, incident postmortem, strategic planning, and PRD policy review",
   "author": {
     "name": "cohemm",
