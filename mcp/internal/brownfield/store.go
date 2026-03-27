@@ -137,7 +137,7 @@ func (s *Store) List(offset, limit int, defaultOnly bool) ([]Repo, int, error) {
 	q := fmt.Sprintf(`
 		SELECT rowid, path, name, COALESCE(desc, ''), is_default, registered_at
 		FROM brownfield_repos %s
-		ORDER BY name ASC
+		ORDER BY rowid ASC
 		LIMIT ? OFFSET ?
 	`, where)
 

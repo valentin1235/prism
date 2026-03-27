@@ -106,10 +106,10 @@ func handleScan(ctx context.Context, args map[string]interface{}) (*mcp.CallTool
 		return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
 	}
 
-	count, bulkErr := store.BulkRegister(repos)
+	_, bulkErr := store.BulkRegister(repos)
 
 	// Fetch all repos with defaults to build formatted list (matches ouroboros format)
-	allRepos, _, listErr := store.List(0, 0, false)
+	allRepos, total, listErr := store.List(0, 0, false)
 	if listErr != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("list after scan failed: %v", listErr)), nil
 	}
@@ -117,7 +117,7 @@ func handleScan(ctx context.Context, args map[string]interface{}) (*mcp.CallTool
 
 	// Build compact numbered list: "{rowid}. {name} *"
 	var lines []string
-	lines = append(lines, fmt.Sprintf("Scan complete. %d repositories registered.", count), "")
+	lines = append(lines, fmt.Sprintf("Scan complete. %d repositories registered.", total), "")
 	for _, r := range allRepos {
 		marker := ""
 		if r.IsDefault {
@@ -252,30 +252,30 @@ func handleSetDefault(args map[string]interface{}) (*mcp.CallToolResult, error) 
 
 func handleSetDefaults(args map[string]interface{}) (*mcp.CallToolResult, error) {
 	indicesStr, _ := args["indices"].(string)
-	if indicesStr == "" {
-		return mcp.NewToolResultError("indices is required for set_defaults action"), nil
-	}
 
-	parts := strings.Split(indicesStr, ",")
+	// Empty string means "clear all defaults" (indices="" for "none")
 	var ids []int64
-	for _, p := range parts {
-		p = strings.TrimSpace(p)
-		if p == "" {
-			continue
+	if indicesStr != "" {
+		parts := strings.Split(indicesStr, ",")
+		for _, p := range parts {
+			p = strings.TrimSpace(p)
+			if p == "" {
+				continue
+			}
+			id, err := strconv.ParseInt(p, 10, 64)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("invalid id: %s", p)), nil
+			}
+			ids = append(ids, id)
 		}
-		id, err := strconv.ParseInt(p, 10, 64)
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("invalid id: %s", p)), nil
-		}
-		ids = append(ids, id)
-	}
-
-	if len(ids) == 0 {
-		return mcp.NewToolResultError("at least one valid index is required"), nil
 	}
 
 	if err := store.SetDefaultsByRowIDs(ids); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("set_defaults failed: %v", err)), nil
+	}
+
+	if len(ids) == 0 {
+		return mcp.NewToolResultText("All defaults cleared."), nil
 	}
 
 	// Return updated defaults
