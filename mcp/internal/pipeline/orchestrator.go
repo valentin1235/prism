@@ -165,7 +165,7 @@ func runScopeStage(task *taskpkg.AnalysisTask, cfg AnalysisConfig) ([]Perspectiv
 		return nil, fmt.Errorf("seed analysis: %w", err)
 	}
 
-	// Sub-step 2: DA review loop (up to 3 rounds)
+	// Sub-step 2: DA review loop (up to 1 round)
 	task.UpdateStageDetail(taskpkg.StageScope, "seed complete, running DA review")
 	if err := RunDAReviewLoop(task, cfg); err != nil {
 		return nil, fmt.Errorf("DA review: %w", err)

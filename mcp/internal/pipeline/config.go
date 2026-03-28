@@ -57,7 +57,7 @@ type DAGap struct {
 
 // MaxDARounds is the hard limit for the DA review loop.
 // After this many rounds, the loop must stop regardless of findings.
-const MaxDARounds = 3
+const MaxDARounds = 1
 
 // DAReviewResult is the structured result returned by prism_da_review.
 type DAReviewResult struct {

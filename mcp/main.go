@@ -16,7 +16,7 @@ func main() {
 
 	s := server.NewMCPServer(
 		"prism",
-		"1.0.1",
+		"1.0.2",
 	)
 
 	s.AddTool(
@@ -32,9 +32,9 @@ func main() {
 
 	s.AddTool(
 		mcp.NewTool("prism_da_review",
-			mcp.WithDescription("Devil's Advocate review of seed analysis. Reads seed-analysis.json, critiques perspective bias and codebase coverage gaps using the 4-phase DA protocol. Returns gap count — any gap (>=1) triggers fail. Hard-stops after 3 rounds."),
+			mcp.WithDescription("Devil's Advocate review of seed analysis. Reads seed-analysis.json, critiques perspective bias and codebase coverage gaps using the 4-phase DA protocol. Returns gap count — any gap (>=1) triggers fail. Runs 1 round only."),
 			mcp.WithString("seed_analysis_path", mcp.Required(), mcp.Description("Absolute path to seed-analysis.json file to review")),
-			mcp.WithNumber("round", mcp.Description("Current loop round (1-based). Defaults to 1. Hard-stops after round 3.")),
+			mcp.WithNumber("round", mcp.Description("Current loop round (1-based). Defaults to 1. Hard-stops after round 1.")),
 			mcp.WithString("context", mcp.Description("Optional additional context for the DA review (e.g., specific areas of concern)")),
 		),
 		handler.HandleDAReview,

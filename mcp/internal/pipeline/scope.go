@@ -526,7 +526,7 @@ func RunSeedAnalysis(task *taskpkg.AnalysisTask, cfg AnalysisConfig) error {
 	return nil
 }
 
-// RunDAReviewLoop executes the Devil's Advocate review loop (up to 3 rounds).
+// RunDAReviewLoop executes the Devil's Advocate review loop (up to MaxDARounds).
 // Each round:
 //  1. Read current seed-analysis.json
 //  2. Run DA review (uses existing DA prompt + LLM call)

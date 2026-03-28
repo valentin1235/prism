@@ -453,21 +453,21 @@ func TestEarlyTermination_JSONPassField(t *testing.T) {
 	}
 }
 
-// === AC 7: Loop hard-stops after maximum 3 iterations ===
+// === AC 7: Loop hard-stops after maximum iterations ===
 
 func TestMaxDARounds_Constant(t *testing.T) {
-	if pipeline.MaxDARounds != 3 {
-		t.Errorf("pipeline.MaxDARounds = %d, want 3", pipeline.MaxDARounds)
+	if pipeline.MaxDARounds != 1 {
+		t.Errorf("pipeline.MaxDARounds = %d, want 1", pipeline.MaxDARounds)
 	}
 }
 
 func TestHardStop_RoundMetadataInJSON(t *testing.T) {
 	// Verify round, max_rounds, and hard_stop fields appear in JSON output
 	result := pipeline.DAReviewResult{
-		Pass:      true,
-		Round:     2,
+		Pass:      false,
+		Round:     1,
 		MaxRounds: pipeline.MaxDARounds,
-		HardStop:  false,
+		HardStop:  true,
 		Gaps:      []pipeline.DAGap{},
 	}
 
@@ -479,19 +479,19 @@ func TestHardStop_RoundMetadataInJSON(t *testing.T) {
 	var parsed map[string]interface{}
 	json.Unmarshal(data, &parsed)
 
-	if round, ok := parsed["round"].(float64); !ok || int(round) != 2 {
-		t.Errorf("round = %v, want 2", parsed["round"])
+	if round, ok := parsed["round"].(float64); !ok || int(round) != 1 {
+		t.Errorf("round = %v, want 1", parsed["round"])
 	}
-	if maxR, ok := parsed["max_rounds"].(float64); !ok || int(maxR) != 3 {
-		t.Errorf("max_rounds = %v, want 3", parsed["max_rounds"])
+	if maxR, ok := parsed["max_rounds"].(float64); !ok || int(maxR) != 1 {
+		t.Errorf("max_rounds = %v, want 1", parsed["max_rounds"])
 	}
-	if hs, ok := parsed["hard_stop"].(bool); !ok || hs != false {
-		t.Errorf("hard_stop = %v, want false", parsed["hard_stop"])
+	if hs, ok := parsed["hard_stop"].(bool); !ok || hs != true {
+		t.Errorf("hard_stop = %v, want true", parsed["hard_stop"])
 	}
 }
 
 func TestHardStop_TrueOnFinalRound(t *testing.T) {
-	// When round == pipeline.MaxDARounds (3), hard_stop must be true
+	// When round == pipeline.MaxDARounds (1), hard_stop must be true
 	hardStop := pipeline.MaxDARounds >= pipeline.MaxDARounds // simulates the check in HandleDAReview
 	if !hardStop {
 		t.Error("hard_stop should be true when round == pipeline.MaxDARounds")
@@ -512,18 +512,8 @@ func TestHardStop_TrueOnFinalRound(t *testing.T) {
 	if !parsed["hard_stop"].(bool) {
 		t.Error("hard_stop must be true when round == pipeline.MaxDARounds")
 	}
-	if int(parsed["round"].(float64)) != 3 {
-		t.Errorf("round = %v, want 3", parsed["round"])
-	}
-}
-
-func TestHardStop_FalseBeforeMaxRound(t *testing.T) {
-	// Rounds 1 and 2 should NOT trigger hard_stop
-	for _, round := range []int{1, 2} {
-		hardStop := round >= pipeline.MaxDARounds
-		if hardStop {
-			t.Errorf("round %d should not trigger hard_stop (pipeline.MaxDARounds=%d)", round, pipeline.MaxDARounds)
-		}
+	if int(parsed["round"].(float64)) != 1 {
+		t.Errorf("round = %v, want 1", parsed["round"])
 	}
 }
 
@@ -536,7 +526,7 @@ func TestHardStop_ExceedingMaxRoundsResult(t *testing.T) {
 		MaxRounds: pipeline.MaxDARounds,
 		HardStop:  true,
 		Gaps:      []pipeline.DAGap{},
-		RawOutput: "hard stop: round 4 exceeds maximum of 3 rounds",
+		RawOutput: "hard stop: round 4 exceeds maximum of 1 rounds",
 	}
 
 	data, _ := json.Marshal(result)
@@ -562,9 +552,8 @@ func TestHardStop_RoundBoundaryTable(t *testing.T) {
 		wantStop bool
 		desc     string
 	}{
-		{1, false, "round 1: loop continues"},
-		{2, false, "round 2: loop continues"},
-		{3, true, "round 3: hard stop (max reached)"},
+		{1, true, "round 1: hard stop (max reached)"},
+		{2, true, "round 2: exceeds max, should be blocked"},
 		{4, true, "round 4: exceeds max, should be blocked"},
 		{100, true, "round 100: far exceeds max"},
 	}
@@ -750,11 +739,11 @@ func TestFreshReadEachRound_NoCaching(t *testing.T) {
 	}
 }
 
-// === AC 11: On 3-round failure, workflow proceeds ===
+// === AC 11: On max-round failure, workflow proceeds ===
 
-func TestThreeRoundFailure_WorkflowContinues(t *testing.T) {
-	// Simulate the complete 3-round failure scenario end-to-end:
-	// All 3 rounds return CRITICAL/MAJOR findings
+func TestMaxRoundFailure_WorkflowContinues(t *testing.T) {
+	// Simulate the complete max-round failure scenario end-to-end:
+	// All rounds return CRITICAL/MAJOR findings
 	// and seed-analysis.json must be consumable by perspective generator.
 
 	tmpDir := t.TempDir()
@@ -772,7 +761,7 @@ func TestThreeRoundFailure_WorkflowContinues(t *testing.T) {
 	data, _ := json.MarshalIndent(initial, "", "  ")
 	os.WriteFile(seedPath, data, 0644)
 
-	// Simulate 3 rounds of DA failure (each round adds findings but DA still finds issues)
+	// Simulate DA failure rounds (each round adds findings but DA still finds issues)
 	for round := 1; round <= pipeline.MaxDARounds; round++ {
 		// Each round: seed analyst adds new findings in response to DA critique
 		patch := pipeline.SeedPatch{
@@ -794,9 +783,10 @@ func TestThreeRoundFailure_WorkflowContinues(t *testing.T) {
 	}
 
 	// Verify: all original + incrementally added findings are preserved
-	// Initial (1) + 3 rounds × 1 finding each = 4
-	if len(final.Findings) != 4 {
-		t.Errorf("expected 4 findings (1 original + 3 rounds), got %d", len(final.Findings))
+	// Initial (1) + MaxDARounds × 1 finding each
+	expectedFindings := 1 + pipeline.MaxDARounds
+	if len(final.Findings) != expectedFindings {
+		t.Errorf("expected %d findings (1 original + %d rounds), got %d", expectedFindings, pipeline.MaxDARounds, len(final.Findings))
 	}
 
 	// Verify: topic is preserved
@@ -805,8 +795,8 @@ func TestThreeRoundFailure_WorkflowContinues(t *testing.T) {
 	}
 }
 
-func TestThreeRoundFailure_NoUnresolvedFindingsRecorded(t *testing.T) {
-	// AC 11: On 3-round hard stop, unresolved DA findings must NOT be recorded
+func TestMaxRoundFailure_NoUnresolvedFindingsRecorded(t *testing.T) {
+	// AC 11: On max-round hard stop, unresolved DA findings must NOT be recorded
 	// in seed-analysis.json. Only the seed analyst's own research findings
 	// should be present — DA critique stays internal.
 
@@ -855,8 +845,8 @@ func TestThreeRoundFailure_NoUnresolvedFindingsRecorded(t *testing.T) {
 	}
 }
 
-func TestThreeRoundFailure_WorkflowProceeds(t *testing.T) {
-	// AC 11: After 3-round failure, the workflow MUST proceed to perspective
+func TestMaxRoundFailure_WorkflowProceeds(t *testing.T) {
+	// AC 11: After max-round failure, the workflow MUST proceed to perspective
 	// generator. This means seed-analysis.json must be a valid, consumable
 	// input for the perspective generator.
 
@@ -905,8 +895,8 @@ func TestThreeRoundFailure_WorkflowProceeds(t *testing.T) {
 
 }
 
-func TestThreeRoundFailure_HardStopResult(t *testing.T) {
-	// Verify that on round 3, HandleDAReview returns hard_stop=true, pass=false
+func TestMaxRoundFailure_HardStopResult(t *testing.T) {
+	// Verify that on final round, HandleDAReview returns hard_stop=true, pass=false
 	// This is the signal for the seed analyst to exit the loop.
 	result := pipeline.DAReviewResult{
 		Pass:          false,
@@ -922,9 +912,9 @@ func TestThreeRoundFailure_HardStopResult(t *testing.T) {
 		},
 	}
 
-	// On round 3, even with findings, hard_stop must be true
+	// On final round, even with findings, hard_stop must be true
 	if !result.HardStop {
-		t.Error("hard_stop must be true on round 3")
+		t.Error("hard_stop must be true on final round")
 	}
 	if result.Pass {
 		t.Error("pass must be false when CRITICAL/MAJOR findings exist")
@@ -947,7 +937,7 @@ func TestThreeRoundFailure_HardStopResult(t *testing.T) {
 	}
 }
 
-func TestThreeRoundFailure_ExceedsMaxReturnsEmpty(t *testing.T) {
+func TestMaxRoundFailure_ExceedsMaxReturnsEmpty(t *testing.T) {
 	// If somehow round > pipeline.MaxDARounds, the tool returns immediately
 	// with pass=false and empty findings — a safety net.
 	result := pipeline.DAReviewResult{
