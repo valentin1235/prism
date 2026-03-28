@@ -172,6 +172,7 @@ func (pe *ParallelExecutor) Execute(ctx context.Context, jobs []ParallelJob) Par
 				// reduce the time available for attempt 2.
 				attemptCtx, attemptCancel := context.WithTimeout(ctx, jobTimeout)
 				outputPath, err := j.Fn(attemptCtx)
+				attemptTimedOut := attemptCtx.Err() == context.DeadlineExceeded
 				attemptCancel() // release timer resources immediately
 				result = JobResult{
 					PerspectiveID: j.PerspectiveID,
@@ -184,7 +185,7 @@ func (pe *ParallelExecutor) Execute(ctx context.Context, jobs []ParallelJob) Par
 				}
 
 				// Annotate timeout errors for clearer diagnostics
-				if attemptCtx.Err() == context.DeadlineExceeded && ctx.Err() == nil {
+				if attemptTimedOut && ctx.Err() == nil {
 					log.Printf("[parallel] Job %s timed out after %v (attempt %d/%d)",
 						j.PerspectiveID, jobTimeout, attempt, retryLimit)
 				}
@@ -192,8 +193,7 @@ func (pe *ParallelExecutor) Execute(ctx context.Context, jobs []ParallelJob) Par
 				if attempt < retryLimit {
 					// Apply exponential backoff for retryable/timeout errors,
 					// immediate retry for others (mirrors Python pattern).
-					if engine.IsRetryableError(result.Err) ||
-						attemptCtx.Err() == context.DeadlineExceeded {
+					if engine.IsRetryableError(result.Err) || attemptTimedOut {
 						backoff := time.Duration(float64(initialBackoff) * math.Pow(2, float64(attempt-1)))
 						if backoff > maxBackoff {
 							backoff = maxBackoff
