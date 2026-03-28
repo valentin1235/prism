@@ -250,7 +250,7 @@ func runSpecialistStage(task *taskpkg.AnalysisTask, cfg AnalysisConfig, perspect
 
 	executor := &parallel.ParallelExecutor{
 		Concurrency: parallel.DefaultConcurrencyLimit,
-		RetryLimit:  2, // 1 initial + 1 retry
+		// RetryLimit uses default (5, matching Python _MAX_RETRIES)
 		JobTimeout:  parallel.DefaultJobTimeout,
 		OnJobComplete: func(perspectiveID string, success bool, attempts int) {
 			if success {
@@ -306,7 +306,7 @@ func runInterviewStage(task *taskpkg.AnalysisTask, cfg AnalysisConfig, perspecti
 
 	executor := &parallel.ParallelExecutor{
 		Concurrency: parallel.DefaultConcurrencyLimit,
-		RetryLimit:  2, // 1 initial + 1 retry
+		// RetryLimit uses default (5, matching Python _MAX_RETRIES)
 		JobTimeout:  parallel.DefaultJobTimeout,
 		OnJobComplete: func(perspectiveID string, success bool, attempts int) {
 			if success {

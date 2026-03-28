@@ -335,14 +335,14 @@ func TestParallelExecutor_ConcurrencyCappedToJobCount(t *testing.T) {
 }
 
 func TestParallelExecutor_PerspectiveIDPreservedInResults(t *testing.T) {
-	pe := &ParallelExecutor{Concurrency: 2}
+	pe := &ParallelExecutor{Concurrency: 2, RetryLimit: 1}
 
 	jobs := []ParallelJob{
 		{PerspectiveID: "security", Fn: func(ctx context.Context) (string, error) {
 			return "/findings/security", nil
 		}},
 		{PerspectiveID: "performance", Fn: func(ctx context.Context) (string, error) {
-			return "", fmt.Errorf("timeout")
+			return "", fmt.Errorf("permanent failure")
 		}},
 	}
 

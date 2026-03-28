@@ -23,6 +23,9 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
+	"syscall"
+	"time"
 )
 
 // ---------------------------------------------------------------------------
@@ -110,11 +113,32 @@ func Query(ctx context.Context, prompt string, opts ClaudeOptions) (<-chan json.
 	}
 
 	ch := make(chan json.RawMessage, 32)
+
+	// sync.Once ensures cmd.Wait() is called exactly once across
+	// the streaming goroutine and cleanup (exec.Cmd contract).
+	var waitOnce sync.Once
+	doWait := func() { waitOnce.Do(func() { cmd.Wait() }) } //nolint:errcheck
+
+	var cleanupOnce sync.Once
 	cleanup := func() {
-		if cmd.Process != nil {
-			cmd.Process.Kill()
-		}
-		cmd.Wait() //nolint:errcheck
+		cleanupOnce.Do(func() {
+			if cmd.Process == nil {
+				return
+			}
+			// Graceful shutdown: SIGTERM → wait → SIGKILL (mirrors Python terminate_process)
+			_ = cmd.Process.Signal(syscall.SIGTERM)
+			done := make(chan struct{})
+			go func() {
+				doWait()
+				close(done)
+			}()
+			select {
+			case <-done:
+			case <-time.After(5 * time.Second):
+				cmd.Process.Kill() //nolint:errcheck
+				<-done
+			}
+		})
 	}
 
 	go func() {
@@ -139,7 +163,7 @@ func Query(ctx context.Context, prompt string, opts ClaudeOptions) (<-chan json.
 				return
 			}
 		}
-		cmd.Wait() //nolint:errcheck
+		doWait()
 	}()
 
 	return ch, cleanup, nil
@@ -269,6 +293,37 @@ func buildCLIEnv(opts ClaudeOptions) []string {
 		env = append(env, k+"="+v)
 	}
 	return env
+}
+
+// ---------------------------------------------------------------------------
+// Retryable error classification (mirrors Python _RETRYABLE_ERROR_PATTERNS)
+// ---------------------------------------------------------------------------
+
+// retryableErrorPatterns are substrings that indicate a transient error
+// worth retrying. Matches Python claude_code_adapter._RETRYABLE_ERROR_PATTERNS.
+var retryableErrorPatterns = []string{
+	"concurrency",
+	"rate",
+	"timeout",
+	"overloaded",
+	"temporarily",
+	"empty response",
+	"need retry",
+}
+
+// IsRetryableError checks whether an error message indicates a transient
+// condition that should be retried with backoff.
+func IsRetryableError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	for _, pattern := range retryableErrorPatterns {
+		if strings.Contains(msg, pattern) {
+			return true
+		}
+	}
+	return false
 }
 
 func dispatchCallback(raw json.RawMessage, cb func(string, string)) {
