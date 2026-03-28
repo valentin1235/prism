@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"sync"
 	"time"
+
+	"github.com/heechul/prism-mcp/internal/engine"
 )
 
 // DefaultConcurrencyLimit is the default maximum number of concurrent
@@ -53,8 +56,13 @@ type ParallelExecutor struct {
 	OnJobComplete func(perspectiveID string, success bool, attempts int)
 
 	// RetryLimit is the maximum number of attempts per job (including the first).
-	// Defaults to 2 (one retry) if <= 0.
+	// Defaults to 5 (mirrors Python _MAX_RETRIES = 5) if <= 0.
 	RetryLimit int
+
+	// InitialBackoff is the base delay before the first retry.
+	// Subsequent retries use exponential backoff: InitialBackoff * 2^attempt.
+	// Defaults to 2 seconds if <= 0 (mirrors Python _INITIAL_BACKOFF_SECONDS).
+	InitialBackoff time.Duration
 
 	// JobTimeout is the per-process timeout for each individual job attempt.
 	// If a single attempt exceeds this duration, the job's context is cancelled.
@@ -93,7 +101,12 @@ func (pe *ParallelExecutor) Execute(ctx context.Context, jobs []ParallelJob) Par
 
 	retryLimit := pe.RetryLimit
 	if retryLimit <= 0 {
-		retryLimit = 2 // 1 initial + 1 retry
+		retryLimit = 5 // mirrors Python _MAX_RETRIES = 5
+	}
+
+	initialBackoff := pe.InitialBackoff
+	if initialBackoff <= 0 {
+		initialBackoff = 2 * time.Second // mirrors Python _INITIAL_BACKOFF_SECONDS
 	}
 
 	jobTimeout := pe.JobTimeout
@@ -173,8 +186,23 @@ func (pe *ParallelExecutor) Execute(ctx context.Context, jobs []ParallelJob) Par
 				}
 
 				if attempt < retryLimit {
-					log.Printf("[parallel] Job %s failed (attempt %d/%d): %v — retrying",
-						j.PerspectiveID, attempt, retryLimit, result.Err)
+					// Apply exponential backoff for retryable/timeout errors,
+					// immediate retry for others (mirrors Python pattern).
+					if engine.IsRetryableError(result.Err) ||
+						attemptCtx.Err() == context.DeadlineExceeded {
+						backoff := time.Duration(float64(initialBackoff) * math.Pow(2, float64(attempt-1)))
+						log.Printf("[parallel] Job %s failed (attempt %d/%d): %v — retrying in %v",
+							j.PerspectiveID, attempt, retryLimit, result.Err, backoff)
+						select {
+						case <-time.After(backoff):
+						case <-ctx.Done():
+							result.Err = fmt.Errorf("context cancelled during backoff: %w", ctx.Err())
+							break
+						}
+					} else {
+						log.Printf("[parallel] Job %s failed (attempt %d/%d): %v — retrying immediately",
+							j.PerspectiveID, attempt, retryLimit, result.Err)
+					}
 				} else {
 					// Wrap the final error to indicate retry exhaustion so downstream
 					// classifiers (classifyError / classifyInterviewError) can detect it.

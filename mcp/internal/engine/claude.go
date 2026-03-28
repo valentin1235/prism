@@ -23,6 +23,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
+	"time"
 )
 
 // ---------------------------------------------------------------------------
@@ -111,10 +113,23 @@ func Query(ctx context.Context, prompt string, opts ClaudeOptions) (<-chan json.
 
 	ch := make(chan json.RawMessage, 32)
 	cleanup := func() {
-		if cmd.Process != nil {
-			cmd.Process.Kill()
+		if cmd.Process == nil {
+			return
 		}
-		cmd.Wait() //nolint:errcheck
+		// Graceful shutdown: SIGTERM → wait → SIGKILL (mirrors Python terminate_process)
+		_ = cmd.Process.Signal(syscall.SIGTERM)
+		done := make(chan struct{})
+		go func() {
+			cmd.Wait() //nolint:errcheck
+			close(done)
+		}()
+		select {
+		case <-done:
+			return
+		case <-time.After(5 * time.Second):
+			cmd.Process.Kill() //nolint:errcheck
+			<-done
+		}
 	}
 
 	go func() {
@@ -269,6 +284,37 @@ func buildCLIEnv(opts ClaudeOptions) []string {
 		env = append(env, k+"="+v)
 	}
 	return env
+}
+
+// ---------------------------------------------------------------------------
+// Retryable error classification (mirrors Python _RETRYABLE_ERROR_PATTERNS)
+// ---------------------------------------------------------------------------
+
+// retryableErrorPatterns are substrings that indicate a transient error
+// worth retrying. Matches Python claude_code_adapter._RETRYABLE_ERROR_PATTERNS.
+var retryableErrorPatterns = []string{
+	"concurrency",
+	"rate",
+	"timeout",
+	"overloaded",
+	"temporarily",
+	"empty response",
+	"need retry",
+}
+
+// IsRetryableError checks whether an error message indicates a transient
+// condition that should be retried with backoff.
+func IsRetryableError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	for _, pattern := range retryableErrorPatterns {
+		if strings.Contains(msg, pattern) {
+			return true
+		}
+	}
+	return false
 }
 
 func dispatchCallback(raw json.RawMessage, cb func(string, string)) {
