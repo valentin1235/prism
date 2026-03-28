@@ -463,11 +463,9 @@ func TestWriteDAHistory_HardStop(t *testing.T) {
 	dir := t.TempDir()
 	history := DAReviewHistory{
 		FinalPassed: false,
-		TotalRounds: 3,
+		TotalRounds: MaxDARounds,
 		Rounds: []DAReviewRound{
 			{Round: 1, Pass: false, GapCount: 2, BiasCount: 1, CoverageCount: 1},
-			{Round: 2, Pass: false, GapCount: 1, CoverageCount: 1},
-			{Round: 3, Pass: false, GapCount: 1, BiasCount: 1},
 		},
 	}
 
@@ -488,11 +486,11 @@ func TestWriteDAHistory_HardStop(t *testing.T) {
 	if loaded.FinalPassed {
 		t.Error("final_passed should be false after hard stop")
 	}
-	if loaded.TotalRounds != 3 {
-		t.Errorf("total_rounds = %d, want 3", loaded.TotalRounds)
+	if loaded.TotalRounds != MaxDARounds {
+		t.Errorf("total_rounds = %d, want %d", loaded.TotalRounds, MaxDARounds)
 	}
-	if len(loaded.Rounds) != 3 {
-		t.Errorf("rounds count = %d, want 3", len(loaded.Rounds))
+	if len(loaded.Rounds) != MaxDARounds {
+		t.Errorf("rounds count = %d, want %d", len(loaded.Rounds), MaxDARounds)
 	}
 }
 
