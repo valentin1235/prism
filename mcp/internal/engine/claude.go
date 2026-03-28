@@ -23,6 +23,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -112,24 +113,32 @@ func Query(ctx context.Context, prompt string, opts ClaudeOptions) (<-chan json.
 	}
 
 	ch := make(chan json.RawMessage, 32)
+
+	// sync.Once ensures cmd.Wait() is called exactly once across
+	// the streaming goroutine and cleanup (exec.Cmd contract).
+	var waitOnce sync.Once
+	doWait := func() { waitOnce.Do(func() { cmd.Wait() }) } //nolint:errcheck
+
+	var cleanupOnce sync.Once
 	cleanup := func() {
-		if cmd.Process == nil {
-			return
-		}
-		// Graceful shutdown: SIGTERM → wait → SIGKILL (mirrors Python terminate_process)
-		_ = cmd.Process.Signal(syscall.SIGTERM)
-		done := make(chan struct{})
-		go func() {
-			cmd.Wait() //nolint:errcheck
-			close(done)
-		}()
-		select {
-		case <-done:
-			return
-		case <-time.After(5 * time.Second):
-			cmd.Process.Kill() //nolint:errcheck
-			<-done
-		}
+		cleanupOnce.Do(func() {
+			if cmd.Process == nil {
+				return
+			}
+			// Graceful shutdown: SIGTERM → wait → SIGKILL (mirrors Python terminate_process)
+			_ = cmd.Process.Signal(syscall.SIGTERM)
+			done := make(chan struct{})
+			go func() {
+				doWait()
+				close(done)
+			}()
+			select {
+			case <-done:
+			case <-time.After(5 * time.Second):
+				cmd.Process.Kill() //nolint:errcheck
+				<-done
+			}
+		})
 	}
 
 	go func() {
@@ -154,7 +163,7 @@ func Query(ctx context.Context, prompt string, opts ClaudeOptions) (<-chan json.
 				return
 			}
 		}
-		cmd.Wait() //nolint:errcheck
+		doWait()
 	}()
 
 	return ch, cleanup, nil

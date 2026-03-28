@@ -29,6 +29,9 @@ type ParallelJob struct {
 	Fn func(ctx context.Context) (outputPath string, err error)
 }
 
+// maxBackoff caps exponential backoff to prevent excessive delays.
+const maxBackoff = 30 * time.Second
+
 // DefaultJobTimeout is the default per-process timeout for claude CLI subprocesses.
 // Each specialist/interview job gets this timeout for a single attempt.
 // This acts as a safety net in addition to any timeout the job function itself may set.
@@ -151,6 +154,7 @@ func (pe *ParallelExecutor) Execute(ctx context.Context, jobs []ParallelJob) Par
 			var result JobResult
 			var attempts int
 
+		retryLoop:
 			for attempt := 1; attempt <= retryLimit; attempt++ {
 				attempts = attempt
 
@@ -191,13 +195,16 @@ func (pe *ParallelExecutor) Execute(ctx context.Context, jobs []ParallelJob) Par
 					if engine.IsRetryableError(result.Err) ||
 						attemptCtx.Err() == context.DeadlineExceeded {
 						backoff := time.Duration(float64(initialBackoff) * math.Pow(2, float64(attempt-1)))
+						if backoff > maxBackoff {
+							backoff = maxBackoff
+						}
 						log.Printf("[parallel] Job %s failed (attempt %d/%d): %v — retrying in %v",
 							j.PerspectiveID, attempt, retryLimit, result.Err, backoff)
 						select {
 						case <-time.After(backoff):
 						case <-ctx.Done():
 							result.Err = fmt.Errorf("context cancelled during backoff: %w", ctx.Err())
-							break
+							break retryLoop
 						}
 					} else {
 						log.Printf("[parallel] Job %s failed (attempt %d/%d): %v — retrying immediately",
