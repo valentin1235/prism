@@ -95,7 +95,7 @@ Write the following JSON to `~/.prism/state/analyze-{SHORT_ID}/seed-analysis.jso
 
 ## STEP 3: Devil's Advocate Self-Review Loop
 
-After writing initial `seed-analysis.json`, run a DA review loop to challenge your coverage sufficiency. This is a **self-loop** — you call the DA review tool directly and act on its critique. Max **3 rounds**.
+After writing initial `seed-analysis.json`, run a DA review loop to challenge your coverage sufficiency. This is a **self-loop** — you call the DA review tool directly and act on its critique. Max **1 round**.
 
 ### Tool Discovery
 
