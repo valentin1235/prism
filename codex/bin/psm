@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+prism_resolve_script_dir() {
+  local source_path="${BASH_SOURCE[0]}"
+
+  while [ -L "${source_path}" ]; do
+    local source_dir
+    source_dir="$(cd "$(dirname "${source_path}")" && pwd)"
+    source_path="$(readlink "${source_path}")"
+    [[ "${source_path}" != /* ]] && source_path="${source_dir}/${source_path}"
+  done
+
+  cd "$(dirname "${source_path}")" && pwd
+}
+
+SCRIPT_DIR="$(prism_resolve_script_dir)"
+
+prism_find_lib_dir() {
+  local candidate
+  for candidate in \
+    "${SCRIPT_DIR}/../lib/prism" \
+    "${SCRIPT_DIR}/../lib"
+  do
+    if [ -f "${candidate}/psm.sh" ]; then
+      cd "${candidate}" && pwd
+      return 0
+    fi
+  done
+
+  printf 'psm: unable to locate shared Prism Codex library relative to %s\n' "${SCRIPT_DIR}" >&2
+  exit 1
+}
+
+LIB_DIR="$(prism_find_lib_dir)"
+
+# Shared Codex integration layer for Prism commands.
+source "${LIB_DIR}/psm.sh"
+
+prism_psm_run "$@"

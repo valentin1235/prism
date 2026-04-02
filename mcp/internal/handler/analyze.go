@@ -50,10 +50,10 @@ func HandleAnalyze(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallT
 	model, _ := request.Params.Arguments["model"].(string)
 	model = strings.TrimSpace(model)
 	if model == "" {
-		model = "claude-sonnet-4-6" // default model
+		model = "default"
 	}
-	if !strings.HasPrefix(model, "claude-") {
-		return mcp.NewToolResultError(fmt.Sprintf("invalid model %q: must start with 'claude-'", model)), nil
+	if !isSupportedModelAlias(model) {
+		return mcp.NewToolResultError(fmt.Sprintf("invalid model %q", model)), nil
 	}
 
 	inputContext, _ := request.Params.Arguments["input_context"].(string)
@@ -214,6 +214,14 @@ func HandleAnalyze(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallT
 	}
 
 	return mcp.NewToolResultText(string(resultBytes)), nil
+}
+
+func isSupportedModelAlias(model string) bool {
+	model = strings.TrimSpace(model)
+	if model == "" || model == "default" {
+		return true
+	}
+	return strings.HasPrefix(model, "claude-") || strings.HasPrefix(model, "gpt-") || strings.HasPrefix(model, "o")
 }
 
 // HandleTaskStatus retrieves the current status and progress of an analysis task

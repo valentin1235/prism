@@ -1,0 +1,2330 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func TestCodexRuleRegistersInitialPSMCommands(t *testing.T) {
+	t.Parallel()
+
+	content := readRepoFile(t, "../codex/rules/prism.md")
+
+	for _, needle := range []string{
+		"`psm analyze`",
+		"`prism-analyze`",
+		"`psm brownfield`",
+		"`prism-brownfield`",
+		"`psm incident`",
+		"`prism-incident`",
+		"`psm prd /path/to/prd.md`",
+		"`prism-prd`",
+		"`psm setup`",
+		"`prism-setup`",
+		"This initial Codex registration only covers `psm analyze`, `psm brownfield`, `psm incident`, `psm prd`, and `psm setup`.",
+		"`psm analyze-workspace`",
+		"`psm test-analyze`",
+		"`codex/lib/command-registry.tsv` as the executable closed set",
+		"`codex/lib/command-ontology.tsv` as the broader command ontology",
+		"`non-acceptance-bearing` and `unregistered`",
+		"`PRISM_REPO_PATH` when it points to a Prism repo containing the required shared analyze assets.",
+		"The installed `repo-root` pointer shipped with the shared `psm` integration layer.",
+		"Do not resolve shared Prism analyze assets from the user's working directory.",
+	} {
+		if !strings.Contains(content, needle) {
+			t.Fatalf("expected %q in Codex rule", needle)
+		}
+	}
+}
+
+func TestCodexAnalyzeSkillDispatchesToSharedPrismWorkflow(t *testing.T) {
+	t.Parallel()
+
+	content := readRepoFile(t, "../codex/skills/analyze/SKILL.md")
+
+	for _, needle := range []string{
+		"name: prism-analyze",
+		"# psm analyze",
+		"Glob(pattern=\"**/skills/analyze/SKILL.md\")",
+		"Treat `PRISM_REPO_PATH/skills/analyze/SKILL.md` as the canonical shared skill path when it is available.",
+		"If multiple matches exist, prefer the Prism-owned path under `PRISM_REPO_PATH` over matches from the user's target repository or working directory.",
+		"Follow that shared skill exactly.",
+		"/prism:analyze` -> `psm analyze`",
+		"`Use \\`psm brownfield\\``",
+		"PRISM_REPO_PATH/skills/analyze/SKILL.md",
+		"PRISM_REPO_PATH/skills/analyze/prompts/seed-analyst.md",
+		"PRISM_REPO_PATH/skills/analyze/templates/report.md",
+		"`PRISM_REPO_PATH` when it points to a Prism repo containing the required shared analyze assets.",
+		"The installed `repo-root` pointer shipped with the shared `psm` integration layer.",
+		"A Prism repo root inferred relative to the shared `psm` library.",
+		"Never resolve shared Prism analyze assets from the user's working directory.",
+		"Pass shared analyze config paths such as `report_template` through unchanged",
+		"Do not reimplement or paraphrase the Prism analyze workflow in this Codex wrapper.",
+	} {
+		if !strings.Contains(content, needle) {
+			t.Fatalf("expected %q in Codex analyze skill", needle)
+		}
+	}
+}
+
+func TestCodexAnalyzeSkillUsesSharedDispatchFramework(t *testing.T) {
+	t.Parallel()
+
+	content := readRepoFile(t, "../codex/skills/analyze/SKILL.md")
+	for _, needle := range []string{
+		"## Shared Codex Dispatch",
+		"## Codex Normalization Rules",
+	} {
+		if !strings.Contains(content, needle) {
+			t.Fatalf("expected %q in Codex analyze skill", needle)
+		}
+	}
+	for _, forbidden := range []string{
+		"### Step 2.1: Call prism_analyze",
+		"`prism_task_status`",
+		"`prism_analyze_result`",
+	} {
+		if strings.Contains(content, forbidden) {
+			t.Fatalf("expected analyze wrapper to avoid embedded workflow detail %q", forbidden)
+		}
+	}
+}
+
+func TestInstalledCodexAnalyzeSkillIsPortableAcrossWorkingDirectories(t *testing.T) {
+	t.Parallel()
+
+	install := installCodexArtifacts(t)
+	unrelatedDir := t.TempDir()
+
+	cmd := exec.Command("bash", "-lc", "pwd")
+	cmd.Dir = unrelatedDir
+	cmd.Env = append(
+		os.Environ(),
+		"HOME="+install.homeDir,
+		"CODEX_HOME="+install.codexHome,
+	)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("verify unrelated working directory: %v\n%s", err, output)
+	}
+
+	ruleContent := readFile(t, filepath.Join(install.codexHome, "rules", "prism.md"))
+	for _, needle := range []string{
+		"| `psm analyze` | `prism-analyze` |",
+		"| `psm analyze <topic>` | `prism-analyze` |",
+		"| `psm analyze --config /path/to/config.json` | `prism-analyze` |",
+		"This initial Codex registration only covers `psm analyze`, `psm brownfield`, `psm incident`, `psm prd`, and `psm setup`.",
+		"`PRISM_REPO_PATH` when it points to a Prism repo containing the required shared analyze assets.",
+		"The installed `repo-root` pointer shipped with the shared `psm` integration layer.",
+	} {
+		if !strings.Contains(ruleContent, needle) {
+			t.Fatalf("expected %q in installed Codex rule", needle)
+		}
+	}
+
+	config := readFile(t, install.configPath)
+	for _, needle := range []string{
+		`command = "` + install.runScript + `"`,
+		`PRISM_REPO_PATH = "` + install.repoRoot + `"`,
+		`# PRISM_REPO_PATH is the source of truth for shared Prism skill, prompt, template, and MCP assets.`,
+	} {
+		if !strings.Contains(config, needle) {
+			t.Fatalf("expected %q in generated Codex config", needle)
+		}
+	}
+
+	installedContent := readFile(t, filepath.Join(install.codexHome, "skills", "prism-analyze", "SKILL.md"))
+	for _, needle := range []string{
+		"Glob(pattern=\"**/skills/analyze/SKILL.md\")",
+		"Read the first match.",
+		"Follow that shared skill exactly.",
+		"Treat the installed Prism MCP server plus `PRISM_REPO_PATH` as the source of truth for shared analyze assets.",
+		"PRISM_REPO_PATH/skills/analyze/prompts/verification-protocol.md",
+		"PRISM_REPO_PATH/skills/analyze/templates/report.md",
+		"## Shared Codex Dispatch",
+		"## Codex Normalization Rules",
+	} {
+		if !strings.Contains(installedContent, needle) {
+			t.Fatalf("expected %q in installed Codex analyze skill", needle)
+		}
+	}
+
+	for _, relativePath := range []string{
+		"skills/analyze/SKILL.md",
+		"skills/analyze/prompts/seed-analyst.md",
+		"skills/analyze/prompts/perspective-generator.md",
+		"skills/analyze/prompts/finding-protocol.md",
+		"skills/analyze/prompts/verification-protocol.md",
+		"skills/analyze/templates/report.md",
+	} {
+		assetPath := filepath.Join(install.repoRoot, filepath.FromSlash(relativePath))
+		if _, err := os.Stat(assetPath); err != nil {
+			t.Fatalf("expected shared analyze asset %s: %v", assetPath, err)
+		}
+	}
+}
+
+func TestCodexDevModeRoutesPSMBrownfieldThroughCodexSkill(t *testing.T) {
+	t.Parallel()
+
+	content := readRepoFile(t, "../CLAUDE.md")
+
+	for _, needle := range []string{
+		"`psm brownfield`",
+		`Glob(pattern="**/codex/skills/brownfield/SKILL.md")`,
+		"Treat `psm brownfield` as a command, not as natural language.",
+		"Reuse Prism's bundled MCP tools and Codex skill assets; do not reimplement the workflow ad hoc.",
+	} {
+		if !strings.Contains(content, needle) {
+			t.Fatalf("expected %q in Codex dev-mode command routing", needle)
+		}
+	}
+}
+
+func TestInstallCodexScriptUsesAbsolutePrismRepoPath(t *testing.T) {
+	t.Parallel()
+
+	install := installCodexArtifacts(t)
+	config := readFile(t, install.configPath)
+
+	for _, needle := range []string{
+		`[mcp_servers.prism]`,
+		`command = "` + install.runScript + `"`,
+		`PRISM_REPO_PATH = "` + install.repoRoot + `"`,
+		`# PRISM_REPO_PATH is the source of truth for shared Prism skill, prompt, template, and MCP assets.`,
+	} {
+		if !strings.Contains(config, needle) {
+			t.Fatalf("expected %q in generated Codex config", needle)
+		}
+	}
+
+	for _, installedPath := range []string{
+		filepath.Join(install.codexHome, "bin", "psm"),
+		filepath.Join(install.codexHome, "lib", "prism", "psm.sh"),
+		filepath.Join(install.codexHome, "lib", "prism", "framework.sh"),
+		filepath.Join(install.codexHome, "lib", "prism", "bridges", "analyze.sh"),
+		filepath.Join(install.codexHome, "lib", "prism", "bridges", "incident.sh"),
+		filepath.Join(install.codexHome, "lib", "prism", "bridges", "prd.sh"),
+		filepath.Join(install.codexHome, "lib", "prism", "commands", "analyze.sh"),
+		filepath.Join(install.codexHome, "lib", "prism", "commands", "brownfield.sh"),
+		filepath.Join(install.codexHome, "lib", "prism", "commands", "incident.sh"),
+		filepath.Join(install.codexHome, "lib", "prism", "commands", "prd.sh"),
+		filepath.Join(install.codexHome, "lib", "prism", "commands", "setup.sh"),
+		filepath.Join(install.codexHome, "lib", "prism", "repo-root"),
+		filepath.Join(install.codexHome, "rules", "prism.md"),
+		filepath.Join(install.codexHome, "skills", "prism-analyze", "SKILL.md"),
+		filepath.Join(install.codexHome, "skills", "prism-brownfield", "SKILL.md"),
+		filepath.Join(install.codexHome, "skills", "prism-incident", "SKILL.md"),
+		filepath.Join(install.codexHome, "skills", "prism-prd", "SKILL.md"),
+		filepath.Join(install.codexHome, "skills", "prism-setup", "SKILL.md"),
+	} {
+		if _, err := os.Stat(installedPath); err != nil {
+			t.Fatalf("expected installed artifact %s: %v", installedPath, err)
+		}
+	}
+}
+
+func TestInstalledPSMWrapperUsesSharedIntegrationLayer(t *testing.T) {
+	t.Parallel()
+
+	install := installCodexArtifacts(t)
+
+	wrapperContent := readFile(t, filepath.Join(install.codexHome, "bin", "psm"))
+	if !strings.Contains(wrapperContent, `source "${LIB_DIR}/psm.sh"`) {
+		t.Fatalf("expected installed psm wrapper to source the shared Codex integration layer")
+	}
+
+	sharedLibContent := readFile(t, filepath.Join(install.codexHome, "lib", "prism", "psm.sh"))
+	for _, needle := range []string{
+		`source "${PRISM_PSM_LIB_DIR}/framework.sh"`,
+		"prism_psm_load_bridges",
+		"prism_psm_load_command_configs",
+	} {
+		if !strings.Contains(sharedLibContent, needle) {
+			t.Fatalf("expected %q in shared psm integration layer", needle)
+		}
+	}
+
+	frameworkContent := readFile(t, filepath.Join(install.codexHome, "lib", "prism", "framework.sh"))
+	for _, needle := range []string{
+		"prism_psm_supported_commands",
+		"repo-root",
+		"prism_psm_define_command_config",
+		"prism_psm_require_command_config",
+		"prism_psm_repo_root_has_required_assets",
+		"unable to locate the shared Prism asset root",
+		"--skip-git-repo-check",
+		"--dangerously-bypass-approvals-and-sandbox",
+		"PRISM_TARGET_CWD",
+		"Codex execution failed",
+	} {
+		if !strings.Contains(frameworkContent, needle) {
+			t.Fatalf("expected %q in shared psm framework", needle)
+		}
+	}
+
+	analyzeCommandContent := readFile(t, filepath.Join(install.codexHome, "lib", "prism", "commands", "analyze.sh"))
+	for _, needle := range []string{
+		"prism_psm_analyze_asset_paths",
+		`prism_psm_define_command_config "analyze" "shared_skill_relative_path" "skills/analyze/SKILL.md"`,
+		`prism_psm_define_command_config "analyze" "prepare_function" "prism_psm_prepare_analyze_args"`,
+	} {
+		if !strings.Contains(analyzeCommandContent, needle) {
+			t.Fatalf("expected %q in analyze command config", needle)
+		}
+	}
+
+	repoRootPointer := strings.TrimSpace(readFile(t, filepath.Join(install.codexHome, "lib", "prism", "repo-root")))
+	if repoRootPointer != install.repoRoot {
+		t.Fatalf("repo-root pointer = %q, want %q", repoRootPointer, install.repoRoot)
+	}
+
+	registryContent := readFile(t, filepath.Join(install.codexHome, "lib", "prism", "command-registry.tsv"))
+	for _, needle := range []string{
+		"analyze\tanalyze\tprism-analyze",
+		"brownfield\tbrownfield\tprism-brownfield",
+		"incident\tincident\tprism-incident",
+		"prd\tprd\tprism-prd",
+		"setup\tsetup\tprism-setup",
+	} {
+		if !strings.Contains(registryContent, needle) {
+			t.Fatalf("expected %q in installed psm command registry", needle)
+		}
+	}
+
+	ontologyContent := readFile(t, filepath.Join(install.codexHome, "lib", "prism", "command-ontology.tsv"))
+	for _, needle := range []string{
+		"analyze\tprism-analyze\tacceptance-bearing\tregistered",
+		"brownfield\tprism-brownfield\tacceptance-bearing\tregistered",
+		"incident\tprism-incident\tacceptance-bearing\tregistered",
+		"prd\tprism-prd\tacceptance-bearing\tregistered",
+		"setup\tprism-setup\tacceptance-bearing\tregistered",
+		"analyze-workspace\tprism-analyze-workspace\tnon-acceptance-bearing\tunregistered",
+		"test-analyze\tprism-test-analyze\tnon-acceptance-bearing\tunregistered",
+	} {
+		if !strings.Contains(ontologyContent, needle) {
+			t.Fatalf("expected %q in installed psm command ontology", needle)
+		}
+	}
+}
+
+func TestInstalledPSMWrapperDispatchesViaSharedCodexRunner(t *testing.T) {
+	t.Parallel()
+
+	install := installCodexArtifacts(t)
+	unrelatedDir := t.TempDir()
+	fakeCodexDir := t.TempDir()
+	argsPath := filepath.Join(fakeCodexDir, "args.txt")
+	stdinPath := filepath.Join(fakeCodexDir, "stdin.txt")
+
+	fakeCodexPath := filepath.Join(fakeCodexDir, "codex")
+	fakeCodex := "#!/usr/bin/env bash\nset -euo pipefail\nprintf '%s\\n' \"$@\" > \"" + argsPath + "\"\ncat > \"" + stdinPath + "\"\nprintf 'ok\\n'\n"
+	if err := os.WriteFile(fakeCodexPath, []byte(fakeCodex), 0o755); err != nil {
+		t.Fatalf("write fake codex: %v", err)
+	}
+
+	cmd := exec.Command(filepath.Join(install.codexHome, "bin", "psm"), "prd", "/tmp/spec doc.md")
+	cmd.Dir = unrelatedDir
+	cmd.Env = append(
+		os.Environ(),
+		"HOME="+install.homeDir,
+		"CODEX_HOME="+install.codexHome,
+		"PRISM_REPO_PATH="+install.repoRoot,
+		"PSM_CODEX_CLI_PATH="+fakeCodexPath,
+	)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("run psm wrapper: %v\n%s", err, output)
+	}
+
+	argsOutput := readFile(t, argsPath)
+	for _, needle := range []string{
+		"exec",
+		"--skip-git-repo-check",
+		"--dangerously-bypass-approvals-and-sandbox",
+		"-C",
+		install.repoRoot,
+		"--add-dir",
+		unrelatedDir,
+		"-",
+	} {
+		if !strings.Contains(argsOutput, needle) {
+			t.Fatalf("expected %q in codex args\n%s", needle, argsOutput)
+		}
+	}
+
+	stdinOutput := readFile(t, stdinPath)
+	for _, needle := range []string{
+		"psm prd /tmp/spec\\ doc.md",
+		install.repoRoot,
+		unrelatedDir,
+		"Treat the following as an exact Prism command invocation",
+		filepath.Join(install.repoRoot, "skills", "analyze", "templates", "report.md"),
+	} {
+		if !strings.Contains(stdinOutput, needle) {
+			t.Fatalf("expected %q in codex prompt\n%s", needle, stdinOutput)
+		}
+	}
+}
+
+func TestInstalledPSMWrapperDispatchesClosedMilestoneCommandsViaSharedRunner(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		args          []string
+		expectedSkill string
+		expectedText  []string
+	}{
+		{
+			name:          "analyze",
+			args:          []string{"analyze", "cache invalidation"},
+			expectedSkill: "prism-analyze",
+			expectedText: []string{
+				"psm analyze cache\\ invalidation",
+				"Registered Prism Codex skill:\nprism-analyze",
+				"skills/analyze/prompts/seed-analyst.md",
+			},
+		},
+		{
+			name:          "brownfield",
+			args:          []string{"brownfield", "defaults"},
+			expectedSkill: "prism-brownfield",
+			expectedText: []string{
+				"psm brownfield defaults",
+				"Registered Prism Codex skill:\nprism-brownfield",
+				"Preserve the shared-skill subcommand behavior exactly: `scan` means scan only, `defaults` means show current defaults, and `set <indices>` means update defaults directly with the provided comma-separated indices.",
+				"No GitHub repositories found in your home directory.",
+			},
+		},
+		{
+			name:          "incident",
+			args:          []string{"incident", "checkout outage"},
+			expectedSkill: "prism-incident",
+			expectedText: []string{
+				"psm incident checkout\\ outage",
+				"Registered Prism Codex skill:\nprism-incident",
+				"Prism Incident Compatibility Bridge",
+				"dispatch to the shared Prism incident workflow entrypoint",
+			},
+		},
+		{
+			name:          "prd",
+			args:          []string{"prd", "/tmp/spec doc.md"},
+			expectedSkill: "prism-prd",
+			expectedText: []string{
+				"psm prd /tmp/spec\\ doc.md",
+				"Registered Prism Codex skill:\nprism-prd",
+				"Use the shared Prism PRD skill at `",
+				"Resolve shared PRD prompts, templates, and analyze handoff assets from `",
+				"Do not assume the command was launched from within `~/prism`",
+			},
+		},
+		{
+			name:          "setup",
+			args:          []string{"setup"},
+			expectedSkill: "prism-setup",
+			expectedText: []string{
+				"psm setup",
+				"Registered Prism Codex skill:\nprism-setup",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			install := installCodexArtifacts(t)
+			unrelatedDir := t.TempDir()
+			fakeCodexDir := t.TempDir()
+			argsPath := filepath.Join(fakeCodexDir, "args.txt")
+			stdinPath := filepath.Join(fakeCodexDir, "stdin.txt")
+
+			fakeCodexPath := filepath.Join(fakeCodexDir, "codex")
+			fakeCodex := "#!/usr/bin/env bash\nset -euo pipefail\nprintf '%s\\n' \"$@\" > \"" + argsPath + "\"\ncat > \"" + stdinPath + "\"\nprintf 'ok\\n'\n"
+			if err := os.WriteFile(fakeCodexPath, []byte(fakeCodex), 0o755); err != nil {
+				t.Fatalf("write fake codex: %v", err)
+			}
+
+			cmd := exec.Command(filepath.Join(install.codexHome, "bin", "psm"), tt.args...)
+			cmd.Dir = unrelatedDir
+			cmd.Env = append(
+				os.Environ(),
+				"HOME="+install.homeDir,
+				"CODEX_HOME="+install.codexHome,
+				"PRISM_REPO_PATH="+install.repoRoot,
+				"PSM_CODEX_CLI_PATH="+fakeCodexPath,
+			)
+			if output, err := cmd.CombinedOutput(); err != nil {
+				t.Fatalf("run psm wrapper: %v\n%s", err, output)
+			}
+
+			argsOutput := readFile(t, argsPath)
+			for _, needle := range []string{
+				"exec",
+				"--skip-git-repo-check",
+				"--dangerously-bypass-approvals-and-sandbox",
+				"-C",
+				install.repoRoot,
+				"--add-dir",
+				unrelatedDir,
+				"-",
+			} {
+				if !strings.Contains(argsOutput, needle) {
+					t.Fatalf("expected %q in codex args\n%s", needle, argsOutput)
+				}
+			}
+
+			stdinOutput := readFile(t, stdinPath)
+			for _, needle := range append(tt.expectedText,
+				install.repoRoot,
+				unrelatedDir,
+				"Treat the following as an exact Prism command invocation",
+			) {
+				if !strings.Contains(stdinOutput, needle) {
+					t.Fatalf("expected %q in codex prompt\n%s", needle, stdinOutput)
+				}
+			}
+		})
+	}
+}
+
+func TestInstalledPSMWrapperResolvesSharedLibraryViaSymlinkedGlobalCommand(t *testing.T) {
+	t.Parallel()
+
+	install := installCodexArtifacts(t)
+	unrelatedDir := t.TempDir()
+	fakeCodexDir := t.TempDir()
+	argsPath := filepath.Join(fakeCodexDir, "args.txt")
+	stdinPath := filepath.Join(fakeCodexDir, "stdin.txt")
+
+	fakeCodexPath := filepath.Join(fakeCodexDir, "codex")
+	fakeCodex := "#!/usr/bin/env bash\nset -euo pipefail\nprintf '%s\\n' \"$@\" > \"" + argsPath + "\"\ncat > \"" + stdinPath + "\"\nprintf 'ok\\n'\n"
+	if err := os.WriteFile(fakeCodexPath, []byte(fakeCodex), 0o755); err != nil {
+		t.Fatalf("write fake codex: %v", err)
+	}
+
+	symlinkPath := filepath.Join(t.TempDir(), "psm")
+	if err := os.Symlink(filepath.Join(install.codexHome, "bin", "psm"), symlinkPath); err != nil {
+		t.Fatalf("symlink psm wrapper: %v", err)
+	}
+
+	cmd := exec.Command(symlinkPath, "incident", "checkout outage")
+	cmd.Dir = unrelatedDir
+	cmd.Env = append(
+		os.Environ(),
+		"HOME="+install.homeDir,
+		"CODEX_HOME="+install.codexHome,
+		"PRISM_REPO_PATH="+install.repoRoot,
+		"PSM_CODEX_CLI_PATH="+fakeCodexPath,
+	)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("run symlinked psm wrapper: %v\n%s", err, output)
+	}
+
+	argsOutput := readFile(t, argsPath)
+	for _, needle := range []string{
+		"exec",
+		"--skip-git-repo-check",
+		"--dangerously-bypass-approvals-and-sandbox",
+		"-C",
+		install.repoRoot,
+		"--add-dir",
+		unrelatedDir,
+		"-",
+	} {
+		if !strings.Contains(argsOutput, needle) {
+			t.Fatalf("expected %q in codex args\n%s", needle, argsOutput)
+		}
+	}
+
+	stdinOutput := readFile(t, stdinPath)
+	for _, needle := range []string{
+		"psm incident checkout\\ outage",
+		"Registered Prism Codex skill:\nprism-incident",
+		install.repoRoot,
+		unrelatedDir,
+		"Treat the following as an exact Prism command invocation",
+	} {
+		if !strings.Contains(stdinOutput, needle) {
+			t.Fatalf("expected %q in codex prompt\n%s", needle, stdinOutput)
+		}
+	}
+}
+
+func TestInstalledPSMBrownfieldResolvesRepoRootWithoutEnvOverride(t *testing.T) {
+	t.Parallel()
+
+	install := installCodexArtifacts(t)
+	unrelatedDir := t.TempDir()
+	argsOutput, stdinOutput := runInstalledPSMWithFakeCodex(t, install, unrelatedDir, "brownfield", "defaults")
+
+	for _, needle := range []string{
+		"exec",
+		"--skip-git-repo-check",
+		"--dangerously-bypass-approvals-and-sandbox",
+		"-C",
+		install.repoRoot,
+		"--add-dir",
+		unrelatedDir,
+		"-",
+	} {
+		if !strings.Contains(argsOutput, needle) {
+			t.Fatalf("expected %q in codex args\n%s", needle, argsOutput)
+		}
+	}
+
+	for _, needle := range []string{
+		"psm brownfield defaults",
+		"Registered Prism Codex skill:\nprism-brownfield",
+		install.repoRoot,
+		unrelatedDir,
+		"Treat the following as an exact Prism command invocation",
+		filepath.Join(install.repoRoot, "skills", "brownfield", "SKILL.md"),
+		"Preserve the default no-argument flow exactly: scan first, render the scan result, then prompt for default selection.",
+		"Invalid brownfield selections or MCP failures must fail the Codex run instead of being converted into a success summary.",
+	} {
+		if !strings.Contains(stdinOutput, needle) {
+			t.Fatalf("expected %q in codex prompt\n%s", needle, stdinOutput)
+		}
+	}
+}
+
+func TestInstalledPSMBrownfieldPreservesSharedParityAcrossSubcommands(t *testing.T) {
+	t.Parallel()
+
+	install := installCodexArtifacts(t)
+	unrelatedDir := t.TempDir()
+
+	sharedContent := readRepoFile(t, "../skills/brownfield/SKILL.md")
+	for _, needle := range []string{
+		"/prism:brownfield                # Scan repos and set defaults",
+		"/prism:brownfield scan           # Scan only (no default selection)",
+		"/prism:brownfield defaults       # Show current defaults",
+		"/prism:brownfield set 6,18,19   # Set defaults by repo numbers",
+		"No GitHub repositories found in your home directory.",
+		"No default repos set. Run '/prism:brownfield' to configure.",
+		"No default repos set. Interviews will run in greenfield mode.",
+		"Brownfield defaults updated!",
+	} {
+		if !strings.Contains(sharedContent, needle) {
+			t.Fatalf("expected %q in shared Prism brownfield skill", needle)
+		}
+	}
+
+	tests := []struct {
+		name         string
+		args         []string
+		promptLine   string
+		promptChecks []string
+	}{
+		{
+			name:       "default_flow",
+			args:       []string{"brownfield"},
+			promptLine: "psm brownfield",
+			promptChecks: []string{
+				filepath.Join(install.repoRoot, "skills", "brownfield", "SKILL.md"),
+				"Treat the invocation as one of these exact shared-skill forms: `psm brownfield`, `psm brownfield scan`, `psm brownfield defaults`, or `psm brownfield set <indices>`.",
+				"Preserve the default no-argument flow exactly: scan first, render the scan result, then prompt for default selection.",
+				"No GitHub repositories found in your home directory.",
+				"clearing defaults should surface the shared greenfield-mode confirmation",
+			},
+		},
+		{
+			name:       "scan_subcommand",
+			args:       []string{"brownfield", "scan"},
+			promptLine: "psm brownfield scan",
+			promptChecks: []string{
+				filepath.Join(install.repoRoot, "skills", "brownfield", "SKILL.md"),
+				"Preserve the shared-skill subcommand behavior exactly: `scan` means scan only, `defaults` means show current defaults, and `set <indices>` means update defaults directly with the provided comma-separated indices.",
+			},
+		},
+		{
+			name:       "defaults_subcommand",
+			args:       []string{"brownfield", "defaults"},
+			promptLine: "psm brownfield defaults",
+			promptChecks: []string{
+				filepath.Join(install.repoRoot, "skills", "brownfield", "SKILL.md"),
+				"Preserve the shared-skill subcommand behavior exactly: `scan` means scan only, `defaults` means show current defaults, and `set <indices>` means update defaults directly with the provided comma-separated indices.",
+				"Preserve the shared skill's user-facing status text and stop conditions: empty scans should surface `No GitHub repositories found in your home directory.`, clearing defaults should surface the shared greenfield-mode confirmation, and successful default updates should confirm the selected repository names.",
+			},
+		},
+		{
+			name:       "set_subcommand",
+			args:       []string{"brownfield", "set", "6,18,19"},
+			promptLine: "psm brownfield set 6\\,18\\,19",
+			promptChecks: []string{
+				filepath.Join(install.repoRoot, "skills", "brownfield", "SKILL.md"),
+				"Preserve the shared-skill subcommand behavior exactly: `scan` means scan only, `defaults` means show current defaults, and `set <indices>` means update defaults directly with the provided comma-separated indices.",
+				"successful default updates should confirm the selected repository names.",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			argsOutput, stdinOutput := runInstalledPSMWithFakeCodex(t, install, unrelatedDir, tt.args...)
+
+			for _, needle := range []string{
+				"exec",
+				"--skip-git-repo-check",
+				"--dangerously-bypass-approvals-and-sandbox",
+				"-C",
+				install.repoRoot,
+				"--add-dir",
+				unrelatedDir,
+				"-",
+			} {
+				if !strings.Contains(argsOutput, needle) {
+					t.Fatalf("expected %q in codex args\n%s", needle, argsOutput)
+				}
+			}
+
+			for _, needle := range append([]string{
+				tt.promptLine,
+				"Registered Prism Codex skill:\nprism-brownfield",
+				install.repoRoot,
+				unrelatedDir,
+				"Treat the following as an exact Prism command invocation",
+				"Invalid brownfield selections or MCP failures must fail the Codex run instead of being converted into a success summary.",
+			}, tt.promptChecks...) {
+				if !strings.Contains(stdinOutput, needle) {
+					t.Fatalf("expected %q in codex prompt\n%s", needle, stdinOutput)
+				}
+			}
+		})
+	}
+}
+
+func TestInstalledPSMSetupPreservesSharedParityAcrossSubcommands(t *testing.T) {
+	t.Parallel()
+
+	install := installCodexArtifacts(t)
+	unrelatedDir := t.TempDir()
+
+	sharedContent := readRepoFile(t, "../skills/setup/SKILL.md")
+	for _, needle := range []string{
+		"/prism:setup",
+		"/prism:setup scan",
+		"/prism:setup defaults",
+		"/prism:setup set 6,18,19",
+		"No GitHub repositories found in your home directory.",
+		"No default repos set. Run '/prism:setup' to configure.",
+		"prism is bundled as a built-in MCP server",
+		"prism is bundled as a built-in MCP server — no restart needed",
+		"After displaying the defaults or the empty-defaults message, confirm that prism is bundled as a built-in MCP server and no restart is needed.",
+	} {
+		if !strings.Contains(sharedContent, needle) {
+			t.Fatalf("expected %q in shared Prism setup skill", needle)
+		}
+	}
+
+	tests := []struct {
+		name         string
+		args         []string
+		promptLine   string
+		promptChecks []string
+	}{
+		{
+			name:       "default_flow",
+			args:       []string{"setup"},
+			promptLine: "psm setup",
+			promptChecks: []string{
+				filepath.Join(install.repoRoot, "skills", "setup", "SKILL.md"),
+				"Preserve the default no-argument flow exactly: scan first, render the scan result, then prompt for default selection.",
+				"Preserve the shared setup flow exactly, including the brownfield scan, default-selection prompt, MCP tool usage, and final confirmation messaging.",
+			},
+		},
+		{
+			name:       "scan_subcommand",
+			args:       []string{"setup", "scan"},
+			promptLine: "psm setup scan",
+			promptChecks: []string{
+				filepath.Join(install.repoRoot, "skills", "setup", "SKILL.md"),
+				"Preserve the shared-skill subcommand behavior exactly: `scan` means scan only, `defaults` means show current defaults, and `set <indices>` means update defaults directly with the provided comma-separated indices.",
+			},
+		},
+		{
+			name:       "defaults_subcommand",
+			args:       []string{"setup", "defaults"},
+			promptLine: "psm setup defaults",
+			promptChecks: []string{
+				filepath.Join(install.repoRoot, "skills", "setup", "SKILL.md"),
+				"Preserve the shared-skill subcommand behavior exactly: `scan` means scan only, `defaults` means show current defaults, and `set <indices>` means update defaults directly with the provided comma-separated indices.",
+				"successful default updates should confirm the selected repository names.",
+			},
+		},
+		{
+			name:       "set_subcommand",
+			args:       []string{"setup", "set", "6,18,19"},
+			promptLine: "psm setup set 6\\,18\\,19",
+			promptChecks: []string{
+				filepath.Join(install.repoRoot, "skills", "setup", "SKILL.md"),
+				"Preserve the shared-skill subcommand behavior exactly: `scan` means scan only, `defaults` means show current defaults, and `set <indices>` means update defaults directly with the provided comma-separated indices.",
+				"successful default updates should confirm the selected repository names.",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			_, stdinOutput := runInstalledPSMWithFakeCodex(t, install, unrelatedDir, tt.args...)
+			if !strings.Contains(stdinOutput, tt.promptLine) {
+				t.Fatalf("expected %q in codex prompt\n%s", tt.promptLine, stdinOutput)
+			}
+			for _, needle := range tt.promptChecks {
+				if !strings.Contains(stdinOutput, needle) {
+					t.Fatalf("expected %q in codex prompt\n%s", needle, stdinOutput)
+				}
+			}
+		})
+	}
+}
+
+func TestInstalledPSMAnalyzeResolvesSharedAssetRootWithoutEnvOverride(t *testing.T) {
+	t.Parallel()
+
+	install := installCodexArtifacts(t)
+	unrelatedDir := t.TempDir()
+	argsOutput, stdinOutput := runInstalledPSMWithFakeCodex(t, install, unrelatedDir, "analyze", "cache invalidation")
+
+	for _, needle := range []string{
+		"exec",
+		"--skip-git-repo-check",
+		"--dangerously-bypass-approvals-and-sandbox",
+		"-C",
+		install.repoRoot,
+		"--add-dir",
+		unrelatedDir,
+		"-",
+	} {
+		if !strings.Contains(argsOutput, needle) {
+			t.Fatalf("expected %q in codex args\n%s", needle, argsOutput)
+		}
+	}
+
+	for _, needle := range []string{
+		"psm analyze cache\\ invalidation",
+		"Registered Prism Codex skill:\nprism-analyze",
+		"Deterministic Prism asset locator for the shared Prism command workflow:",
+		"1. Use PRISM_REPO_PATH when it points to a Prism repo containing skills/analyze/SKILL.md.",
+		"2. Otherwise use the installed repo-root pointer shipped with the shared psm integration layer.",
+		"3. Otherwise infer the Prism repo root relative to the shared psm library.",
+		"The resolved asset root for this invocation is:",
+		"Do not resolve Prism assets from the user's working directory.",
+		"Preserve the full shared-skill decision flow and exit gates, not just the MCP payload shape.",
+		"if `--config <path>` is present, read that config and use `config.topic` as the description when present, otherwise fall back to remaining arguments;",
+		"if no config is present, use the remaining command arguments as the description;",
+		"if the description is still empty, ask the user directly for what to analyze.",
+		"Honor the shared Phase 1 exit gate before starting analysis: do not call `prism_analyze` until the description has been collected.",
+		"Honor the shared Phase 2 exit gate: do not proceed to polling until `prism_analyze` returns a `task_id`.",
+		"During Phase 3, poll `prism_task_status` every 30 seconds until the task reaches `completed` or `failed`, and surface brief progress updates that include the current stage and progress text.",
+		"if the task status is `failed`, report the error and stop without calling `prism_analyze_result`;",
+		"Honor the shared Phase 4 exit gate: after completion, call `prism_analyze_result(task_id)`, present the returned `summary`, and communicate the returned `report_path`.",
+		filepath.Join(install.repoRoot, "skills", "analyze", "SKILL.md"),
+		filepath.Join(install.repoRoot, "skills", "analyze", "templates", "report.md"),
+	} {
+		if !strings.Contains(stdinOutput, needle) {
+			t.Fatalf("expected %q in codex prompt\n%s", needle, stdinOutput)
+		}
+	}
+}
+
+func TestInstalledPSMAnalyzeFallsBackFromInvalidEnvRepoRoot(t *testing.T) {
+	t.Parallel()
+
+	install := installCodexArtifacts(t)
+	unrelatedDir := t.TempDir()
+	fakeCodexDir := t.TempDir()
+	argsPath := filepath.Join(fakeCodexDir, "args.txt")
+	stdinPath := filepath.Join(fakeCodexDir, "stdin.txt")
+	fakeCodexPath := filepath.Join(fakeCodexDir, "codex")
+
+	fakeCodex := "#!/usr/bin/env bash\nset -euo pipefail\nprintf '%s\\n' \"$@\" > \"" + argsPath + "\"\ncat > \"" + stdinPath + "\"\nprintf 'ok\\n'\n"
+	if err := os.WriteFile(fakeCodexPath, []byte(fakeCodex), 0o755); err != nil {
+		t.Fatalf("write fake codex: %v", err)
+	}
+
+	cmd := exec.Command(filepath.Join(install.codexHome, "bin", "psm"), "analyze", "cache invalidation")
+	cmd.Dir = unrelatedDir
+	cmd.Env = append(
+		os.Environ(),
+		"HOME="+install.homeDir,
+		"CODEX_HOME="+install.codexHome,
+		"PRISM_REPO_PATH="+filepath.Join(unrelatedDir, "not-a-prism-repo"),
+		"PSM_CODEX_CLI_PATH="+fakeCodexPath,
+	)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("run psm wrapper with invalid PRISM_REPO_PATH: %v\n%s", err, output)
+	}
+
+	argsOutput := readFile(t, argsPath)
+	if !strings.Contains(argsOutput, install.repoRoot) {
+		t.Fatalf("expected wrapper to fall back to installed repo-root pointer\n%s", argsOutput)
+	}
+
+	stdinOutput := readFile(t, stdinPath)
+	for _, needle := range []string{
+		"The resolved asset root for this invocation is:",
+		install.repoRoot,
+		filepath.Join(install.repoRoot, "skills", "analyze", "SKILL.md"),
+	} {
+		if !strings.Contains(stdinOutput, needle) {
+			t.Fatalf("expected %q in codex prompt\n%s", needle, stdinOutput)
+		}
+	}
+}
+
+func TestInstalledPSMAnalyzePrefersExplicitEnvRepoRootOverInstalledPointer(t *testing.T) {
+	t.Parallel()
+
+	install := installCodexArtifacts(t)
+	unrelatedDir := t.TempDir()
+	overrideRoot := t.TempDir()
+
+	for _, relativePath := range []string{
+		"agents/devils-advocate.md",
+		"skills/analyze/SKILL.md",
+		"skills/analyze/prompts/seed-analyst.md",
+		"skills/analyze/prompts/perspective-generator.md",
+		"skills/analyze/prompts/finding-protocol.md",
+		"skills/analyze/prompts/verification-protocol.md",
+		"skills/analyze/templates/report.md",
+	} {
+		targetPath := filepath.Join(overrideRoot, filepath.FromSlash(relativePath))
+		if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
+			t.Fatalf("mkdir override asset dir: %v", err)
+		}
+		if err := os.WriteFile(targetPath, []byte("override asset\n"), 0o644); err != nil {
+			t.Fatalf("write override asset %s: %v", targetPath, err)
+		}
+	}
+
+	argsOutput, stdinOutput := runInstalledPSMWithFakeCodexOptions(t, install, unrelatedDir, psmInvocationOptions{
+		extraEnv: []string{
+			"PRISM_REPO_PATH=" + overrideRoot,
+		},
+		args: []string{"analyze", "cache invalidation"},
+	})
+
+	for _, needle := range []string{
+		"exec",
+		"--skip-git-repo-check",
+		"--dangerously-bypass-approvals-and-sandbox",
+		"-C",
+		overrideRoot,
+		"--add-dir",
+		unrelatedDir,
+		"-",
+	} {
+		if !strings.Contains(argsOutput, needle) {
+			t.Fatalf("expected %q in codex args\n%s", needle, argsOutput)
+		}
+	}
+
+	for _, needle := range []string{
+		"The resolved asset root for this invocation is:",
+		overrideRoot,
+		filepath.Join(overrideRoot, "skills", "analyze", "SKILL.md"),
+		filepath.Join(overrideRoot, "skills", "analyze", "templates", "report.md"),
+	} {
+		if !strings.Contains(stdinOutput, needle) {
+			t.Fatalf("expected %q in codex prompt\n%s", needle, stdinOutput)
+		}
+	}
+
+	if strings.Contains(stdinOutput, filepath.Join(install.repoRoot, "skills", "analyze", "SKILL.md")) {
+		t.Fatalf("expected explicit PRISM_REPO_PATH override to win over installed repo-root pointer\n%s", stdinOutput)
+	}
+}
+
+func TestInstalledPSMIsGloballyExecutableViaPATHFromUnrelatedDirectory(t *testing.T) {
+	t.Parallel()
+
+	install := installCodexArtifacts(t)
+	unrelatedDir := t.TempDir()
+
+	argsOutput, stdinOutput := runInstalledPSMWithFakeCodexOptions(t, install, unrelatedDir, psmInvocationOptions{
+		invokeViaPath: true,
+		extraEnv: []string{
+			"PATH=" + filepath.Join(install.codexHome, "bin") + string(os.PathListSeparator) + os.Getenv("PATH"),
+		},
+		args: []string{"analyze", "cache invalidation"},
+	})
+
+	for _, needle := range []string{
+		"exec",
+		"--skip-git-repo-check",
+		"--dangerously-bypass-approvals-and-sandbox",
+		"-C",
+		install.repoRoot,
+		"--add-dir",
+		unrelatedDir,
+		"-",
+	} {
+		if !strings.Contains(argsOutput, needle) {
+			t.Fatalf("expected %q in codex args\n%s", needle, argsOutput)
+		}
+	}
+
+	for _, needle := range []string{
+		"psm analyze cache\\ invalidation",
+		"Registered Prism Codex skill:\nprism-analyze",
+		install.repoRoot,
+		unrelatedDir,
+	} {
+		if !strings.Contains(stdinOutput, needle) {
+			t.Fatalf("expected %q in codex prompt\n%s", needle, stdinOutput)
+		}
+	}
+}
+
+func TestInstalledPSMAnalyzePromptPreservesSharedSkillDecisionFlow(t *testing.T) {
+	t.Parallel()
+
+	install := installCodexArtifacts(t)
+	unrelatedDir := t.TempDir()
+	_, stdinOutput := runInstalledPSMWithFakeCodex(t, install, unrelatedDir, "analyze", "cache invalidation")
+
+	for _, needle := range []string{
+		"Execute the shared intake branch exactly:",
+		"if `--config <path>` is present, read that config and use `config.topic` as the description when present, otherwise fall back to remaining arguments;",
+		"if no config is present, use the remaining command arguments as the description;",
+		"if the description is still empty, ask the user directly for what to analyze.",
+		"Honor the shared Phase 1 exit gate before starting analysis: do not call `prism_analyze` until the description has been collected.",
+		"When calling `prism_analyze`, preserve the shared optional-field behavior exactly:",
+		"omit optional MCP fields when the shared skill says to omit them rather than inventing defaults in the wrapper layer.",
+		"Honor the shared Phase 2 exit gate: do not proceed to polling until `prism_analyze` returns a `task_id`.",
+		"During Phase 3, poll `prism_task_status` every 30 seconds until the task reaches `completed` or `failed`, and surface brief progress updates that include the current stage and progress text.",
+		"if the user cancels during polling, call `prism_cancel_task(task_id)` and report the cancellation result;",
+		"if the task status is `failed`, report the error and stop without calling `prism_analyze_result`;",
+		"only continue to result retrieval after a `completed` status.",
+		"Preserve the shared output contract: poll progress via `prism_task_status`, then present the `summary` and `report_path` returned by `prism_analyze_result`.",
+		"Honor the shared Phase 4 exit gate: after completion, call `prism_analyze_result(task_id)`, present the returned `summary`, and communicate the returned `report_path`.",
+	} {
+		if !strings.Contains(stdinOutput, needle) {
+			t.Fatalf("expected %q in codex prompt\n%s", needle, stdinOutput)
+		}
+	}
+}
+
+func TestInstalledPSMAnalyzeConfigAdapterPreservesSharedArtifactContract(t *testing.T) {
+	t.Parallel()
+
+	install := installCodexArtifacts(t)
+	invokeDir := t.TempDir()
+	configDir := filepath.Join(invokeDir, "configs")
+	inputDir := filepath.Join(invokeDir, "inputs")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatalf("mkdir config dir: %v", err)
+	}
+	if err := os.MkdirAll(inputDir, 0o755); err != nil {
+		t.Fatalf("mkdir input dir: %v", err)
+	}
+
+	inputContextPath := filepath.Join(inputDir, "request.md")
+	if err := os.WriteFile(inputContextPath, []byte("analyze this\n"), 0o644); err != nil {
+		t.Fatalf("write input context: %v", err)
+	}
+
+	reportTemplatePath := filepath.Join(install.repoRoot, "skills", "analyze", "templates", "report.md")
+	perspectiveInjectionPath := filepath.Join("skills", "analyze", "prompts", "finding-protocol.md")
+	configPath := filepath.Join(configDir, "analyze.json")
+	originalConfig := map[string]string{
+		"topic":                 "Adapter contract coverage",
+		"input_context":         filepath.Join("inputs", "request.md"),
+		"report_template":       reportTemplatePath,
+		"seed_hints":            "Focus on unchanged artifact contract",
+		"session_id":            "session-123",
+		"model":                 "claude-sonnet-4-6",
+		"ontology_scope":        "repo:payments",
+		"perspective_injection": perspectiveInjectionPath,
+	}
+	configBytes, err := json.MarshalIndent(originalConfig, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal config: %v", err)
+	}
+	configBytes = append(configBytes, '\n')
+	if err := os.WriteFile(configPath, configBytes, 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	fakeCodexDir := t.TempDir()
+	stdinPath := filepath.Join(fakeCodexDir, "stdin.txt")
+	normalizedConfigCopy := filepath.Join(fakeCodexDir, "normalized-config.json")
+	fakeCodexPath := filepath.Join(fakeCodexDir, "codex")
+	fakeCodex := fmt.Sprintf(`#!/usr/bin/env bash
+set -euo pipefail
+cat > %q
+config_path="$(python3 - %q <<'PY'
+from __future__ import annotations
+
+import re
+import sys
+
+text = open(sys.argv[1], "r", encoding="utf-8").read()
+match = re.search(r"^psm analyze --config (\S+)", text, re.MULTILINE)
+if not match:
+    raise SystemExit("missing normalized analyze config path in prompt")
+print(match.group(1))
+PY
+)"
+cp "${config_path}" %q
+printf 'ok\n'
+`, stdinPath, stdinPath, normalizedConfigCopy)
+	if err := os.WriteFile(fakeCodexPath, []byte(fakeCodex), 0o755); err != nil {
+		t.Fatalf("write fake codex: %v", err)
+	}
+
+	cmd := exec.Command(filepath.Join(install.codexHome, "bin", "psm"), "analyze", "--config", filepath.Join("configs", "analyze.json"))
+	cmd.Dir = invokeDir
+	cmd.Env = append(
+		os.Environ(),
+		"HOME="+install.homeDir,
+		"CODEX_HOME="+install.codexHome,
+		"PSM_CODEX_CLI_PATH="+fakeCodexPath,
+	)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("run psm analyze --config: %v\n%s", err, output)
+	}
+
+	stdinOutput := readFile(t, stdinPath)
+	for _, needle := range []string{
+		"psm analyze --config ",
+		"Prism Analyze Compatibility Bridge",
+		"Shared analyze assets that remain available to Codex-side wrappers and adapters when this command delegates into analyze:",
+		filepath.Join(install.repoRoot, "skills", "analyze", "SKILL.md"),
+		filepath.Join(install.repoRoot, "skills", "analyze", "prompts", "seed-analyst.md"),
+		filepath.Join(install.repoRoot, "skills", "analyze", "prompts", "verification-protocol.md"),
+		reportTemplatePath,
+		"Preserve the full shared-skill decision flow and exit gates, not just the MCP payload shape.",
+		"Preserve the shared analyze config schema and MCP payload contract exactly.",
+		"Path-valued analyze config fields have already been normalized for Codex execution context. Pass them through unchanged once read.",
+		"Preserve the shared output contract: poll progress via `prism_task_status`, then present the `summary` and `report_path` returned by `prism_analyze_result`.",
+	} {
+		if !strings.Contains(stdinOutput, needle) {
+			t.Fatalf("expected %q in codex prompt\n%s", needle, stdinOutput)
+		}
+	}
+
+	var gotOriginal map[string]string
+	if err := json.Unmarshal([]byte(readFile(t, configPath)), &gotOriginal); err != nil {
+		t.Fatalf("unmarshal original config: %v", err)
+	}
+	if gotOriginal["input_context"] != filepath.Join("inputs", "request.md") {
+		t.Fatalf("original config input_context = %q, want relative path preserved", gotOriginal["input_context"])
+	}
+	if gotOriginal["perspective_injection"] != perspectiveInjectionPath {
+		t.Fatalf("original config perspective_injection = %q, want %q", gotOriginal["perspective_injection"], perspectiveInjectionPath)
+	}
+
+	var normalized map[string]string
+	if err := json.Unmarshal([]byte(readFile(t, normalizedConfigCopy)), &normalized); err != nil {
+		t.Fatalf("unmarshal normalized config copy: %v", err)
+	}
+
+	wantNormalized := map[string]string{
+		"topic":                 originalConfig["topic"],
+		"input_context":         canonicalPath(t, filepath.Join(invokeDir, "inputs", "request.md")),
+		"report_template":       reportTemplatePath,
+		"seed_hints":            originalConfig["seed_hints"],
+		"session_id":            originalConfig["session_id"],
+		"model":                 originalConfig["model"],
+		"ontology_scope":        originalConfig["ontology_scope"],
+		"perspective_injection": filepath.Join(install.repoRoot, "skills", "analyze", "prompts", "finding-protocol.md"),
+	}
+	if len(normalized) != len(wantNormalized) {
+		t.Fatalf("normalized config field count = %d, want %d: %#v", len(normalized), len(wantNormalized), normalized)
+	}
+	for key, want := range wantNormalized {
+		if normalized[key] != want {
+			t.Fatalf("normalized config %s = %q, want %q", key, normalized[key], want)
+		}
+	}
+}
+
+func TestPSMRegistryEntriesUseSharedDispatchContract(t *testing.T) {
+	t.Parallel()
+
+	registry := readPSMRegistry(t, "../codex/lib/command-registry.tsv")
+	repCases := representativePSMInvocations()
+
+	if len(registry) != len(repCases) {
+		t.Fatalf("registry has %d commands but representative invocation coverage has %d", len(registry), len(repCases))
+	}
+
+	for _, entry := range registry {
+		entry := entry
+		t.Run(entry.Command, func(t *testing.T) {
+			t.Parallel()
+
+			skillPath := filepath.Join("..", "codex", "skills", entry.SkillDir, "SKILL.md")
+			content := readRepoFile(t, skillPath)
+
+			for _, needle := range []string{
+				fmt.Sprintf("name: %s", entry.SkillID),
+				fmt.Sprintf("# psm %s", entry.Command),
+				fmt.Sprintf("Treat `psm %s` as a command, not as natural language.", entry.Command),
+				fmt.Sprintf("Glob(pattern=\"**/skills/%s/SKILL.md\")", entry.SkillDir),
+				"## Shared Codex Dispatch",
+				"## Codex Normalization Rules",
+				"Follow that shared skill exactly.",
+			} {
+				if !strings.Contains(content, needle) {
+					t.Fatalf("expected %q in %s", needle, skillPath)
+				}
+			}
+			if !strings.Contains(content, "Read the first match.") &&
+				!strings.Contains(content, "Read the resolved shared Prism") {
+				t.Fatalf("expected shared skill read instruction in %s", skillPath)
+			}
+
+			if _, ok := repCases[entry.Command]; !ok {
+				t.Fatalf("missing representative invocation for registry command %q", entry.Command)
+			}
+		})
+	}
+}
+
+func TestInstalledPSMWrapperDispatchesRepresentativeRegistryCommands(t *testing.T) {
+	t.Parallel()
+
+	install := installCodexArtifacts(t)
+	unrelatedDir := t.TempDir()
+	registry := readPSMRegistry(t, "../codex/lib/command-registry.tsv")
+	repCases := representativePSMInvocations()
+
+	if len(registry) != len(repCases) {
+		t.Fatalf("registry has %d commands but representative invocation coverage has %d", len(registry), len(repCases))
+	}
+
+	for _, entry := range registry {
+		entry := entry
+		tc, ok := repCases[entry.Command]
+		if !ok {
+			t.Fatalf("missing representative invocation for registry command %q", entry.Command)
+		}
+
+		t.Run(entry.Command, func(t *testing.T) {
+			t.Parallel()
+
+			argsOutput, stdinOutput := runInstalledPSMWithFakeCodex(t, install, unrelatedDir, tc.args...)
+
+			for _, needle := range []string{
+				"exec",
+				"--skip-git-repo-check",
+				"--dangerously-bypass-approvals-and-sandbox",
+				"-C",
+				install.repoRoot,
+				"--add-dir",
+				unrelatedDir,
+				"-",
+			} {
+				if !strings.Contains(argsOutput, needle) {
+					t.Fatalf("expected %q in codex args\n%s", needle, argsOutput)
+				}
+			}
+
+			for _, needle := range append([]string{
+				tc.promptCommand,
+				"Registered Prism Codex skill:\n" + entry.SkillID,
+				install.repoRoot,
+				unrelatedDir,
+				"Treat the following as an exact Prism command invocation",
+			}, expandPromptNeedles(tc.promptNeedles, install.repoRoot)...) {
+				if !strings.Contains(stdinOutput, needle) {
+					t.Fatalf("expected %q in codex prompt\n%s", needle, stdinOutput)
+				}
+			}
+		})
+	}
+}
+
+func TestInstalledPSMWrapperReusesSharedRunnerWithConfigScopedCommandDifferences(t *testing.T) {
+	t.Parallel()
+
+	install := installCodexArtifacts(t)
+	unrelatedDir := t.TempDir()
+	registry := readPSMRegistry(t, "../codex/lib/command-registry.tsv")
+	repCases := representativePSMInvocations()
+
+	type promptCapture struct {
+		command    string
+		skillID    string
+		argsOutput string
+		stdin      string
+	}
+
+	var captures []promptCapture
+	for _, entry := range registry {
+		tc, ok := repCases[entry.Command]
+		if !ok {
+			t.Fatalf("missing representative invocation for registry command %q", entry.Command)
+		}
+
+		argsOutput, stdinOutput := runInstalledPSMWithFakeCodex(t, install, unrelatedDir, tc.args...)
+		captures = append(captures, promptCapture{
+			command:    entry.Command,
+			skillID:    entry.SkillID,
+			argsOutput: argsOutput,
+			stdin:      stdinOutput,
+		})
+	}
+
+	baselineArgs := captures[0].argsOutput
+	for _, capture := range captures[1:] {
+		if capture.argsOutput != baselineArgs {
+			t.Fatalf(
+				"expected %s to reuse the same shared Codex runner args as %s\nwant:\n%s\ngot:\n%s",
+				capture.command,
+				captures[0].command,
+				baselineArgs,
+				capture.argsOutput,
+			)
+		}
+	}
+
+	for _, capture := range captures {
+		sharedSkillPath := filepath.Join(install.repoRoot, "skills", capture.command, "SKILL.md")
+		for _, needle := range []string{
+			"Treat the following as an exact Prism command invocation and execute it via the installed Prism Codex skills and MCP server:",
+			"Deterministic Prism asset locator for the shared Prism command workflow:",
+			"The resolved asset root for this invocation is:",
+			install.repoRoot,
+			"The user's original working directory is:",
+			unrelatedDir,
+			"Use the original working directory as the project context for repo analysis and file operations. Use the Prism repository only for shared skill, prompt, template, and MCP assets.",
+			"Shared analyze assets that remain available to Codex-side wrappers and adapters when this command delegates into analyze:",
+			"Registered Prism Codex skill:\n" + capture.skillID,
+			"The canonical shared Prism skill for this command is:\n" + sharedSkillPath,
+		} {
+			if !strings.Contains(capture.stdin, needle) {
+				t.Fatalf("expected %q in shared framework prompt for %s\n%s", needle, capture.command, capture.stdin)
+			}
+		}
+	}
+}
+
+func TestInstalledPSMWrapperRejectsUnsupportedCommands(t *testing.T) {
+	t.Parallel()
+
+	install := installCodexArtifacts(t)
+
+	cmd := exec.Command(filepath.Join(install.codexHome, "bin", "psm"), "analyze-workspace")
+	cmd.Env = append(
+		os.Environ(),
+		"HOME="+install.homeDir,
+		"CODEX_HOME="+install.codexHome,
+		"PRISM_REPO_PATH="+install.repoRoot,
+	)
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected unsupported psm command to fail")
+	}
+
+	text := string(output)
+	for _, needle := range []string{
+		"unsupported command 'analyze-workspace'",
+		"Supported commands:",
+		"psm analyze",
+		"psm brownfield",
+		"psm incident",
+		"psm prd",
+		"psm setup",
+	} {
+		if !strings.Contains(text, needle) {
+			t.Fatalf("expected %q in unsupported-command output\n%s", needle, text)
+		}
+	}
+}
+
+func TestInstallCodexScriptOnlyInstallsInitialClosedSkillSet(t *testing.T) {
+	t.Parallel()
+
+	install := installCodexArtifacts(t)
+	entries, err := os.ReadDir(filepath.Join(install.codexHome, "skills"))
+	if err != nil {
+		t.Fatalf("read installed skill directory: %v", err)
+	}
+
+	var got []string
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		got = append(got, entry.Name())
+	}
+
+	want := []string{
+		"prism-analyze",
+		"prism-brownfield",
+		"prism-incident",
+		"prism-prd",
+		"prism-setup",
+	}
+
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("expected installed Codex skills %v, got %v", want, got)
+	}
+
+	for _, unsupported := range []string{
+		filepath.Join(install.codexHome, "skills", "prism-analyze-workspace"),
+		filepath.Join(install.codexHome, "skills", "prism-test-analyze"),
+	} {
+		if _, err := os.Stat(unsupported); !os.IsNotExist(err) {
+			t.Fatalf("expected unsupported Codex skill to be absent: %s", unsupported)
+		}
+	}
+}
+
+func TestPSMCommandOntologyKeepsOutOfScopeCommandsNonAcceptanceBearing(t *testing.T) {
+	t.Parallel()
+
+	ontology := readPSMCommandOntology(t, "../codex/lib/command-ontology.tsv")
+	registry := readPSMRegistry(t, "../codex/lib/command-registry.tsv")
+
+	registered := make(map[string]struct{}, len(registry))
+	for _, entry := range registry {
+		registered[entry.Command] = struct{}{}
+	}
+
+	for _, entry := range ontology {
+		_, isRegistered := registered[entry.Command]
+
+		switch entry.MilestoneStatus {
+		case "acceptance-bearing":
+			if entry.RegistrationStatus != "registered" {
+				t.Fatalf("acceptance-bearing command %q must be marked registered", entry.Command)
+			}
+			if !isRegistered {
+				t.Fatalf("acceptance-bearing command %q must remain in the executable closed set", entry.Command)
+			}
+		case "non-acceptance-bearing":
+			if entry.RegistrationStatus != "unregistered" {
+				t.Fatalf("non-acceptance-bearing command %q must be marked unregistered", entry.Command)
+			}
+			if isRegistered {
+				t.Fatalf("non-acceptance-bearing command %q must not expand the executable closed set", entry.Command)
+			}
+		default:
+			t.Fatalf("unknown milestone status %q for command %q", entry.MilestoneStatus, entry.Command)
+		}
+	}
+}
+
+func TestInstalledCodexBrownfieldSkillIsPortableAcrossWorkingDirectories(t *testing.T) {
+	t.Parallel()
+
+	install := installCodexArtifacts(t)
+	unrelatedDir := t.TempDir()
+
+	cmd := exec.Command("bash", "-lc", "pwd")
+	cmd.Dir = unrelatedDir
+	cmd.Env = append(
+		os.Environ(),
+		"HOME="+install.homeDir,
+		"CODEX_HOME="+install.codexHome,
+	)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("verify unrelated working directory: %v\n%s", err, output)
+	}
+
+	ruleContent := readFile(t, filepath.Join(install.codexHome, "rules", "prism.md"))
+	for _, needle := range []string{
+		"| `psm brownfield` | `prism-brownfield` |",
+		"| `psm brownfield scan` | `prism-brownfield` |",
+		"| `psm brownfield defaults` | `prism-brownfield` |",
+		"| `psm brownfield set 6,18,19` | `prism-brownfield` |",
+		"| `psm setup` | `prism-setup` |",
+	} {
+		if !strings.Contains(ruleContent, needle) {
+			t.Fatalf("expected %q in installed Codex rule", needle)
+		}
+	}
+
+	config := readFile(t, install.configPath)
+	for _, needle := range []string{
+		`command = "` + install.runScript + `"`,
+		`PRISM_REPO_PATH = "` + install.repoRoot + `"`,
+	} {
+		if !strings.Contains(config, needle) {
+			t.Fatalf("expected %q in generated Codex config", needle)
+		}
+	}
+}
+
+func TestCodexBrownfieldSkillUsesSharedPrismMCPTool(t *testing.T) {
+	t.Parallel()
+
+	content := readRepoFile(t, "../codex/skills/brownfield/SKILL.md")
+
+	for _, needle := range []string{
+		"name: prism-brownfield",
+		"# psm brownfield",
+		"Glob(pattern=\"**/skills/brownfield/SKILL.md\")",
+		"Follow that shared skill exactly.",
+		"psm brownfield set 6,18,19",
+	} {
+		if !strings.Contains(content, needle) {
+			t.Fatalf("expected %q in Codex skill", needle)
+		}
+	}
+}
+
+func TestCodexBrownfieldSkillUsesSharedDispatchFramework(t *testing.T) {
+	t.Parallel()
+
+	content := readRepoFile(t, "../codex/skills/brownfield/SKILL.md")
+	for _, needle := range []string{
+		"## Shared Codex Dispatch",
+		"## Codex Normalization Rules",
+		"/prism:brownfield` -> `psm brownfield`",
+	} {
+		if !strings.Contains(content, needle) {
+			t.Fatalf("expected %q in Codex brownfield skill", needle)
+		}
+	}
+	for _, forbidden := range []string{
+		"ToolSearch query: \"+prism brownfield\"",
+		"Tool: prism_brownfield",
+		"Display only the repos marked with `*` (defaults).",
+	} {
+		if strings.Contains(content, forbidden) {
+			t.Fatalf("expected brownfield wrapper to avoid embedded workflow detail %q", forbidden)
+		}
+	}
+}
+
+func TestInstalledCodexBrownfieldSkillMatchesRepresentativeClaudeScenarios(t *testing.T) {
+	t.Parallel()
+
+	install := installCodexArtifacts(t)
+	installedContent := readFile(t, filepath.Join(install.codexHome, "skills", "prism-brownfield", "SKILL.md"))
+
+	for _, needle := range []string{
+		"psm brownfield",
+		"psm brownfield scan",
+		"psm brownfield defaults",
+		"psm brownfield set 6,18,19",
+		"Glob(pattern=\"**/skills/brownfield/SKILL.md\")",
+		"Follow that shared skill exactly.",
+	} {
+		if !strings.Contains(installedContent, needle) {
+			t.Fatalf("expected %q in installed Codex brownfield skill", needle)
+		}
+	}
+}
+
+func TestCodexIncidentSkillDispatchesToSharedPrismWorkflow(t *testing.T) {
+	t.Parallel()
+
+	content := readRepoFile(t, "../codex/skills/incident/SKILL.md")
+
+	for _, needle := range []string{
+		"name: prism-incident",
+		"# psm incident",
+		"Glob(pattern=\"**/skills/incident/SKILL.md\")",
+		"`PRISM_REPO_PATH/skills/incident/SKILL.md` as the canonical shared skill path when it is available.",
+		"Follow that shared skill exactly.",
+		"/prism:incident` -> `psm incident`",
+		"any Codex-side analyze invocation must use `psm analyze`",
+		"`PRISM_REPO_PATH` when it points to a Prism repo containing `skills/incident/SKILL.md`.",
+		"Do not assume the command was launched from within `~/prism` or from the user's current working directory.",
+		"`prism_analyze` dispatch with the shared incident `report_template`, `perspective_injection`, and language contract;",
+		"`prism_analyze_result(task_id)` with summary, report path, and raw-artifact location.",
+		"Do not reimplement or paraphrase the Prism incident workflow in this Codex wrapper.",
+	} {
+		if !strings.Contains(content, needle) {
+			t.Fatalf("expected %q in Codex incident skill", needle)
+		}
+	}
+}
+
+func TestCodexDevModeRoutesPSMIncidentThroughCodexSkill(t *testing.T) {
+	t.Parallel()
+
+	content := readRepoFile(t, "../CLAUDE.md")
+
+	for _, needle := range []string{
+		"`psm incident`",
+		"`Glob(pattern=\"**/codex/skills/incident/SKILL.md\")`",
+		"Treat `psm incident` as a command, not as natural language.",
+		"Reuse Prism's bundled MCP tools and Codex skill assets; do not reimplement the workflow ad hoc.",
+	} {
+		if !strings.Contains(content, needle) {
+			t.Fatalf("expected %q in Codex dev-mode incident routing", needle)
+		}
+	}
+}
+
+func TestInstalledPSMWrapperPreservesIncidentDescriptionAsSingleArgument(t *testing.T) {
+	t.Parallel()
+
+	install := installCodexArtifacts(t)
+	unrelatedDir := t.TempDir()
+
+	_, stdinOutput := runInstalledPSMWithFakeCodex(t, install, unrelatedDir, "incident", "checkout", "outage")
+
+	for _, needle := range []string{
+		"psm incident checkout\\ outage",
+		"Prism Incident Compatibility Bridge",
+		"passing through the shared incident report template and UX perspective injection assets unchanged.",
+	} {
+		if !strings.Contains(stdinOutput, needle) {
+			t.Fatalf("expected %q in codex prompt\n%s", needle, stdinOutput)
+		}
+	}
+}
+
+func TestInstalledCodexIncidentSkillMatchesRepresentativeClaudeScenario(t *testing.T) {
+	t.Parallel()
+
+	install := installCodexArtifacts(t)
+	installedContent := readFile(t, filepath.Join(install.codexHome, "skills", "prism-incident", "SKILL.md"))
+	sharedContent := readRepoFile(t, "../skills/incident/SKILL.md")
+
+	for _, needle := range []string{
+		"Incident RCA Analysis (Thin Wrapper for prism_analyze)",
+		"AskUserQuestion",
+		"`~/.prism/state/analyze-{short-id}/`",
+		"perspective_injection",
+		"`prism_analyze_result` when complete",
+	} {
+		if !strings.Contains(sharedContent, needle) {
+			t.Fatalf("expected %q in shared Prism incident skill", needle)
+		}
+	}
+
+	for _, needle := range []string{
+		"`PRISM_REPO_PATH/skills/incident/SKILL.md` as the canonical shared skill path when it is available.",
+		"Follow that shared skill exactly.",
+		"`PRISM_REPO_PATH` when it points to a Prism repo containing `skills/incident/SKILL.md`.",
+		"`PRISM_REPO_PATH/skills/incident/templates/report.md`",
+		"`PRISM_REPO_PATH/skills/incident/perspectives/ux-impact.json`",
+		"Do not assume the command was launched from within `~/prism` or from the user's current working directory.",
+		"Do not reimplement or paraphrase the Prism incident workflow in this Codex wrapper.",
+	} {
+		if !strings.Contains(installedContent, needle) {
+			t.Fatalf("expected %q in installed Codex incident skill", needle)
+		}
+	}
+}
+
+func TestCodexPRDSkillDispatchesToSharedPrismWorkflow(t *testing.T) {
+	t.Parallel()
+
+	content := readRepoFile(t, "../codex/skills/prd/SKILL.md")
+
+	for _, needle := range []string{
+		"name: prism-prd",
+		"# psm prd",
+		"`PRISM_REPO_PATH` when it points to a Prism repo containing `skills/prd/SKILL.md`; otherwise fall back to `Glob(pattern=\"**/skills/prd/SKILL.md\")`.",
+		"Follow that shared skill exactly.",
+		"Preserve the shared PRD wrapper phases exactly: PRD path intake, shared session/state setup, analyze config creation, analyze delegation, post-processing, report verification, and final report delivery.",
+		"/prism:prd` -> `psm prd`",
+		"`Skill(skill=\"prism:analyze\", args=\"...\")` -> `psm analyze ...`",
+		"Resolve the PRD input path from the user's launch directory, not from the shared Prism repo, and fail if the referenced file does not exist.",
+		"~/.prism/state/prd-{short-id}/analyze-config.json",
+		"~/.prism/state/analyze-{short-id}/analyst-findings.md",
+		"invoke analyze as `psm analyze --config ~/.prism/state/prd-{short-id}/analyze-config.json`",
+		"require the post-processor to return that same report file path as its handoff result",
+		"{PRD_DIR}/prd-policy-review-report.md",
+		"`PM Decision Checklist`",
+		"`PRISM_REPO_PATH/skills/prd/prompts/post-processor.md`",
+		"`PRISM_REPO_PATH/skills/prd/templates/report.md`",
+		"Do not assume the command was launched from within `~/prism` or from the user's current working directory.",
+		"Do not reimplement or paraphrase the Prism PRD workflow in this Codex wrapper.",
+	} {
+		if !strings.Contains(content, needle) {
+			t.Fatalf("expected %q in Codex PRD skill", needle)
+		}
+	}
+}
+
+func TestCodexDevModeRoutesPSMPRDThroughCodexSkill(t *testing.T) {
+	t.Parallel()
+
+	content := readRepoFile(t, "../CLAUDE.md")
+
+	for _, needle := range []string{
+		"`psm prd`",
+		"`Glob(pattern=\"**/codex/skills/prd/SKILL.md\")`",
+		"Treat `psm prd` as a command, not as natural language.",
+		"Reuse Prism's bundled MCP tools and Codex skill assets; do not reimplement the workflow ad hoc.",
+	} {
+		if !strings.Contains(content, needle) {
+			t.Fatalf("expected %q in Codex dev-mode PRD routing", needle)
+		}
+	}
+}
+
+func TestInstalledCodexPRDSkillIsPortableAcrossWorkingDirectories(t *testing.T) {
+	t.Parallel()
+
+	install := installCodexArtifacts(t)
+	unrelatedDir := t.TempDir()
+
+	cmd := exec.Command("bash", "-lc", "pwd")
+	cmd.Dir = unrelatedDir
+	cmd.Env = append(
+		os.Environ(),
+		"HOME="+install.homeDir,
+		"CODEX_HOME="+install.codexHome,
+	)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("verify unrelated working directory: %v\n%s", err, output)
+	}
+
+	ruleContent := readFile(t, filepath.Join(install.codexHome, "rules", "prism.md"))
+	for _, needle := range []string{
+		"| `psm prd /path/to/prd.md` | `prism-prd` |",
+		"This initial Codex registration only covers `psm analyze`, `psm brownfield`, `psm incident`, `psm prd`, and `psm setup`.",
+	} {
+		if !strings.Contains(ruleContent, needle) {
+			t.Fatalf("expected %q in installed Codex rule", needle)
+		}
+	}
+
+	config := readFile(t, install.configPath)
+	for _, needle := range []string{
+		`command = "` + install.runScript + `"`,
+		`PRISM_REPO_PATH = "` + install.repoRoot + `"`,
+	} {
+		if !strings.Contains(config, needle) {
+			t.Fatalf("expected %q in generated Codex config", needle)
+		}
+	}
+
+	installedContent := readFile(t, filepath.Join(install.codexHome, "skills", "prism-prd", "SKILL.md"))
+	for _, needle := range []string{
+		"`PRISM_REPO_PATH` when it points to a Prism repo containing `skills/prd/SKILL.md`; otherwise fall back to `Glob(pattern=\"**/skills/prd/SKILL.md\")`.",
+		"Follow that shared skill exactly.",
+		"`Skill(skill=\"prism:analyze\", args=\"...\")` -> `psm analyze ...`",
+		"`PRISM_REPO_PATH/skills/prd/prompts/post-processor.md`",
+		"`PRISM_REPO_PATH/skills/prd/templates/report.md`",
+	} {
+		if !strings.Contains(installedContent, needle) {
+			t.Fatalf("expected %q in installed Codex PRD skill", needle)
+		}
+	}
+}
+
+func TestInstalledCodexPRDSkillMatchesRepresentativeClaudeScenario(t *testing.T) {
+	t.Parallel()
+
+	install := installCodexArtifacts(t)
+	installedContent := readFile(t, filepath.Join(install.codexHome, "skills", "prism-prd", "SKILL.md"))
+	sharedContent := readRepoFile(t, "../skills/prd/SKILL.md")
+
+	for _, needle := range []string{
+		"`~/.prism/state/prd-{short-id}/analyze-config.json`",
+		"`~/.prism/state/analyze-{short-id}`",
+		"`prd-policy-review-report.md` exists",
+		"Return the report file path: `{PRD_STATE_DIR}/prd-policy-review-report.md`",
+		"PM Decision Checklist",
+		"PRD policy analysis complete.",
+	} {
+		if !strings.Contains(sharedContent, needle) {
+			t.Fatalf("expected %q in shared Prism PRD skill", needle)
+		}
+	}
+
+	for _, needle := range []string{
+		"`PRISM_REPO_PATH` when it points to a Prism repo containing `skills/prd/SKILL.md`; otherwise fall back to `Glob(pattern=\"**/skills/prd/SKILL.md\")`.",
+		"Follow that shared skill exactly.",
+		"`Skill(skill=\"prism:analyze\", args=\"...\")` -> `psm analyze ...`",
+		"Preserve the shared PRD wrapper phases exactly: PRD path intake, shared session/state setup, analyze config creation, analyze delegation, post-processing, report verification, and final report delivery.",
+		"`PRISM_REPO_PATH/skills/prd/prompts/post-processor.md`",
+		"`PRISM_REPO_PATH/skills/prd/templates/report.md`",
+		"invoke analyze as `psm analyze --config ~/.prism/state/prd-{short-id}/analyze-config.json`",
+		"require the post-processor to return that same report file path as its handoff result",
+		"`{PRD_DIR}/prd-policy-review-report.md`",
+		"Do not assume the command was launched from within `~/prism` or from the user's current working directory.",
+		"Do not reimplement or paraphrase the Prism PRD workflow in this Codex wrapper.",
+	} {
+		if !strings.Contains(installedContent, needle) {
+			t.Fatalf("expected %q in installed Codex PRD skill", needle)
+		}
+	}
+}
+
+func TestInstalledPSMWrapperDispatchesPRDFromOutsideRepoRootWithSharedArtifactContract(t *testing.T) {
+	t.Parallel()
+
+	install := installCodexArtifacts(t)
+	unrelatedDir := t.TempDir()
+
+	argsOutput, stdinOutput := runInstalledPSMWithFakeCodex(t, install, unrelatedDir, "prd", "docs/spec doc.md")
+
+	for _, needle := range []string{
+		"exec",
+		"--skip-git-repo-check",
+		"--dangerously-bypass-approvals-and-sandbox",
+		"-C",
+		install.repoRoot,
+		"--add-dir",
+		unrelatedDir,
+		"-",
+	} {
+		if !strings.Contains(argsOutput, needle) {
+			t.Fatalf("expected %q in codex args\n%s", needle, argsOutput)
+		}
+	}
+
+	for _, needle := range []string{
+		"psm prd docs/spec\\ doc.md",
+		install.repoRoot,
+		unrelatedDir,
+		"Treat the following as an exact Prism command invocation",
+		"Treat `psm prd ...` as the exact Codex equivalent of Claude Code `/prism:prd ...`.",
+		"if the PRD file path is relative, resolve it from `PRISM_TARGET_CWD`, not from the shared Prism repo.",
+		"write `~/.prism/state/prd-{short-id}/analyze-config.json` with the shared `topic`, `input_context`, `seed_hints`, and `session_id` contract;",
+		"keep `~/.prism/state/prd-{short-id}/analyze-config.json` as the concrete handoff artifact and do not substitute a different filename or directory.",
+		"require `analyst-findings.md` before post-processing;",
+		"require `~/.prism/state/prd-{short-id}/prd-policy-review-report.md` to exist after post-processing;",
+		"require the post-processor handoff result to be that exact report path.",
+		"copy the final report into the PRD file's directory as `prd-policy-review-report.md`;",
+		"report both the copied report path and `~/.prism/state/prd-{short-id}/prd-policy-review-report.md`;",
+		"mention the raw analyze artifacts directory under `~/.prism/state/analyze-{short-id}/`;",
+	} {
+		if !strings.Contains(stdinOutput, needle) {
+			t.Fatalf("expected %q in codex prompt\n%s", needle, stdinOutput)
+		}
+	}
+}
+
+func TestInstalledPSMSetupIsGloballyExecutableViaPATHFromUnrelatedDirectory(t *testing.T) {
+	t.Parallel()
+
+	install := installCodexArtifacts(t)
+	unrelatedDir := t.TempDir()
+
+	argsOutput, stdinOutput := runInstalledPSMWithFakeCodexOptions(t, install, unrelatedDir, psmInvocationOptions{
+		invokeViaPath: true,
+		extraEnv: []string{
+			"PATH=" + filepath.Join(install.codexHome, "bin") + string(os.PathListSeparator) + os.Getenv("PATH"),
+		},
+		args: []string{"setup", "defaults"},
+	})
+
+	for _, needle := range []string{
+		"exec",
+		"--skip-git-repo-check",
+		"--dangerously-bypass-approvals-and-sandbox",
+		"-C",
+		install.repoRoot,
+		"--add-dir",
+		unrelatedDir,
+		"-",
+	} {
+		if !strings.Contains(argsOutput, needle) {
+			t.Fatalf("expected %q in codex args\n%s", needle, argsOutput)
+		}
+	}
+
+	for _, needle := range []string{
+		"psm setup defaults",
+		"Registered Prism Codex skill:\nprism-setup",
+		install.repoRoot,
+		unrelatedDir,
+		filepath.Join(install.repoRoot, "skills", "setup", "SKILL.md"),
+		"Resolve the shared Prism setup skill deterministically from `",
+		"Preserve the shared-skill subcommand behavior exactly: `scan` means scan only, `defaults` means show current defaults, and `set <indices>` means update defaults directly with the provided comma-separated indices.",
+		"Preserve the shared skill's user-facing status text and stop conditions: empty scans should surface `No GitHub repositories found in your home directory.`, clearing defaults should surface the shared greenfield-mode confirmation, and successful default updates should confirm the selected repository names.",
+	} {
+		if !strings.Contains(stdinOutput, needle) {
+			t.Fatalf("expected %q in codex prompt\n%s", needle, stdinOutput)
+		}
+	}
+}
+
+func TestCodexSetupSkillDispatchesToSharedPrismWorkflow(t *testing.T) {
+	t.Parallel()
+
+	content := readRepoFile(t, "../codex/skills/setup/SKILL.md")
+
+	for _, needle := range []string{
+		"name: prism-setup",
+		"# psm setup",
+		"psm setup scan",
+		"psm setup defaults",
+		"psm setup set 6,18,19",
+		"Glob(pattern=\"**/skills/setup/SKILL.md\")",
+		"`PRISM_REPO_PATH` when it points to a Prism repo containing `skills/setup/SKILL.md`; otherwise fall back to `Glob(pattern=\"**/skills/setup/SKILL.md\")`.",
+		"Follow that shared skill exactly.",
+		"/prism:setup` -> `psm setup`",
+		"/prism:brownfield` -> `psm brownfield`",
+		"Do not reimplement or paraphrase the Prism setup workflow in this Codex wrapper.",
+	} {
+		if !strings.Contains(content, needle) {
+			t.Fatalf("expected %q in Codex setup skill", needle)
+		}
+	}
+}
+
+func TestCodexSetupSkillUsesSharedDispatchFramework(t *testing.T) {
+	t.Parallel()
+
+	content := readRepoFile(t, "../codex/skills/setup/SKILL.md")
+	for _, needle := range []string{
+		"## Shared Codex Dispatch",
+		"## Codex Normalization Rules",
+	} {
+		if !strings.Contains(content, needle) {
+			t.Fatalf("expected %q in Codex setup skill", needle)
+		}
+	}
+	for _, forbidden := range []string{
+		"ToolSearch query: \"+prism brownfield\"",
+		"Tool: prism_brownfield",
+		"Default repo selection — IMMEDIATELY after showing the list:",
+	} {
+		if strings.Contains(content, forbidden) {
+			t.Fatalf("expected setup wrapper to avoid embedded workflow detail %q", forbidden)
+		}
+	}
+}
+
+func TestInstalledCodexSetupSkillIsPortableAcrossWorkingDirectories(t *testing.T) {
+	t.Parallel()
+
+	install := installCodexArtifacts(t)
+	unrelatedDir := t.TempDir()
+
+	cmd := exec.Command("bash", "-lc", "pwd")
+	cmd.Dir = unrelatedDir
+	cmd.Env = append(
+		os.Environ(),
+		"HOME="+install.homeDir,
+		"CODEX_HOME="+install.codexHome,
+	)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("verify unrelated working directory: %v\n%s", err, output)
+	}
+
+	ruleContent := readFile(t, filepath.Join(install.codexHome, "rules", "prism.md"))
+	for _, needle := range []string{
+		"| `psm setup` | `prism-setup` |",
+		"This initial Codex registration only covers `psm analyze`, `psm brownfield`, `psm incident`, `psm prd`, and `psm setup`.",
+	} {
+		if !strings.Contains(ruleContent, needle) {
+			t.Fatalf("expected %q in installed Codex rule", needle)
+		}
+	}
+
+	config := readFile(t, install.configPath)
+	for _, needle := range []string{
+		`command = "` + install.runScript + `"`,
+		`PRISM_REPO_PATH = "` + install.repoRoot + `"`,
+	} {
+		if !strings.Contains(config, needle) {
+			t.Fatalf("expected %q in generated Codex config", needle)
+		}
+	}
+
+	installedContent := readFile(t, filepath.Join(install.codexHome, "skills", "prism-setup", "SKILL.md"))
+	for _, needle := range []string{
+		"Glob(pattern=\"**/skills/setup/SKILL.md\")",
+		"`PRISM_REPO_PATH` when it points to a Prism repo containing `skills/setup/SKILL.md`; otherwise fall back to `Glob(pattern=\"**/skills/setup/SKILL.md\")`.",
+		"Follow that shared skill exactly.",
+		"Reuse Prism's bundled MCP tools and shared skill content exactly.",
+		"## Shared Codex Dispatch",
+		"## Codex Normalization Rules",
+		"/prism:brownfield` -> `psm brownfield`",
+	} {
+		if !strings.Contains(installedContent, needle) {
+			t.Fatalf("expected %q in installed Codex setup skill", needle)
+		}
+	}
+}
+
+func TestCodexDevModeRoutesPSMSetupThroughCodexSkill(t *testing.T) {
+	t.Parallel()
+
+	content := readRepoFile(t, "../CLAUDE.md")
+
+	for _, needle := range []string{
+		"`psm setup`",
+		"`Glob(pattern=\"**/codex/skills/setup/SKILL.md\")`",
+		"Treat `psm setup` as a command, not as natural language.",
+		"Reuse Prism's bundled MCP tools and Codex skill assets; do not reimplement the workflow ad hoc.",
+	} {
+		if !strings.Contains(content, needle) {
+			t.Fatalf("expected %q in Codex dev-mode setup routing", needle)
+		}
+	}
+}
+
+func TestPRDCommandDispatchesToSharedSkill(t *testing.T) {
+	t.Parallel()
+
+	content := readRepoFile(t, "../commands/prd.md")
+
+	for _, needle := range []string{
+		`description: "Run Prism PRD policy analysis"`,
+		`Use ` + "`PRISM_REPO_PATH` as the source of truth for shared Prism assets",
+		`Glob(pattern="**/skills/prd/SKILL.md")`,
+		"post-processor prompt",
+		"`psm analyze --config ...` delegation",
+		"`~/.prism/state/prd-{short-id}/analyze-config.json`",
+		"`~/.prism/state/prd-{short-id}/prd-policy-review-report.md`",
+		"`{PRD_DIR}/prd-policy-review-report.md`",
+		"`PM Decision Checklist` verification",
+		"follow its instructions exactly",
+	} {
+		if !strings.Contains(content, needle) {
+			t.Fatalf("expected %q in PRD command wiring", needle)
+		}
+	}
+}
+
+func TestSetupCommandDispatchesToSharedSkill(t *testing.T) {
+	t.Parallel()
+
+	content := readRepoFile(t, "../commands/setup.md")
+
+	for _, needle := range []string{
+		`description: "Run Prism setup workflow"`,
+		`Use ` + "`PRISM_REPO_PATH` as the source of truth for shared Prism assets",
+		`Glob(pattern="**/skills/setup/SKILL.md")`,
+		"Treat `psm setup`, `psm setup scan`, `psm setup defaults`, and `psm setup set <indices>` as exact command forms routed through that shared skill.",
+		"follow its instructions exactly",
+	} {
+		if !strings.Contains(content, needle) {
+			t.Fatalf("expected %q in setup command wiring", needle)
+		}
+	}
+}
+
+func TestBrownfieldCommandDispatchesToSharedSkill(t *testing.T) {
+	t.Parallel()
+
+	content := readRepoFile(t, "../commands/brownfield.md")
+
+	for _, needle := range []string{
+		`description: "Run Prism brownfield repository setup"`,
+		`Use ` + "`PRISM_REPO_PATH` as the source of truth for shared Prism assets",
+		`Glob(pattern="**/skills/brownfield/SKILL.md")`,
+		"Treat `psm brownfield`, `psm brownfield scan`, `psm brownfield defaults`, and `psm brownfield set <indices>` as exact command forms routed through that shared skill.",
+		"Preserve the default no-argument flow exactly: scan first, render the scan result, then prompt for default selection.",
+		"follow its instructions exactly",
+	} {
+		if !strings.Contains(content, needle) {
+			t.Fatalf("expected %q in brownfield command wiring", needle)
+		}
+	}
+}
+
+func TestPSMEntrypointsAreRenderedFromSharedFrameworkConfigs(t *testing.T) {
+	t.Parallel()
+
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	repoRoot := filepath.Clean(filepath.Join(wd, ".."))
+	psmSource := filepath.Join(repoRoot, "codex", "lib", "psm.sh")
+	commands := []string{"analyze", "brownfield", "incident", "prd", "setup"}
+
+	for _, commandName := range commands {
+		commandName := commandName
+		t.Run(commandName, func(t *testing.T) {
+			t.Parallel()
+
+			renderedSkill := renderPSMEntrypoint(t, repoRoot, psmSource, "prism_psm_render_codex_skill", commandName)
+			actualSkill := readRepoFile(t, filepath.Join("..", "codex", "skills", commandName, "SKILL.md"))
+			if actualSkill != renderedSkill {
+				t.Fatalf("codex skill entrypoint for %s drifted from shared framework renderer", commandName)
+			}
+
+			renderedCommand := renderPSMEntrypoint(t, repoRoot, psmSource, "prism_psm_render_command_markdown", commandName)
+			actualCommand := readRepoFile(t, filepath.Join("..", "commands", commandName+".md"))
+			if actualCommand != renderedCommand {
+				t.Fatalf("command entrypoint for %s drifted from shared framework renderer", commandName)
+			}
+		})
+	}
+}
+
+func readRepoFile(t *testing.T, relativePath string) string {
+	t.Helper()
+
+	path := filepath.Clean(relativePath)
+	return readFile(t, path)
+}
+
+func readFile(t *testing.T, path string) string {
+	t.Helper()
+
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	return string(content)
+}
+
+func canonicalPath(t *testing.T, path string) string {
+	t.Helper()
+
+	resolved, err := filepath.EvalSymlinks(path)
+	if err == nil {
+		return resolved
+	}
+	return filepath.Clean(path)
+}
+
+func renderPSMEntrypoint(t *testing.T, repoRoot, psmSource, renderFunc, commandName string) string {
+	t.Helper()
+
+	cmd := exec.Command(
+		"bash",
+		"-lc",
+		fmt.Sprintf("source %q && %s %q", psmSource, renderFunc, commandName),
+	)
+	cmd.Dir = repoRoot
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("render %s for %s: %v\n%s", renderFunc, commandName, err, output)
+	}
+	return string(output)
+}
+
+func mustGetwd(t *testing.T) string {
+	t.Helper()
+
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	return wd
+}
+
+type codexInstallPaths struct {
+	homeDir    string
+	codexHome  string
+	configPath string
+	repoRoot   string
+	runScript  string
+}
+
+func installCodexArtifacts(t *testing.T) codexInstallPaths {
+	t.Helper()
+
+	homeDir := t.TempDir()
+	codexHome := filepath.Join(homeDir, ".codex")
+	repoRoot := filepath.Clean(filepath.Join(mustGetwd(t), ".."))
+	installScript := filepath.Join(repoRoot, "scripts", "install-codex.sh")
+
+	cmd := exec.Command("bash", installScript)
+	cmd.Dir = t.TempDir()
+	cmd.Env = append(
+		os.Environ(),
+		"HOME="+homeDir,
+		"CODEX_HOME="+codexHome,
+	)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("install-codex.sh failed: %v\n%s", err, output)
+	}
+
+	return codexInstallPaths{
+		homeDir:    homeDir,
+		codexHome:  codexHome,
+		configPath: filepath.Join(codexHome, "config.toml"),
+		repoRoot:   repoRoot,
+		runScript:  filepath.Join(repoRoot, "mcp", "run.sh"),
+	}
+}
+
+type psmRegistryEntry struct {
+	Command  string
+	SkillDir string
+	SkillID  string
+}
+
+type psmCommandOntologyEntry struct {
+	Command            string
+	SkillID            string
+	MilestoneStatus    string
+	RegistrationStatus string
+}
+
+type psmRepresentativeInvocation struct {
+	args          []string
+	promptCommand string
+	promptNeedles []string
+}
+
+func readPSMRegistry(t *testing.T, relativePath string) []psmRegistryEntry {
+	t.Helper()
+
+	content := readRepoFile(t, relativePath)
+	var entries []psmRegistryEntry
+	for _, rawLine := range strings.Split(content, "\n") {
+		line := strings.TrimSpace(rawLine)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		fields := strings.Split(line, "\t")
+		if len(fields) != 3 {
+			t.Fatalf("invalid registry row %q in %s", rawLine, relativePath)
+		}
+
+		entries = append(entries, psmRegistryEntry{
+			Command:  fields[0],
+			SkillDir: fields[1],
+			SkillID:  fields[2],
+		})
+	}
+
+	return entries
+}
+
+func readPSMCommandOntology(t *testing.T, relativePath string) []psmCommandOntologyEntry {
+	t.Helper()
+
+	content := readRepoFile(t, relativePath)
+	var entries []psmCommandOntologyEntry
+	for _, rawLine := range strings.Split(content, "\n") {
+		line := strings.TrimSpace(rawLine)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		fields := strings.Split(line, "\t")
+		if len(fields) != 4 {
+			t.Fatalf("invalid ontology row %q in %s", rawLine, relativePath)
+		}
+
+		entries = append(entries, psmCommandOntologyEntry{
+			Command:            fields[0],
+			SkillID:            fields[1],
+			MilestoneStatus:    fields[2],
+			RegistrationStatus: fields[3],
+		})
+	}
+
+	return entries
+}
+
+func representativePSMInvocations() map[string]psmRepresentativeInvocation {
+	return map[string]psmRepresentativeInvocation{
+		"analyze": {
+			args:          []string{"analyze", "cache invalidation"},
+			promptCommand: "psm analyze cache\\ invalidation",
+			promptNeedles: []string{
+				"{REPO_ROOT}/skills/analyze/templates/report.md",
+				"Preserve the full shared-skill decision flow and exit gates, not just the MCP payload shape.",
+				"Honor the shared Phase 2 exit gate: do not proceed to polling until `prism_analyze` returns a `task_id`.",
+			},
+		},
+		"brownfield": {
+			args:          []string{"brownfield", "defaults"},
+			promptCommand: "psm brownfield defaults",
+			promptNeedles: []string{
+				"{REPO_ROOT}/skills/brownfield/SKILL.md",
+				"Preserve the shared-skill subcommand behavior exactly: `scan` means scan only, `defaults` means show current defaults, and `set <indices>` means update defaults directly with the provided comma-separated indices.",
+			},
+		},
+		"incident": {
+			args:          []string{"incident", "checkout outage"},
+			promptCommand: "psm incident checkout\\ outage",
+			promptNeedles: []string{
+				"{REPO_ROOT}/skills/incident/SKILL.md",
+				"Prism Incident Compatibility Bridge",
+				"by passing through the shared incident report template and UX perspective injection assets unchanged.",
+			},
+		},
+		"prd": {
+			args:          []string{"prd", "/tmp/spec doc.md"},
+			promptCommand: "psm prd /tmp/spec\\ doc.md",
+		},
+		"setup": {
+			args:          []string{"setup", "defaults"},
+			promptCommand: "psm setup defaults",
+			promptNeedles: []string{
+				"{REPO_ROOT}/skills/setup/SKILL.md",
+				"Resolve the shared Prism setup skill deterministically from `",
+				"Preserve the shared-skill subcommand behavior exactly: `scan` means scan only, `defaults` means show current defaults, and `set <indices>` means update defaults directly with the provided comma-separated indices.",
+			},
+		},
+	}
+}
+
+func expandPromptNeedles(needles []string, repoRoot string) []string {
+	expanded := make([]string, 0, len(needles))
+	for _, needle := range needles {
+		expanded = append(expanded, strings.ReplaceAll(needle, "{REPO_ROOT}", repoRoot))
+	}
+	return expanded
+}
+
+func shellEscapeArg(arg string) string {
+	return "'" + strings.ReplaceAll(arg, "'", `'"'"'`) + "'"
+}
+
+func runInstalledPSMWithFakeCodex(t *testing.T, install codexInstallPaths, workingDir string, args ...string) (string, string) {
+	t.Helper()
+
+	return runInstalledPSMWithFakeCodexOptions(t, install, workingDir, psmInvocationOptions{
+		args: args,
+	})
+}
+
+type psmInvocationOptions struct {
+	args          []string
+	extraEnv      []string
+	invokeViaPath bool
+}
+
+func runInstalledPSMWithFakeCodexOptions(t *testing.T, install codexInstallPaths, workingDir string, opts psmInvocationOptions) (string, string) {
+	t.Helper()
+
+	fakeCodexDir := t.TempDir()
+	argsPath := filepath.Join(fakeCodexDir, "args.txt")
+	stdinPath := filepath.Join(fakeCodexDir, "stdin.txt")
+	fakeCodexPath := filepath.Join(fakeCodexDir, "codex")
+
+	fakeCodex := "#!/usr/bin/env bash\nset -euo pipefail\nprintf '%s\\n' \"$@\" > \"" + argsPath + "\"\ncat > \"" + stdinPath + "\"\nprintf 'ok\\n'\n"
+	if err := os.WriteFile(fakeCodexPath, []byte(fakeCodex), 0o755); err != nil {
+		t.Fatalf("write fake codex: %v", err)
+	}
+
+	commandPath := filepath.Join(install.codexHome, "bin", "psm")
+	commandArgs := opts.args
+	if opts.invokeViaPath {
+		commandPath = "bash"
+		escapedArgs := make([]string, 0, len(commandArgs)+1)
+		escapedArgs = append(escapedArgs, "psm")
+		for _, arg := range commandArgs {
+			escapedArgs = append(escapedArgs, shellEscapeArg(arg))
+		}
+		commandArgs = []string{"-c", strings.Join(escapedArgs, " ")}
+	}
+
+	cmd := exec.Command(commandPath, commandArgs...)
+	cmd.Dir = workingDir
+	cmd.Env = append(
+		os.Environ(),
+		"HOME="+install.homeDir,
+		"CODEX_HOME="+install.codexHome,
+		"PSM_CODEX_CLI_PATH="+fakeCodexPath,
+	)
+	cmd.Env = append(cmd.Env, opts.extraEnv...)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("run psm wrapper: %v\n%s", err, output)
+	}
+
+	return readFile(t, argsPath), readFile(t, stdinPath)
+}

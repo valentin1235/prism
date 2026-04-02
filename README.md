@@ -1,6 +1,6 @@
 # Prism
 
-Multi-perspective agent team analysis plugin for [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
+Multi-perspective agent team analysis for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and Codex.
 
 Prism spawns a coordinated team of specialized AI agents — each analyzing from a different perspective — then cross-validates findings through a Devil's Advocate before producing a final report.
 
@@ -8,25 +8,70 @@ Prism spawns a coordinated team of specialized AI agents — each analyzing from
 
 How has humanity solved its hardest problems? Diverse minds in a room, arguing until only the defensible ideas survive. Prism is that room — but the minds are AI specialists, and nobody gets to leave until the weak ideas are dead.
 
-## Skills
+## Commands
 
-| Skill | Command | Description |
-|-------|---------|-------------|
-| **analyze** | `/prism:analyze` | General-purpose multi-perspective analysis with MCP-based Socratic verification + ambiguity scoring |
-| **incident** | `/prism:incident` | Incident postmortem with 3-6 perspective agents + Devil's Advocate + optional Tribunal |
-| **prd** | `/prism:prd` | PRD policy conflict analysis against your reference docs |
-| **plan** | `/prism:plan` | Multi-perspective planning with committee debate + consensus enforcement |
+| Skill | Claude Code | Codex | Description |
+|-------|-------------|-------|-------------|
+| **analyze** | `/prism:analyze` | `psm analyze` | General-purpose multi-perspective analysis with MCP-based Socratic verification + ambiguity scoring |
+| **incident** | `/prism:incident` | `psm incident` | Incident postmortem with 3-6 perspective agents + Devil's Advocate + optional Tribunal |
+| **prd** | `/prism:prd` | `psm prd` | PRD policy conflict analysis against your reference docs |
+| **setup** | `/prism:setup` | `psm setup` | Runtime-aware setup plus brownfield default repository management |
 
 ## Prerequisites
 
-Before installing Prism, make sure you have:
+Before installing Prism, make sure you have one supported runtime installed:
 
-1. **Claude Code** installed and working
-2. **oh-my-claudecode** plugin installed (Prism uses its agent types for team members)
+1. **Claude Code** for `/prism:*` commands inside Claude Code
+2. **Codex CLI** for `psm *` commands inside Codex
+
+If you plan to use Prism in Claude Code, also install **oh-my-claudecode** because Prism uses its agent types for team members.
 
 ## Installation
 
-### Step 1: Install the plugin
+Prism keeps its active runtime in `~/.prism/config.yaml`, similar to Ouroboros. The shared setup entrypoint is:
+
+```bash
+bash scripts/setup.sh --runtime <claude|codex>
+```
+
+Use `--runtime codex` if you want global `psm` commands in Codex. Use `--runtime claude` if you want Claude Code as the active backend.
+
+### Codex Installation
+
+From the Prism repo:
+
+```bash
+bash scripts/setup.sh --runtime codex
+```
+
+Then make sure `~/.codex/bin` is on your `PATH`:
+
+```bash
+export PATH="$HOME/.codex/bin:$PATH"
+```
+
+Start a new Codex session and run:
+
+```text
+psm setup
+psm analyze
+psm brownfield
+```
+
+Quick verification:
+
+```bash
+which psm
+cat ~/.prism/config.yaml
+```
+
+Expected result:
+- `which psm` points to `~/.codex/bin/psm`
+- `~/.prism/config.yaml` contains `runtime.backend: codex`
+
+### Claude Code Installation
+
+#### Step 1: Install the plugin
 
 Inside Claude Code, register the Prism marketplace and install the plugin:
 
@@ -48,7 +93,7 @@ The plugin will be automatically enabled after installation. You can verify with
 claude plugin list
 ```
 
-### Step 2: Enable Agent Team Mode
+#### Step 2: Enable Agent Team Mode
 
 Prism uses multi-agent team features (TeamCreate, TaskList, SendMessage, etc.) which require Agent Team Mode to be enabled.
 
@@ -77,7 +122,7 @@ If you already have an `env` section with other keys, just add the new key insid
 
 > Without this setting, Prism skills will refuse to run and show a setup guide instead.
 
-### Step 3: Install oh-my-claudecode (agent pack)
+#### Step 3: Install oh-my-claudecode (agent pack)
 
 Prism does not have its own built-in agents. It currently uses [oh-my-claudecode](https://github.com/anthropics-community/oh-my-claudecode) as a general-purpose agent pack, which provides the specialized agent types needed for team analysis (`architect`, `architect-medium`, `analyst`, etc.). The `critic` role has been replaced by Prism's built-in `devils-advocate` agent. Install oh-my-claudecode if you haven't already:
 
@@ -93,17 +138,23 @@ claude plugin marketplace add Yeachan-Heo/oh-my-claudecode
 claude plugin install oh-my-claudecode@omc
 ```
 
-### Step 4: Run setup
+#### Step 4: Select the Claude runtime
 
-Prism includes a setup skill that automatically downloads the `prism` binary and registers it as a user-scope MCP server:
+From the Prism repo:
+
+```bash
+bash scripts/setup.sh --runtime claude
+```
+
+Then open Claude Code and run:
 
 ```
 /prism:setup
 ```
 
-This configures the MCP tools (`prism_interview`) used by the analyze skill's Socratic verification.
+This keeps `~/.prism/config.yaml` aligned with Claude Code and configures the MCP tools (`prism_interview`) used by the analyze skill's Socratic verification.
 
-### Step 5: Verify installation
+#### Step 5: Verify installation
 
 Restart Claude Code, then type:
 
@@ -112,6 +163,15 @@ Restart Claude Code, then type:
 ```
 
 If everything is configured correctly, the skill will start the incident intake process. If Agent Team Mode is not enabled, it will show you the setup instructions.
+
+Quick verification from the terminal:
+
+```bash
+cat ~/.prism/config.yaml
+```
+
+Expected result:
+- `~/.prism/config.yaml` contains `runtime.backend: claude`
 
 ## Full settings.json Example
 
@@ -131,12 +191,33 @@ After completing all installation steps, your `~/.claude/settings.json` should c
 
 ## Usage
 
-| Skill | Command | Workflow | Output |
-|-------|---------|---------|--------|
-| **analyze** | `/prism:analyze` | Intake → Seed Analysis → Perspective Generation → Parallel Analysts → Socratic Verification (per analyst) → Synthesis | Analysis report |
-| **incident** | `/prism:incident` | Intake → Seed Analysis → 3-6 Perspective Agents → Devil's Advocate → optional Tribunal → Report | Postmortem report |
-| **prd** | `/prism:prd path/to/prd.md` | Read PRD → 3-6 Policy Analysts → Devil's Advocate → Report | `prd-policy-review-report.md` |
-| **plan** | `/prism:plan path/to/prd.md` | Input Analysis → 3-6 Analysts → Devil's Advocate → Committee Debate (UX + Eng + Planner) → Consensus Loop → Plan | `plan.md` |
+### Codex
+
+```text
+psm setup
+psm brownfield
+psm analyze
+psm incident
+psm prd path/to/prd.md
+```
+
+### Claude Code
+
+```text
+/prism:setup
+/prism:analyze
+/prism:incident
+/prism:prd path/to/prd.md
+```
+
+### Shared workflow summary
+
+| Skill | Workflow | Output |
+|-------|---------|--------|
+| **analyze** | Intake → Seed Analysis → Perspective Generation → Parallel Analysts → Socratic Verification (per analyst) → Synthesis | Analysis report |
+| **incident** | Intake → Seed Analysis → 3-6 Perspective Agents → Devil's Advocate → optional Tribunal → Report | Postmortem report |
+| **prd** | Read PRD → 3-6 Policy Analysts → Devil's Advocate → Report | `prd-policy-review-report.md` |
+| **plan** | Input Analysis → 3-6 Analysts → Devil's Advocate → Committee Debate (UX + Eng + Planner) → Consensus Loop → Plan | `plan.md` |
 
 All skills share the same core pattern: **spawn multi-perspective agents → cross-validate → synthesize**. See [How It Works](#how-it-works) for detailed flow diagrams.
 

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 
 	"github.com/heechul/prism-mcp/internal/parallel"
@@ -28,6 +29,12 @@ type AnalysisConfig struct {
 	PerspectiveInjection string `json:"perspective_injection,omitempty"`
 }
 
+type ontologyScopeSource struct {
+	Type   string `json:"type"`
+	Path   string `json:"path,omitempty"`
+	Status string `json:"status"`
+}
+
 // ReadAnalysisConfig reads config.json from the task's state directory.
 func ReadAnalysisConfig(stateDir string) (AnalysisConfig, error) {
 	var cfg AnalysisConfig
@@ -39,6 +46,175 @@ func ReadAnalysisConfig(stateDir string) (AnalysisConfig, error) {
 		return cfg, fmt.Errorf("parse config.json: %w", err)
 	}
 	return cfg, nil
+}
+
+// ResolveAnalysisWorkDir picks a filesystem workspace root for tool-driven Codex
+// sessions. Seed analysis, specialists, and interview verification need Grep/Glob
+// to run against the actual target repositories, not the Prism state directory.
+func ResolveAnalysisWorkDir(cfg AnalysisConfig) string {
+	roots := ontologyScopePaths(cfg.OntologyScope)
+	if len(roots) == 0 {
+		if root := normalizeExistingDir(cfg.InputContext); root != "" {
+			return root
+		}
+		if root := normalizeExistingDir(cfg.StateDir); root != "" {
+			return root
+		}
+		return "."
+	}
+
+	if len(roots) == 1 {
+		return roots[0]
+	}
+
+	if common := longestExistingCommonAncestor(roots); common != "" {
+		return common
+	}
+
+	if root := normalizeExistingDir(cfg.StateDir); root != "" {
+		return root
+	}
+	return roots[0]
+}
+
+func ontologyScopePaths(raw string) []string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+
+	var scope struct {
+		Sources []ontologyScopeSource `json:"sources"`
+	}
+	if err := json.Unmarshal([]byte(raw), &scope); err != nil {
+		return nil
+	}
+
+	roots := make([]string, 0, len(scope.Sources))
+	seen := map[string]struct{}{}
+	for _, src := range scope.Sources {
+		if src.Status != "" && src.Status != "available" {
+			continue
+		}
+		switch src.Type {
+		case "doc", "file":
+		default:
+			continue
+		}
+
+		root := normalizeExistingDir(src.Path)
+		if root == "" {
+			continue
+		}
+		if _, ok := seen[root]; ok {
+			continue
+		}
+		seen[root] = struct{}{}
+		roots = append(roots, root)
+	}
+
+	return roots
+}
+
+func normalizeExistingDir(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return ""
+	}
+
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return ""
+	}
+	if eval, err := filepath.EvalSymlinks(abs); err == nil {
+		abs = eval
+	}
+
+	info, err := os.Stat(abs)
+	if err != nil {
+		return ""
+	}
+	if info.IsDir() {
+		return abs
+	}
+	return filepath.Dir(abs)
+}
+
+func longestExistingCommonAncestor(paths []string) string {
+	if len(paths) == 0 {
+		return ""
+	}
+	if len(paths) == 1 {
+		return normalizeExistingDir(paths[0])
+	}
+
+	parts := make([][]string, 0, len(paths))
+	for _, p := range paths {
+		root := normalizeExistingDir(p)
+		if root == "" {
+			return ""
+		}
+		parts = append(parts, splitPathComponents(root))
+	}
+
+	limit := len(parts[0])
+	for _, partSet := range parts[1:] {
+		if len(partSet) < limit {
+			limit = len(partSet)
+		}
+	}
+
+	common := make([]string, 0, limit)
+	for i := 0; i < limit; i++ {
+		candidate := parts[0][i]
+		match := true
+		for _, partSet := range parts[1:] {
+			if partSet[i] != candidate {
+				match = false
+				break
+			}
+		}
+		if !match {
+			break
+		}
+		common = append(common, candidate)
+	}
+
+	if len(common) == 0 {
+		return ""
+	}
+
+	var joined string
+	if filepath.IsAbs(paths[0]) {
+		if runtime.GOOS == "windows" && strings.HasSuffix(common[0], ":") {
+			joined = filepath.Join(common...)
+		} else {
+			joined = string(filepath.Separator) + filepath.Join(common...)
+		}
+	} else {
+		joined = filepath.Join(common...)
+	}
+
+	return normalizeExistingDir(joined)
+}
+
+func splitPathComponents(path string) []string {
+	clean := filepath.Clean(path)
+	vol := filepath.VolumeName(clean)
+	clean = strings.TrimPrefix(clean, vol)
+	clean = strings.TrimPrefix(clean, string(filepath.Separator))
+	if clean == "" {
+		if vol != "" {
+			return []string{vol}
+		}
+		return []string{}
+	}
+
+	parts := strings.Split(clean, string(filepath.Separator))
+	if vol != "" {
+		return append([]string{vol}, parts...)
+	}
+	return parts
 }
 
 // StageResult holds the outcome of a single parallel sub-task (specialist or interview).
@@ -61,33 +237,33 @@ const MaxDARounds = 1
 
 // DAReviewResult is the structured result returned by prism_da_review.
 type DAReviewResult struct {
-	Pass              bool     `json:"pass"`
-	GapCount          int      `json:"gap_count"`
-	BiasCount         int      `json:"bias_count"`
-	CoverageCount     int      `json:"coverage_count"`
-	Gaps              []DAGap  `json:"gaps"`
-	Round             int      `json:"round"`
-	MaxRounds         int      `json:"max_rounds"`
-	HardStop          bool     `json:"hard_stop"`
-	ParseWarning      string   `json:"parse_warning,omitempty"`
-	OverallConfidence string   `json:"overall_confidence"`
-	TopConcerns       string   `json:"top_concerns"`
-	WhatHoldsUp       string   `json:"what_holds_up"`
-	RawOutput         string   `json:"raw_output"`
+	Pass              bool    `json:"pass"`
+	GapCount          int     `json:"gap_count"`
+	BiasCount         int     `json:"bias_count"`
+	CoverageCount     int     `json:"coverage_count"`
+	Gaps              []DAGap `json:"gaps"`
+	Round             int     `json:"round"`
+	MaxRounds         int     `json:"max_rounds"`
+	HardStop          bool    `json:"hard_stop"`
+	ParseWarning      string  `json:"parse_warning,omitempty"`
+	OverallConfidence string  `json:"overall_confidence"`
+	TopConcerns       string  `json:"top_concerns"`
+	WhatHoldsUp       string  `json:"what_holds_up"`
+	RawOutput         string  `json:"raw_output"`
 }
 
 // DAReviewRound captures the result of a single DA review round for history tracking.
 type DAReviewRound struct {
-	Round             int      `json:"round"`
-	Pass              bool     `json:"pass"`
-	GapCount          int      `json:"gap_count"`
-	BiasCount         int      `json:"bias_count"`
-	CoverageCount     int      `json:"coverage_count"`
-	Gaps              []DAGap  `json:"gaps"`
-	OverallConfidence string   `json:"overall_confidence,omitempty"`
-	TopConcerns       string   `json:"top_concerns,omitempty"`
-	WhatHoldsUp       string   `json:"what_holds_up,omitempty"`
-	ParseWarning      string   `json:"parse_warning,omitempty"`
+	Round             int     `json:"round"`
+	Pass              bool    `json:"pass"`
+	GapCount          int     `json:"gap_count"`
+	BiasCount         int     `json:"bias_count"`
+	CoverageCount     int     `json:"coverage_count"`
+	Gaps              []DAGap `json:"gaps"`
+	OverallConfidence string  `json:"overall_confidence,omitempty"`
+	TopConcerns       string  `json:"top_concerns,omitempty"`
+	WhatHoldsUp       string  `json:"what_holds_up,omitempty"`
+	ParseWarning      string  `json:"parse_warning,omitempty"`
 }
 
 // DAReviewHistory stores the complete DA review history for a session.
@@ -141,7 +317,15 @@ func GetRepoRoot() string {
 	marker := filepath.Join("agents", "devils-advocate.md")
 	var tried []string
 
-	// First priority: PRISM_ROOT environment variable
+	// First priority: Codex install path override.
+	if root := os.Getenv("PRISM_REPO_PATH"); root != "" {
+		if _, err := os.Stat(filepath.Join(root, marker)); err == nil {
+			return root
+		}
+		tried = append(tried, "PRISM_REPO_PATH="+root)
+	}
+
+	// Second priority: legacy PRISM_ROOT environment variable.
 	if root := os.Getenv("PRISM_ROOT"); root != "" {
 		if _, err := os.Stat(filepath.Join(root, marker)); err == nil {
 			return root
@@ -179,8 +363,24 @@ func GetRepoRoot() string {
 		tried = append(tried, abs)
 	}
 
-	log.Printf("WARNING: could not locate %s. Tried paths: %v. Set PRISM_ROOT to override.", marker, tried)
+	log.Printf("WARNING: could not locate %s. Tried paths: %v. Set PRISM_REPO_PATH or PRISM_ROOT to override.", marker, tried)
 	return cwd
+}
+
+// ResolveRepoAssetPath resolves a repository-relative Prism asset path using the
+// same root detection logic as the rest of the pipeline.
+func ResolveRepoAssetPath(relativePath string) (string, error) {
+	root := GetRepoRoot()
+	if root == "" {
+		return "", fmt.Errorf("resolve repo root for asset %q", relativePath)
+	}
+
+	assetPath := filepath.Join(root, filepath.FromSlash(relativePath))
+	if _, err := os.Stat(assetPath); err != nil {
+		return "", fmt.Errorf("resolve repo asset %s: %w", assetPath, err)
+	}
+
+	return assetPath, nil
 }
 
 // ParseDAGaps extracts structured gaps from DA markdown output using regex.

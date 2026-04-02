@@ -66,6 +66,9 @@ type SpecialistContext struct {
 	// StateDir is the root state directory for this analysis.
 	StateDir string
 
+	// WorkDir is the filesystem root Codex should investigate with Grep/Glob/Bash.
+	WorkDir string
+
 	// SeedSummary is the research summary from seed-analysis.json,
 	// injected as CONTEXT in the analyst prompt.
 	SeedSummary string
@@ -181,6 +184,7 @@ func LoadSpecialistContext(cfg AnalysisConfig) (SpecialistContext, error) {
 		ContextID: cfg.ContextID,
 		Model:     cfg.Model,
 		StateDir:  cfg.StateDir,
+		WorkDir:   ResolveAnalysisWorkDir(cfg),
 	}
 
 	// Read seed analysis summary for CONTEXT injection
@@ -338,7 +342,6 @@ func LoadOntologyScopeText(stateDir string) string {
 //   - sctx: shared specialist context (built once via LoadSpecialistContext)
 //   - perspective: the specific perspective to build a command for
 func BuildSpecialistCommand(sctx SpecialistContext, perspective Perspective) SpecialistCommand {
-	perspDir := PerspectiveDir(sctx.StateDir, perspective.ID)
 	findingsPath := FindingsPath(sctx.StateDir, perspective.ID)
 
 	systemPrompt := buildSpecialistSystemPrompt(sctx, perspective)
@@ -355,7 +358,7 @@ func BuildSpecialistCommand(sctx SpecialistContext, perspective Perspective) Spe
 		SystemPrompt:  systemPrompt,
 		UserPrompt:    userPrompt,
 		Model:         sctx.Model,
-		WorkDir:       perspDir,
+		WorkDir:       sctx.WorkDir,
 		OutputPath:    findingsPath,
 		MaxTurns:      10,
 		JSONSchema:    SpecialistFindingsSchema(),

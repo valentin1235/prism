@@ -78,6 +78,33 @@ func TestHandlerScanFormat(t *testing.T) {
 	}
 }
 
+func TestHandlerScanNoReposFound(t *testing.T) {
+	newTestHandlerStore(t)
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	emptyDir := filepath.Join(home, "prism", ".tmp-handler-test-empty")
+	if err := os.MkdirAll(emptyDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(emptyDir) })
+	req := makeRequest(map[string]any{
+		"action":    "scan",
+		"scan_root": emptyDir,
+	})
+	result, err := HandleBrownfield(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	text := extractText(result)
+	if text != "No GitHub repositories found in your home directory." {
+		t.Fatalf("expected no-repos message, got: %q", text)
+	}
+}
+
 func TestHandlerScanNoDefaults(t *testing.T) {
 	newTestHandlerStore(t)
 
@@ -130,8 +157,14 @@ func TestHandlerSetDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := extractText(result)
-	if !strings.Contains(text, "set_defaults") {
-		t.Errorf("expected 'set_defaults' in result, got: %s", text)
+	if !strings.Contains(text, "Brownfield defaults updated!") {
+		t.Errorf("expected confirmation header, got: %s", text)
+	}
+	if !strings.Contains(text, "Defaults: a, b") {
+		t.Errorf("expected updated default names, got: %s", text)
+	}
+	if !strings.Contains(text, "These repos will be used as context in interviews.") {
+		t.Errorf("expected usage note, got: %s", text)
 	}
 
 	defaults, _, _ := s.List(0, 0, true)
@@ -152,7 +185,10 @@ func TestHandlerSetDefaultsEmpty(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := extractText(result)
-	if !strings.Contains(text, "All defaults cleared") {
+	if !strings.Contains(text, "No default repos set. Interviews will run in greenfield mode.") {
+		t.Errorf("expected greenfield mode message, got: %s", text)
+	}
+	if !strings.Contains(text, "You can set defaults anytime with: /prism:brownfield") {
 		t.Errorf("expected defaults cleared message, got: %s", text)
 	}
 }
@@ -169,7 +205,10 @@ func TestHandlerSetDefaultsEmptyString(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := extractText(result)
-	if !strings.Contains(text, "All defaults cleared") {
+	if !strings.Contains(text, "No default repos set. Interviews will run in greenfield mode.") {
+		t.Errorf("expected greenfield mode message, got: %s", text)
+	}
+	if !strings.Contains(text, "You can set defaults anytime with: /prism:brownfield") {
 		t.Errorf("expected defaults cleared message, got: %s", text)
 	}
 }

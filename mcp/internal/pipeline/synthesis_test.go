@@ -246,6 +246,44 @@ func TestBuildSynthesisUserPrompt(t *testing.T) {
 	}
 }
 
+func TestLoadReportTemplateUsesResolvedRepoAsset(t *testing.T) {
+	t.Setenv("PRISM_REPO_PATH", filepath.Clean(filepath.Join("..", "..")))
+
+	got, err := loadReportTemplate(AnalysisConfig{})
+	if err != nil {
+		t.Fatalf("load default report template: %v", err)
+	}
+
+	wantPath := filepath.Clean(filepath.Join("..", "..", "skills", "analyze", "templates", "report.md"))
+	wantBytes, err := os.ReadFile(wantPath)
+	if err != nil {
+		t.Fatalf("read expected template: %v", err)
+	}
+
+	if got != string(wantBytes) {
+		t.Fatalf("default template mismatch")
+	}
+}
+
+func TestResolveRepoAssetPathPrefersCodexRepoOverride(t *testing.T) {
+	repoRoot, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatalf("abs repo root: %v", err)
+	}
+	t.Setenv("PRISM_REPO_PATH", repoRoot)
+	t.Setenv("PRISM_ROOT", t.TempDir())
+
+	got, err := ResolveRepoAssetPath("skills/analyze/templates/report.md")
+	if err != nil {
+		t.Fatalf("resolve repo asset: %v", err)
+	}
+
+	want := filepath.Join(repoRoot, "skills", "analyze", "templates", "report.md")
+	if got != want {
+		t.Fatalf("resolved asset = %q, want %q", got, want)
+	}
+}
+
 func TestValidateReportSections(t *testing.T) {
 	t.Run("all sections present", func(t *testing.T) {
 		report := `# Analysis Report

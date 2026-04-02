@@ -8,6 +8,17 @@ import (
 	"strings"
 )
 
+var analysisFilesystemTools = []string{"Glob", "Grep", "Read", "Bash"}
+
+var nonFilesystemToolRoutes = []string{
+	"MCP",
+	"ToolSearch",
+	"WebFetch",
+	"Browser",
+	"Write",
+	"Edit",
+}
+
 // FilterEnv returns os.Environ() with the specified keys removed.
 func FilterEnv(keys ...string) []string {
 	env := os.Environ()
@@ -34,7 +45,8 @@ func FilterEnv(keys ...string) []string {
 // QueryLLM calls the claude CLI as a subprocess.
 func QueryLLM(ctx context.Context, prompt string) (string, error) {
 	return QuerySync(ctx, prompt, ClaudeOptions{
-		MaxTurns: 1,
+		AllowedTools: []string{},
+		MaxTurns:     1,
 	})
 }
 
@@ -42,6 +54,7 @@ func QueryLLM(ctx context.Context, prompt string) (string, error) {
 func QueryLLMWithSystemPrompt(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
 	return QuerySync(ctx, userPrompt, ClaudeOptions{
 		SystemPrompt: systemPrompt,
+		AllowedTools: []string{},
 		MaxTurns:     1,
 	})
 }
@@ -49,9 +62,10 @@ func QueryLLMWithSystemPrompt(ctx context.Context, systemPrompt, userPrompt stri
 // QueryLLMScoped calls the claude CLI with task-scoped isolation.
 func QueryLLMScoped(ctx context.Context, stateDir, model, prompt string) (string, error) {
 	return QuerySync(ctx, prompt, ClaudeOptions{
-		Model:    model,
-		Cwd:      stateDir,
-		MaxTurns: 1,
+		Model:        model,
+		Cwd:          stateDir,
+		AllowedTools: []string{},
+		MaxTurns:     1,
 	})
 }
 
@@ -62,6 +76,7 @@ func QueryLLMScopedWithSystemPrompt(ctx context.Context, stateDir, model, system
 		Model:        model,
 		SystemPrompt: systemPrompt,
 		Cwd:          stateDir,
+		AllowedTools: []string{},
 		MaxTurns:     1,
 	})
 }
@@ -70,23 +85,31 @@ func QueryLLMScopedWithSystemPrompt(ctx context.Context, stateDir, model, system
 // output. Single-turn, no tool access.
 func QueryLLMScopedWithSchema(ctx context.Context, stateDir, model, jsonSchema, prompt string) (string, error) {
 	return QuerySync(ctx, prompt, ClaudeOptions{
-		Model:      model,
-		JSONSchema: jsonSchema,
-		Cwd:        stateDir,
-		MaxTurns:   1,
+		Model:        model,
+		JSONSchema:   jsonSchema,
+		Cwd:          stateDir,
+		AllowedTools: []string{},
+		MaxTurns:     1,
 	})
 }
 
-// QueryLLMScopedWithToolsAndSchema calls the claude CLI with tool access and
-// --json-schema for structured output. Multi-turn mode — timeout controls duration.
-func QueryLLMScopedWithToolsAndSchema(ctx context.Context, stateDir, model, jsonSchema, systemPrompt, userPrompt string, _ int) (string, error) {
+// QueryLLMScopedWithToolsAndSchema calls the Codex CLI with tool access and
+// --json-schema for structured output. Multi-turn mode — timeout controls duration,
+// while maxTurns is still surfaced as an execution-budget hint in the prompt.
+func QueryLLMScopedWithToolsAndSchema(ctx context.Context, stateDir, model, jsonSchema, systemPrompt, userPrompt string, maxTurns int) (string, error) {
+	if maxTurns <= 0 {
+		maxTurns = 8
+	}
+
 	return QuerySync(ctx, userPrompt, ClaudeOptions{
-		Model:          model,
-		SystemPrompt:   systemPrompt,
-		JSONSchema:     jsonSchema,
-		PermissionMode: "bypassPermissions",
-		Cwd:            stateDir,
-		// No MaxTurns — context timeout is the safety net
+		Model:           model,
+		SystemPrompt:    systemPrompt,
+		JSONSchema:      jsonSchema,
+		PermissionMode:  "bypassPermissions",
+		AllowedTools:    analysisFilesystemTools,
+		DisallowedTools: nonFilesystemToolRoutes,
+		Cwd:             stateDir,
+		MaxTurns:        maxTurns,
 	})
 }
 

@@ -141,6 +141,14 @@ After post-processor agent completes, verify report file exists:
 ~/.prism/state/prd-{short-id}/prd-policy-review-report.md
 ```
 
+Require the post-processor handoff result to return this exact path:
+
+```
+~/.prism/state/prd-{short-id}/prd-policy-review-report.md
+```
+
+Return the report file path: `{PRD_STATE_DIR}/prd-policy-review-report.md`
+
 If missing → ERROR: "Post-processor agent failed to generate report."
 
 ### Phase 2 Exit Gate

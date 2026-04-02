@@ -129,15 +129,14 @@ func loadReportTemplate(cfg AnalysisConfig) (string, error) {
 	}
 
 	// Fall back to default template
-	home, err := os.UserHomeDir()
+	defaultPath, err := ResolveRepoAssetPath("skills/analyze/templates/report.md")
 	if err != nil {
-		return "", fmt.Errorf("resolve home dir: %w", err)
+		return "", fmt.Errorf("resolve default report template: %w", err)
 	}
 
-	defaultPath := filepath.Join(home, "prism", "skills", "analyze", "templates", "report.md")
 	data, err := os.ReadFile(defaultPath)
 	if err != nil {
-		return "", fmt.Errorf("read default report template: %w", err)
+		return "", fmt.Errorf("read default report template %s: %w", defaultPath, err)
 	}
 
 	return string(data), nil

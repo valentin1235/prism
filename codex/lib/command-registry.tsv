@@ -1,0 +1,6 @@
+# command	skill_dir	installed_skill_id
+analyze	analyze	prism-analyze
+brownfield	brownfield	prism-brownfield
+incident	incident	prism-incident
+prd	prd	prism-prd
+setup	setup	prism-setup

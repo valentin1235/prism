@@ -1,0 +1,22 @@
+{
+  "name": "prism",
+  "version": "2.14.0",
+  "description": "Multi-perspective agent team analysis for Codex using Prism skills and MCP workflows.",
+  "author": {
+    "name": "cohemm",
+    "email": "valentin930316@gmail.com"
+  },
+  "skills": "./skills/",
+  "mcpServers": "./.claude-plugin/.mcp.json",
+  "interface": {
+    "displayName": "Prism",
+    "shortDescription": "Multi-perspective analysis workflows for Codex",
+    "longDescription": "Run Prism analysis workflows in Codex while reusing the same skills, prompts, templates, and MCP server configuration shipped for Claude Code.",
+    "developerName": "cohemm",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ]
+  }
+}

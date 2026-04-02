@@ -14,6 +14,7 @@ func TestBuildInterviewCommand_BasicFields(t *testing.T) {
 		ContextID:         "analyze-abc123",
 		Model:             "claude-sonnet-4-6",
 		StateDir:          "/tmp/test-state",
+		WorkDir:           "/tmp/workspace-root",
 		SeedSummary:       "Worker pool has potential goroutine leak under high load.",
 		OntologyScopeText: "- doc: worker pool implementation",
 	}
@@ -63,8 +64,8 @@ func TestBuildInterviewCommand_BasicFields(t *testing.T) {
 	if cmd.MaxTurns != 10 {
 		t.Errorf("MaxTurns = %d, want 10", cmd.MaxTurns)
 	}
-	if cmd.WorkDir != "/tmp/test-state/perspectives/concurrency-analysis" {
-		t.Errorf("WorkDir = %q, want perspectives dir", cmd.WorkDir)
+	if cmd.WorkDir != "/tmp/workspace-root" {
+		t.Errorf("WorkDir = %q, want analysis work dir", cmd.WorkDir)
 	}
 	if !strings.HasSuffix(cmd.OutputPath, "verified-findings.json") {
 		t.Errorf("OutputPath = %q, should end with verified-findings.json", cmd.OutputPath)
@@ -80,6 +81,7 @@ func TestBuildInterviewCommand_SystemPromptContainsFindings(t *testing.T) {
 		ContextID:   "analyze-def456",
 		Model:       "claude-sonnet-4-6",
 		StateDir:    "/tmp/test-state",
+		WorkDir:     "/tmp/workspace-root",
 		SeedSummary: "Error handling patterns vary across modules.",
 	}
 
@@ -421,7 +423,7 @@ func TestBuildAllInterviewCommands_SkipsFailedSpecialists(t *testing.T) {
 	}
 
 	results := []StageResult{
-		{PerspectiveID: "persp-1", Err: nil},                              // succeeded
+		{PerspectiveID: "persp-1", Err: nil},            // succeeded
 		{PerspectiveID: "persp-2", Err: os.ErrNotExist}, // failed
 	}
 

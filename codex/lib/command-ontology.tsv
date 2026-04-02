@@ -1,0 +1,8 @@
+# command	installed_skill_id	milestone_status	registration_status
+analyze	prism-analyze	acceptance-bearing	registered
+brownfield	prism-brownfield	acceptance-bearing	registered
+incident	prism-incident	acceptance-bearing	registered
+prd	prism-prd	acceptance-bearing	registered
+setup	prism-setup	acceptance-bearing	registered
+analyze-workspace	prism-analyze-workspace	non-acceptance-bearing	unregistered
+test-analyze	prism-test-analyze	non-acceptance-bearing	unregistered

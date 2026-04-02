@@ -54,7 +54,7 @@ func main() {
 		mcp.NewTool("prism_analyze",
 			mcp.WithDescription("Start a new multi-perspective analysis. Launches a 4-stage pipeline (Scope → Specialists → Interview → Synthesis) as a background task. Returns immediately with a task_id for status polling via prism_task_status."),
 			mcp.WithString("topic", mcp.Required(), mcp.Description("What to analyze — the central question or subject")),
-			mcp.WithString("model", mcp.Description("Claude model to use for all stages. Default: claude-sonnet-4-6")),
+			mcp.WithString("model", mcp.Description("Optional model override for all stages. Use Codex/OpenAI model IDs if needed. Default: runtime default model")),
 			mcp.WithString("input_context", mcp.Description("Absolute path to input file providing additional context for the analysis")),
 			mcp.WithString("ontology_scope", mcp.Description("JSON string of ontology scope in canonical {\"sources\": [...]} format (pre-resolved by caller). Written to state dir as ontology-scope.json.")),
 			mcp.WithString("seed_hints", mcp.Description("Additional guidance for the seed analyst stage")),

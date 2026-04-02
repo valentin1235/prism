@@ -57,6 +57,12 @@ func RunAnalysisPipeline(task *taskpkg.AnalysisTask) {
 		log.Printf("[%s] Stage scope: FAILED — %v", task.ID, err)
 		return
 	}
+	if err := writeLegacyContextArtifact(task.GetStateDir(), cfg); err != nil {
+		task.FailStage(taskpkg.StageScope, fmt.Sprintf("context artifact failed: %v", err))
+		task.SetError(fmt.Sprintf("scope compatibility artifacts failed: %v", err))
+		log.Printf("[%s] Stage scope: FAILED writing context artifact — %v", task.ID, err)
+		return
+	}
 
 	task.CompleteStage(taskpkg.StageScope, fmt.Sprintf("%d perspectives generated", len(perspectives)))
 	log.Printf("[%s] Stage scope: completed with %d perspectives", task.ID, len(perspectives))
@@ -120,6 +126,12 @@ func RunAnalysisPipeline(task *taskpkg.AnalysisTask) {
 		log.Printf("[%s] Warning: failed to persist collected verifications: %v", task.ID, err)
 		// Non-fatal — downstream stages can still use in-memory results
 	}
+	if err := writeLegacyVerificationArtifacts(interviewStateDir, perspectives, collectedVerifications); err != nil {
+		task.FailStage(taskpkg.StageInterview, fmt.Sprintf("legacy verification artifacts failed: %v", err))
+		task.SetError(fmt.Sprintf("interview compatibility artifacts failed: %v", err))
+		log.Printf("[%s] Stage interview: FAILED writing compatibility artifacts — %v", task.ID, err)
+		return
+	}
 
 	// All interviews failed -> still proceed with unverified findings (degraded)
 	intDetail := fmt.Sprintf("%d/%d verified", collectedVerifications.Succeeded, interviewCount)
@@ -149,6 +161,12 @@ func RunAnalysisPipeline(task *taskpkg.AnalysisTask) {
 		return
 	}
 
+	if err := writeLegacyStateReportCopy(task.GetStateDir(), reportPath); err != nil {
+		task.FailStage(taskpkg.StageSynthesis, fmt.Sprintf("state report copy failed: %v", err))
+		task.SetError(fmt.Sprintf("synthesis compatibility artifacts failed: %v", err))
+		log.Printf("[%s] Stage synthesis: FAILED writing state report copy — %v", task.ID, err)
+		return
+	}
 	task.CompleteStage(taskpkg.StageSynthesis, fmt.Sprintf("report at %s", reportPath))
 	task.SetReportPath(reportPath)
 	log.Printf("[%s] Pipeline completed — report: %s", task.ID, reportPath)
@@ -251,7 +269,7 @@ func runSpecialistStage(task *taskpkg.AnalysisTask, cfg AnalysisConfig, perspect
 	executor := &parallel.ParallelExecutor{
 		Concurrency: parallel.DefaultConcurrencyLimit,
 		// RetryLimit uses default (5, matching Python _MAX_RETRIES)
-		JobTimeout:  parallel.DefaultJobTimeout,
+		JobTimeout: parallel.DefaultJobTimeout,
 		OnJobComplete: func(perspectiveID string, success bool, attempts int) {
 			if success {
 				task.IncrStageCompleted(taskpkg.StageSpecialist)
@@ -307,7 +325,7 @@ func runInterviewStage(task *taskpkg.AnalysisTask, cfg AnalysisConfig, perspecti
 	executor := &parallel.ParallelExecutor{
 		Concurrency: parallel.DefaultConcurrencyLimit,
 		// RetryLimit uses default (5, matching Python _MAX_RETRIES)
-		JobTimeout:  parallel.DefaultJobTimeout,
+		JobTimeout: parallel.DefaultJobTimeout,
 		OnJobComplete: func(perspectiveID string, success bool, attempts int) {
 			if success {
 				task.IncrStageCompleted(taskpkg.StageInterview)

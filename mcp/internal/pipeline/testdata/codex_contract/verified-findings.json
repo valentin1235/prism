@@ -1,0 +1,28 @@
+{
+  "analyst": "security-analysis",
+  "topic": "Analyze checkout reliability",
+  "verdict": "pass_with_caveats",
+  "score": {
+    "assumption": 0.9,
+    "relevance": 0.95,
+    "constraints": 0.75,
+    "weighted_total": 0.89
+  },
+  "findings": [
+    {
+      "finding": "Checkout retries can duplicate settlement attempts",
+      "evidence": "payments/checkout.go:88 - retry loop reuses the same settlement token",
+      "severity": "HIGH",
+      "status": "confirmed",
+      "verification": "Confirmed by tracing the retry path and matching settlement token reuse."
+    },
+    {
+      "finding": "Background reconciliation omits idempotency guardrails",
+      "evidence": "payments/reconcile.go:144 - replay path skips duplicate detection",
+      "severity": "CRITICAL",
+      "status": "revised",
+      "verification": "Replay risk is real, but the blast radius is limited to reconciliation jobs."
+    }
+  ],
+  "summary": "The core duplication risk holds, but reconciliation impact is narrower than the specialist draft claimed."
+}

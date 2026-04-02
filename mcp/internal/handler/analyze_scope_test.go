@@ -330,3 +330,48 @@ func TestBuildOntologyScopeFromPaths(t *testing.T) {
 		}
 	}
 }
+
+func TestHandleAnalyze_DefaultModelUsesRuntimeDefaultAlias(t *testing.T) {
+	dir := setupTestBrownfieldDB(t, []brownfield.Repo{
+		{Path: t.TempDir(), Name: "repo"},
+	}, []string{})
+
+	origBase := PrismBaseDir
+	PrismBaseDir = dir
+	defer func() { PrismBaseDir = origBase }()
+
+	TaskStore = taskpkg.NewTaskStore()
+
+	explicitScope := `{"sources":[{"id":1,"type":"doc","path":"` + t.TempDir() + `","domain":"explicit","summary":"Explicit scope","status":"available","access":{"tools":["Read"],"instructions":"Use Read"}}],"totals":{"doc":1}}`
+
+	result, err := HandleAnalyze(context.Background(), makeAnalyzeRequest(map[string]interface{}{
+		"topic":          "test default model alias",
+		"ontology_scope": explicitScope,
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("unexpected error result: %s", result.Content[0].(mcp.TextContent).Text)
+	}
+
+	var snap taskpkg.TaskSnapshot
+	if err := json.Unmarshal([]byte(result.Content[0].(mcp.TextContent).Text), &snap); err != nil {
+		t.Fatalf("parse response: %v", err)
+	}
+
+	stateDir := filepath.Join(dir, "state", snap.ID)
+	configData, err := os.ReadFile(filepath.Join(stateDir, "config.json"))
+	if err != nil {
+		t.Fatalf("read config.json: %v", err)
+	}
+
+	var cfg map[string]any
+	if err := json.Unmarshal(configData, &cfg); err != nil {
+		t.Fatalf("parse config.json: %v", err)
+	}
+
+	if got, _ := cfg["model"].(string); got != "default" {
+		t.Fatalf("config model = %q, want %q", got, "default")
+	}
+}

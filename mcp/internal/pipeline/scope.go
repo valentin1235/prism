@@ -365,13 +365,13 @@ func BuildOntologyScopeFromPaths(paths []string) (string, error) {
 		Instructions string   `json:"instructions"`
 	}
 	type source struct {
-		ID       int        `json:"id"`
-		Type     string     `json:"type"`
-		Path     string     `json:"path"`
-		Domain   string     `json:"domain"`
-		Summary  string     `json:"summary"`
-		Status   string     `json:"status"`
-		Access   accessInfo `json:"access"`
+		ID      int        `json:"id"`
+		Type    string     `json:"type"`
+		Path    string     `json:"path"`
+		Domain  string     `json:"domain"`
+		Summary string     `json:"summary"`
+		Status  string     `json:"status"`
+		Access  accessInfo `json:"access"`
 	}
 	type totals struct {
 		Doc int `json:"doc"`
@@ -464,6 +464,7 @@ func PerspectivesPath(stateDir string) string {
 // separately by RunDAReviewLoop after this step completes.
 func RunSeedAnalysis(task *taskpkg.AnalysisTask, cfg AnalysisConfig) error {
 	stateDir := task.GetStateDir()
+	workDir := ResolveAnalysisWorkDir(cfg)
 
 	// Build the seed analyst system prompt
 	systemPrompt := BuildSeedAnalystPrompt(
@@ -486,12 +487,12 @@ func RunSeedAnalysis(task *taskpkg.AnalysisTask, cfg AnalysisConfig) error {
 
 	rawOutput, err := engine.QueryLLMScopedWithToolsAndSchema(
 		ctx,
-		stateDir,
+		workDir,
 		cfg.Model,
 		SeedAnalysisSchema(),
 		systemPrompt,
 		userPrompt,
-		0, // unused — timeout controls duration
+		8,
 	)
 	if err != nil {
 		return fmt.Errorf("seed analysis subprocess: %w", err)
@@ -644,6 +645,7 @@ func RunDAReviewLoop(task *taskpkg.AnalysisTask, cfg AnalysisConfig) error {
 // the existing seed-analysis.json using MergeSeedAnalysis.
 func runSupplementaryResearch(task *taskpkg.AnalysisTask, cfg AnalysisConfig, gaps []DAGap) error {
 	stateDir := task.GetStateDir()
+	workDir := ResolveAnalysisWorkDir(cfg)
 
 	// Build focused re-research system prompt
 	var sb strings.Builder
@@ -663,7 +665,7 @@ func runSupplementaryResearch(task *taskpkg.AnalysisTask, cfg AnalysisConfig, ga
 
 	rawOutput, err := engine.QueryLLMScopedWithToolsAndSchema(
 		ctx,
-		stateDir,
+		workDir,
 		cfg.Model,
 		SeedAnalysisSchema(),
 		sb.String(),

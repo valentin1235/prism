@@ -106,6 +106,10 @@ func handleScan(ctx context.Context, args map[string]interface{}) (*mcp.CallTool
 		return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
 	}
 
+	if len(repos) == 0 {
+		return mcp.NewToolResultText("No GitHub repositories found in your home directory."), nil
+	}
+
 	_, bulkErr := store.BulkRegister(repos)
 
 	// Fetch all repos with defaults to build formatted list (matches ouroboros format)
@@ -275,18 +279,20 @@ func handleSetDefaults(args map[string]interface{}) (*mcp.CallToolResult, error)
 	}
 
 	if len(ids) == 0 {
-		return mcp.NewToolResultText("All defaults cleared."), nil
+		return mcp.NewToolResultText("No default repos set. Interviews will run in greenfield mode.\nYou can set defaults anytime with: /prism:brownfield"), nil
 	}
 
 	// Return updated defaults
 	defaults, _, _ := store.List(0, 0, true)
-
-	result := map[string]interface{}{
-		"action":   "set_defaults",
-		"indices":  ids,
-		"defaults": defaults,
+	var names []string
+	for _, repo := range defaults {
+		names = append(names, repo.Name)
 	}
-	return jsonResult(result)
+
+	return mcp.NewToolResultText(fmt.Sprintf(
+		"Brownfield defaults updated!\nDefaults: %s\n\nThese repos will be used as context in interviews.",
+		strings.Join(names, ", "),
+	)), nil
 }
 
 func handleGenerateDesc(ctx context.Context, args map[string]interface{}) (*mcp.CallToolResult, error) {

@@ -1,0 +1,16 @@
+{
+  "analyst": "security-analysis",
+  "input": "Analyze checkout reliability",
+  "findings": [
+    {
+      "finding": "Checkout retries can duplicate settlement attempts",
+      "evidence": "payments/checkout.go:88 - retry loop reuses the same settlement token",
+      "severity": "HIGH"
+    },
+    {
+      "finding": "Background reconciliation omits idempotency guardrails",
+      "evidence": "payments/reconcile.go:144 - replay path skips duplicate detection",
+      "severity": "CRITICAL"
+    }
+  ]
+}

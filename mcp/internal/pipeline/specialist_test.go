@@ -14,6 +14,7 @@ func TestBuildSpecialistCommand_BasicStructure(t *testing.T) {
 		ContextID:         "analyze-abc123def456",
 		Model:             "claude-sonnet-4-6",
 		StateDir:          "/tmp/test-state",
+		WorkDir:           "/tmp/workspace-root",
 		SeedSummary:       "Payment processing spans 3 modules with 12 findings.",
 		OntologyScopeText: "Your reference documents:\n- doc: Payment API docs",
 	}
@@ -31,7 +32,7 @@ func TestBuildSpecialistCommand_BasicStructure(t *testing.T) {
 			Role:               "You are the SECURITY ANALYST.",
 			InvestigationScope: "Focus on authentication, authorization, and input validation in the payment processing pipeline.",
 			Tasks:              "1. Identify all authentication entry points\n2. Check token validation logic\n3. Review input sanitization patterns",
-			OutputFormat:        "## Findings\n| Finding | Evidence | Severity |\n|---------|----------|----------|\n| ... | file:func:line | HIGH/MED/LOW |",
+			OutputFormat:       "## Findings\n| Finding | Evidence | Severity |\n|---------|----------|----------|\n| ... | file:func:line | HIGH/MED/LOW |",
 		},
 		Rationale: "Seed analysis found 3 payment modules with no apparent auth validation.",
 	}
@@ -49,7 +50,7 @@ func TestBuildSpecialistCommand_BasicStructure(t *testing.T) {
 	}
 
 	// Check working directory
-	expectedWorkDir := filepath.Join("/tmp/test-state", "perspectives", "security-analysis")
+	expectedWorkDir := "/tmp/workspace-root"
 	if cmd.WorkDir != expectedWorkDir {
 		t.Errorf("WorkDir = %q, want %q", cmd.WorkDir, expectedWorkDir)
 	}
@@ -90,6 +91,7 @@ func TestBuildSpecialistSystemPrompt_FollowsAnalystPromptStructure(t *testing.T)
 		ContextID:         "analyze-test123",
 		Model:             "claude-sonnet-4-6",
 		StateDir:          "/tmp/test-state",
+		WorkDir:           "/tmp/workspace-root",
 		SeedSummary:       "API rate limiting implemented across 5 services.",
 		OntologyScopeText: "Your reference documents:\n- doc: API Gateway docs",
 	}
@@ -106,7 +108,7 @@ func TestBuildSpecialistSystemPrompt_FollowsAnalystPromptStructure(t *testing.T)
 			Role:               "You are the RATE LIMIT ANALYST.",
 			InvestigationScope: "Focus on rate limiting configuration, enforcement, and bypass vectors.",
 			Tasks:              "1. Map rate limit configurations\n2. Test enforcement boundaries\n3. Check for bypass vectors",
-			OutputFormat:        "## Rate Limit Findings\n| Finding | Evidence | Severity |\n...",
+			OutputFormat:       "## Rate Limit Findings\n| Finding | Evidence | Severity |\n...",
 		},
 		Rationale: "Seed found inconsistent rate limit configs.",
 	}
@@ -171,7 +173,7 @@ func TestBuildSpecialistSystemPrompt_KeyQuestionsInProtocol(t *testing.T) {
 			Role:               "You are the TEST ANALYST.",
 			InvestigationScope: "Test scope",
 			Tasks:              "1. Test",
-			OutputFormat:        "## Test",
+			OutputFormat:       "## Test",
 		},
 	}
 
@@ -195,15 +197,15 @@ func TestBuildSpecialistSystemPrompt_NoTeamCoordination(t *testing.T) {
 	}
 
 	perspective := Perspective{
-		ID:    "test-persp",
-		Name:  "Test",
-		Scope: "Test scope",
+		ID:           "test-persp",
+		Name:         "Test",
+		Scope:        "Test scope",
 		KeyQuestions: []string{"Q1?", "Q2?"},
 		Prompt: AnalystPrompt{
 			Role:               "You are the TEST ANALYST.",
 			InvestigationScope: "Test scope",
 			Tasks:              "1. Test",
-			OutputFormat:        "## Test",
+			OutputFormat:       "## Test",
 		},
 	}
 
@@ -235,15 +237,15 @@ func TestBuildSpecialistSystemPrompt_NoSelfVerification(t *testing.T) {
 	}
 
 	perspective := Perspective{
-		ID:    "test-persp",
-		Name:  "Test",
-		Scope: "Test scope",
+		ID:           "test-persp",
+		Name:         "Test",
+		Scope:        "Test scope",
 		KeyQuestions: []string{"Q1?", "Q2?"},
 		Prompt: AnalystPrompt{
 			Role:               "You are the TEST ANALYST.",
 			InvestigationScope: "Test scope",
 			Tasks:              "1. Test",
-			OutputFormat:        "## Test",
+			OutputFormat:       "## Test",
 		},
 	}
 
@@ -265,15 +267,15 @@ func TestBuildSpecialistSystemPrompt_DataSourceConstraint(t *testing.T) {
 	}
 
 	perspective := Perspective{
-		ID:    "test-persp",
-		Name:  "Test",
-		Scope: "Test scope",
+		ID:           "test-persp",
+		Name:         "Test",
+		Scope:        "Test scope",
 		KeyQuestions: []string{"Q1?", "Q2?"},
 		Prompt: AnalystPrompt{
 			Role:               "You are the TEST ANALYST.",
 			InvestigationScope: "Test scope",
 			Tasks:              "1. Test",
-			OutputFormat:        "## Test",
+			OutputFormat:       "## Test",
 		},
 	}
 
@@ -299,15 +301,15 @@ func TestBuildSpecialistSystemPrompt_NoOntologyScope(t *testing.T) {
 	}
 
 	perspective := Perspective{
-		ID:    "test-persp",
-		Name:  "Test",
-		Scope: "Test scope",
+		ID:           "test-persp",
+		Name:         "Test",
+		Scope:        "Test scope",
 		KeyQuestions: []string{"Q1?", "Q2?"},
 		Prompt: AnalystPrompt{
 			Role:               "You are the TEST ANALYST.",
 			InvestigationScope: "Test scope",
 			Tasks:              "1. Test",
-			OutputFormat:        "## Test",
+			OutputFormat:       "## Test",
 		},
 	}
 
@@ -352,7 +354,7 @@ func TestBuildAllSpecialistCommands(t *testing.T) {
 				Role:               "You are the AUTH ANALYST.",
 				InvestigationScope: "Focus on auth flows",
 				Tasks:              "1. Map auth entry points",
-				OutputFormat:        "## Auth Findings\n...",
+				OutputFormat:       "## Auth Findings\n...",
 			},
 		},
 		{
@@ -364,7 +366,7 @@ func TestBuildAllSpecialistCommands(t *testing.T) {
 				Role:               "You are the PERFORMANCE ANALYST.",
 				InvestigationScope: "Focus on query performance",
 				Tasks:              "1. Profile slow queries",
-				OutputFormat:        "## Perf Findings\n...",
+				OutputFormat:       "## Perf Findings\n...",
 			},
 		},
 	}
@@ -424,7 +426,7 @@ func TestBuildAllSpecialistCommands_MissingSeedAnalysis(t *testing.T) {
 				Role:               "You are the TEST ANALYST.",
 				InvestigationScope: "Test",
 				Tasks:              "1. Test",
-				OutputFormat:        "## Test",
+				OutputFormat:       "## Test",
 			},
 		},
 	}
@@ -671,7 +673,7 @@ func TestBuildSpecialistCommand_FixedModelIgnoresPerspectiveModel(t *testing.T) 
 			Role:               "You are the TEST ANALYST.",
 			InvestigationScope: "Test scope",
 			Tasks:              "1. Test",
-			OutputFormat:        "## Test",
+			OutputFormat:       "## Test",
 		},
 	}
 
@@ -701,7 +703,7 @@ func TestBuildSpecialistSystemPrompt_ContainsToolReferences(t *testing.T) {
 			Role:               "You are the TEST ANALYST.",
 			InvestigationScope: "Test scope",
 			Tasks:              "1. Test",
-			OutputFormat:        "## Test",
+			OutputFormat:       "## Test",
 		},
 	}
 
@@ -733,7 +735,7 @@ func TestBuildSpecialistSystemPrompt_ContainsOutputInstructions(t *testing.T) {
 			Role:               "You are the MY ANALYST.",
 			InvestigationScope: "Test scope",
 			Tasks:              "1. Test",
-			OutputFormat:        "## Test",
+			OutputFormat:       "## Test",
 		},
 	}
 
@@ -765,11 +767,11 @@ func TestLoadOntologyScopeText_MCPQuerySource(t *testing.T) {
 				"summary":     "Grafana monitoring dashboards",
 				"status":      "available",
 				"access": map[string]interface{}{
-					"tools":          []string{"mcp__grafana__query_prometheus"},
-					"instructions":   "Query Prometheus via grafana",
-					"capabilities":   "Query metrics and logs",
+					"tools":           []string{"mcp__grafana__query_prometheus"},
+					"instructions":    "Query Prometheus via grafana",
+					"capabilities":    "Query metrics and logs",
 					"getting_started": "Start with list_datasources",
-					"error_handling": "Note errors and continue",
+					"error_handling":  "Note errors and continue",
 				},
 			},
 		},

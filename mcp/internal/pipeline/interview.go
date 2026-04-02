@@ -180,6 +180,9 @@ type InterviewContext struct {
 	// StateDir is the root state directory for this analysis.
 	StateDir string
 
+	// WorkDir is the filesystem root Codex should investigate with Grep/Glob/Bash.
+	WorkDir string
+
 	// SeedSummary is the research summary from seed-analysis.json,
 	// providing context for evaluating finding relevance.
 	SeedSummary string
@@ -198,6 +201,7 @@ func LoadInterviewContext(cfg AnalysisConfig) (InterviewContext, error) {
 		ContextID: cfg.ContextID,
 		Model:     cfg.Model,
 		StateDir:  cfg.StateDir,
+		WorkDir:   ResolveAnalysisWorkDir(cfg),
 	}
 
 	// Read seed analysis summary for context
@@ -255,7 +259,7 @@ func BuildInterviewCommand(ictx InterviewContext, perspective Perspective, findi
 		SystemPrompt:  systemPrompt,
 		UserPrompt:    userPrompt,
 		Model:         ictx.Model,
-		WorkDir:       perspDir,
+		WorkDir:       ictx.WorkDir,
 		OutputPath:    outputPath,
 		MaxTurns:      10,
 		JSONSchema:    VerifiedFindingsSchema(),
