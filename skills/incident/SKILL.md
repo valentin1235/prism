@@ -17,6 +17,13 @@ This skill is a thin wrapper that:
 4. Retrieves results via `prism_analyze_result` when complete
 5. Presents the final RCA report to the user
 
+All incident-owned assets must remain under this skill directory:
+- `skills/incident/SKILL.md`
+- `skills/incident/templates/report.md`
+- `skills/incident/perspectives/ux-impact.json`
+
+Do not depend on `~/.codex`, cloned copies of this skill elsewhere, or repo-external prompt/template paths.
+
 ---
 
 ## Phase 0: Incident Input Collection
@@ -62,7 +69,7 @@ If no screenshots are referenced, skip this step.
 
 Determine the absolute path of the directory containing this SKILL.md:
 
-Use `Glob` to find the skill directory:
+Use `Glob` to find this exact skill file:
 
 ```
 Glob(pattern="**/skills/incident/SKILL.md")
@@ -70,7 +77,7 @@ Glob(pattern="**/skills/incident/SKILL.md")
 
 Extract the directory path from the first match (remove `/SKILL.md` suffix). Store as `{SKILL_DIR}`.
 
-If Glob returns no results, fall back to `~/prism/skills/incident` as default path and verify it exists via `Bash(ls {path}/SKILL.md)`.
+If Glob returns no results, stop with an error. Do not guess a fallback path outside the repo-local `skills/incident/` tree.
 
 ### Step 1.2: Session Setup
 

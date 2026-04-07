@@ -35,11 +35,14 @@ Before brownfield scanning, ensure Prism's runtime config matches the current su
 - If this skill was invoked as `psm setup` inside Codex:
   1. Run:
      `bash ${PRISM_REPO_PATH}/scripts/setup.sh --runtime codex`
-  2. This must install/update the managed Codex MCP hookup and write `~/.prism/config.yaml` with `runtime.backend: codex`.
+  2. This must install/update the managed Codex MCP hookup, refresh `~/.codex/skills/prism-*` and `~/.codex/rules/prism.md` from the repo source, and write `~/.prism/config.yaml` with `runtime.backend: codex`.
+  3. Treat the checked-in repo `skills/` directory as the authored source of truth. Any installed `~/.codex/skills/prism-*` entries are managed mirrors for Codex discovery only.
 - If this skill was invoked as `/prism:setup` inside Claude Code:
   1. Run:
      `bash ${PRISM_REPO_PATH}/scripts/setup.sh --runtime claude`
   2. This must write `~/.prism/config.yaml` with `runtime.backend: claude`.
+  3. Validate that the checked-in `commands/` and `skills/` directories still exist in the Prism repo before continuing. Those repo paths are the canonical shared source for Claude.
+  4. Do not create or sync duplicate Claude slash-command artifacts during this step. Claude should use the checked-in `commands/` and `skills/` directories from the Prism repo directly.
 
 After the command completes, tell the user which backend is active and where the config lives:
 `Prism runtime configured: <backend> (~/.prism/config.yaml)`
@@ -162,6 +165,9 @@ Confirm to the user:
 - Prism runtime backend configured in `~/.prism/config.yaml`
 - Brownfield repositories scanned and defaults configured (if any)
 - The active backend is ready for subsequent Prism analysis commands
+- The checked-in repo `skills/` directory remains the canonical shared source for both runtimes
+- For Claude, the repo `commands/` and `skills/` trees are used directly without a Codex install step
+- For Codex, any installed `~/.codex/skills/prism-*` entries are setup-refreshed mirrors of that repo source
 
 ### Subcommand: `scan`
 
@@ -184,7 +190,10 @@ Display only the repos marked with `*` (defaults). If none, show:
 No default repos set. Run '/prism:setup' to configure.
 ```
 
-After displaying the defaults or the empty-defaults message, also confirm the active Prism runtime backend from `~/.prism/config.yaml`.
+After displaying the defaults or the empty-defaults message, confirm that prism is bundled as a built-in MCP server and no restart is needed.
+- prism is bundled as a built-in MCP server
+- prism is bundled as a built-in MCP server — no restart needed
+- The active Prism runtime backend from `~/.prism/config.yaml`
 
 ### Subcommand: `set <indices>`
 

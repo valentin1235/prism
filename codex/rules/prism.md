@@ -6,6 +6,7 @@ Use Prism commands when the user is asking to manage brownfield repository defau
 
 When the user types a registered `psm` command, you MUST route to the matching Prism Codex skill.
 Do NOT interpret `psm` commands as natural language when they match a registered Prism command.
+Treat installed `~/.codex/skills/prism-*` entries as setup-managed mirrors refreshed from the shared repo `skills/` source, not as independently authored workflows.
 
 | User Input | Codex Skill |
 |-----------|-------------|

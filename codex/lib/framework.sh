@@ -338,7 +338,7 @@ ${prism_command}
 Registered Prism Codex skill:
 ${skill_id}
 
-Prism skill assets are installed under ~/.codex/skills, while the shared Prism repository lives at:
+Prism setup may install managed mirror copies under ~/.codex/skills for Codex discovery, but the shared Prism repository is the authored source of truth:
 ${PRISM_REPO_PATH}
 
 Deterministic Prism asset locator for the shared Prism command workflow:
@@ -348,11 +348,12 @@ Deterministic Prism asset locator for the shared Prism command workflow:
 The resolved asset root for this invocation is:
 ${PRISM_REPO_PATH}
 Do not resolve Prism assets from the user's working directory.
+Do not resolve Prism workflow assets from ~/.codex/skills or from the user's working directory when the shared repo assets are available.
 
 The canonical shared Prism skill for this command is:
 ${shared_skill_path}
 
-Read and follow that shared Prism skill from the resolved Prism asset root, not from the user's working directory.
+Read and follow that shared Prism skill from the resolved Prism asset root. Treat any installed ~/.codex skill copy as a managed mirror, not as the authored source.
 
 Shared analyze assets that remain available to Codex-side wrappers and adapters when this command delegates into analyze:
 - ${PRISM_REPO_PATH}/skills/analyze/SKILL.md
@@ -485,18 +486,18 @@ EOF
 prism_psm_render_command_markdown() {
   local command_name="${1:-}"
   local description
-  local body_function
+  local shared_skill_relative_path
 
   description="$(prism_psm_require_command_config "${command_name}" "command_description")"
-  body_function="$(prism_psm_require_command_config "${command_name}" "command_entrypoint_function")"
+  shared_skill_relative_path="$(prism_psm_require_command_config "${command_name}" "shared_skill_relative_path")"
 
   cat <<EOF
 ---
 description: "${description}"
 ---
 
+Read the file at \`\${CLAUDE_PLUGIN_ROOT}/${shared_skill_relative_path}\` using the Read tool and follow its instructions exactly.
 EOF
-  "${body_function}"
 }
 
 prism_psm_prepare_command_args() {

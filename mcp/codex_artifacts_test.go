@@ -45,7 +45,7 @@ func TestCodexRuleRegistersInitialPSMCommands(t *testing.T) {
 func TestCodexAnalyzeSkillDispatchesToSharedPrismWorkflow(t *testing.T) {
 	t.Parallel()
 
-	content := readRepoFile(t, "../codex/skills/analyze/SKILL.md")
+	content := renderGeneratedPSMSkill(t, "analyze")
 
 	for _, needle := range []string{
 		"name: prism-analyze",
@@ -75,7 +75,7 @@ func TestCodexAnalyzeSkillDispatchesToSharedPrismWorkflow(t *testing.T) {
 func TestCodexAnalyzeSkillUsesSharedDispatchFramework(t *testing.T) {
 	t.Parallel()
 
-	content := readRepoFile(t, "../codex/skills/analyze/SKILL.md")
+	content := renderGeneratedPSMSkill(t, "analyze")
 	for _, needle := range []string{
 		"## Shared Codex Dispatch",
 		"## Codex Normalization Rules",
@@ -127,10 +127,14 @@ func TestInstalledCodexAnalyzeSkillIsPortableAcrossWorkingDirectories(t *testing
 	}
 
 	config := readFile(t, install.configPath)
+	canonicalCodexHome := canonicalPath(t, install.codexHome)
 	for _, needle := range []string{
 		`command = "` + install.runScript + `"`,
 		`PRISM_REPO_PATH = "` + install.repoRoot + `"`,
 		`# PRISM_REPO_PATH is the source of truth for shared Prism skill, prompt, template, and MCP assets.`,
+		`PRISM_SHARED_SKILLS_ROOT = "` + filepath.Join(install.repoRoot, "skills") + `"`,
+		`PRISM_CODEX_SKILLS_ROOT = "` + filepath.Join(canonicalCodexHome, "skills") + `"`,
+		`PRISM_CODEX_RULES_ROOT = "` + filepath.Join(canonicalCodexHome, "rules") + `"`,
 	} {
 		if !strings.Contains(config, needle) {
 			t.Fatalf("expected %q in generated Codex config", needle)
@@ -138,15 +142,15 @@ func TestInstalledCodexAnalyzeSkillIsPortableAcrossWorkingDirectories(t *testing
 	}
 
 	installedContent := readFile(t, filepath.Join(install.codexHome, "skills", "prism-analyze", "SKILL.md"))
+	sharedContent := readRepoFile(t, "../skills/analyze/SKILL.md")
+	if installedContent != sharedContent {
+		t.Fatalf("expected installed Codex analyze skill to match the shared repo skill")
+	}
 	for _, needle := range []string{
-		"Glob(pattern=\"**/skills/analyze/SKILL.md\")",
-		"Read the first match.",
-		"Follow that shared skill exactly.",
-		"Treat the installed Prism MCP server plus `PRISM_REPO_PATH` as the source of truth for shared analyze assets.",
-		"PRISM_REPO_PATH/skills/analyze/prompts/verification-protocol.md",
-		"PRISM_REPO_PATH/skills/analyze/templates/report.md",
-		"## Shared Codex Dispatch",
-		"## Codex Normalization Rules",
+		"# Multi-Perspective Analysis",
+		"Calls `prism_analyze` to start the analysis pipeline",
+		"Polls `prism_task_status` for progress updates",
+		"Retrieves results via `prism_analyze_result` when complete",
 	} {
 		if !strings.Contains(installedContent, needle) {
 			t.Fatalf("expected %q in installed Codex analyze skill", needle)
@@ -175,9 +179,9 @@ func TestCodexDevModeRoutesPSMBrownfieldThroughCodexSkill(t *testing.T) {
 
 	for _, needle := range []string{
 		"`psm brownfield`",
-		`Glob(pattern="**/codex/skills/brownfield/SKILL.md")`,
+		"`skills/brownfield/SKILL.md`",
 		"Treat `psm brownfield` as a command, not as natural language.",
-		"Reuse Prism's bundled MCP tools and Codex skill assets; do not reimplement the workflow ad hoc.",
+		"Reuse Prism's bundled MCP tools and skill assets; do not reimplement the workflow ad hoc.",
 	} {
 		if !strings.Contains(content, needle) {
 			t.Fatalf("expected %q in Codex dev-mode command routing", needle)
@@ -190,12 +194,16 @@ func TestInstallCodexScriptUsesAbsolutePrismRepoPath(t *testing.T) {
 
 	install := installCodexArtifacts(t)
 	config := readFile(t, install.configPath)
+	canonicalCodexHome := canonicalPath(t, install.codexHome)
 
 	for _, needle := range []string{
 		`[mcp_servers.prism]`,
 		`command = "` + install.runScript + `"`,
 		`PRISM_REPO_PATH = "` + install.repoRoot + `"`,
 		`# PRISM_REPO_PATH is the source of truth for shared Prism skill, prompt, template, and MCP assets.`,
+		`PRISM_SHARED_SKILLS_ROOT = "` + filepath.Join(install.repoRoot, "skills") + `"`,
+		`PRISM_CODEX_SKILLS_ROOT = "` + filepath.Join(canonicalCodexHome, "skills") + `"`,
+		`PRISM_CODEX_RULES_ROOT = "` + filepath.Join(canonicalCodexHome, "rules") + `"`,
 	} {
 		if !strings.Contains(config, needle) {
 			t.Fatalf("expected %q in generated Codex config", needle)
@@ -602,16 +610,14 @@ func TestInstalledPSMBrownfieldPreservesSharedParityAcrossSubcommands(t *testing
 	unrelatedDir := t.TempDir()
 
 	sharedContent := readRepoFile(t, "../skills/brownfield/SKILL.md")
-	for _, needle := range []string{
+	for _, needle := range append([]string{
 		"/prism:brownfield                # Scan repos and set defaults",
 		"/prism:brownfield scan           # Scan only (no default selection)",
 		"/prism:brownfield defaults       # Show current defaults",
 		"/prism:brownfield set 6,18,19   # Set defaults by repo numbers",
-		"No GitHub repositories found in your home directory.",
-		"No default repos set. Run '/prism:brownfield' to configure.",
-		"No default repos set. Interviews will run in greenfield mode.",
-		"Brownfield defaults updated!",
-	} {
+		"In Codex, this same shared workflow is invoked through `psm brownfield`.",
+		"any installed `~/.codex/skills/prism-brownfield` copy is just a managed mirror refreshed by setup.",
+	}, sharedBrownfieldUserFacingBehaviorNeedles()...) {
 		if !strings.Contains(sharedContent, needle) {
 			t.Fatalf("expected %q in shared Prism brownfield skill", needle)
 		}
@@ -701,6 +707,28 @@ func TestInstalledPSMBrownfieldPreservesSharedParityAcrossSubcommands(t *testing
 				}
 			}
 		})
+	}
+}
+
+func TestInstalledPSMBrownfieldDefaultsCommandUsesRepoSkillAsCanonicalSource(t *testing.T) {
+	t.Parallel()
+
+	install := installCodexArtifacts(t)
+	unrelatedDir := t.TempDir()
+	_, stdinOutput := runInstalledPSMWithFakeCodex(t, install, unrelatedDir, "brownfield", "defaults")
+
+	for _, needle := range []string{
+		"psm brownfield defaults",
+		"Registered Prism Codex skill:\nprism-brownfield",
+		"The canonical shared Prism skill for this command is:\n" + filepath.Join(install.repoRoot, "skills", "brownfield", "SKILL.md"),
+		"Read and follow that shared Prism skill from the resolved Prism asset root. Treat any installed ~/.codex skill copy as a managed mirror, not as the authored source.",
+		"Treat installed `~/.codex/skills/prism-brownfield` entries as setup-refreshed mirrors of the shared repo skill, not as the authored workflow source.",
+		"Preserve the shared-skill subcommand behavior exactly: `scan` means scan only, `defaults` means show current defaults, and `set <indices>` means update defaults directly with the provided comma-separated indices.",
+		"Preserve the shared skill's user-facing status text and stop conditions: empty scans should surface `No GitHub repositories found in your home directory.`, clearing defaults should surface the shared greenfield-mode confirmation, and successful default updates should confirm the selected repository names.",
+	} {
+		if !strings.Contains(stdinOutput, needle) {
+			t.Fatalf("expected %q in brownfield defaults prompt\n%s", needle, stdinOutput)
+		}
 	}
 }
 
@@ -1167,8 +1195,7 @@ func TestPSMRegistryEntriesUseSharedDispatchContract(t *testing.T) {
 		t.Run(entry.Command, func(t *testing.T) {
 			t.Parallel()
 
-			skillPath := filepath.Join("..", "codex", "skills", entry.SkillDir, "SKILL.md")
-			content := readRepoFile(t, skillPath)
+			content := renderGeneratedPSMSkill(t, entry.Command)
 
 			for _, needle := range []string{
 				fmt.Sprintf("name: %s", entry.SkillID),
@@ -1180,12 +1207,12 @@ func TestPSMRegistryEntriesUseSharedDispatchContract(t *testing.T) {
 				"Follow that shared skill exactly.",
 			} {
 				if !strings.Contains(content, needle) {
-					t.Fatalf("expected %q in %s", needle, skillPath)
+					t.Fatalf("expected %q in rendered skill for %s", needle, entry.Command)
 				}
 			}
 			if !strings.Contains(content, "Read the first match.") &&
 				!strings.Contains(content, "Read the resolved shared Prism") {
-				t.Fatalf("expected shared skill read instruction in %s", skillPath)
+				t.Fatalf("expected shared skill read instruction in rendered skill for %s", entry.Command)
 			}
 
 			if _, ok := repCases[entry.Command]; !ok {
@@ -1465,7 +1492,7 @@ func TestInstalledCodexBrownfieldSkillIsPortableAcrossWorkingDirectories(t *test
 func TestCodexBrownfieldSkillUsesSharedPrismMCPTool(t *testing.T) {
 	t.Parallel()
 
-	content := readRepoFile(t, "../codex/skills/brownfield/SKILL.md")
+	content := renderGeneratedPSMSkill(t, "brownfield")
 
 	for _, needle := range []string{
 		"name: prism-brownfield",
@@ -1483,7 +1510,7 @@ func TestCodexBrownfieldSkillUsesSharedPrismMCPTool(t *testing.T) {
 func TestCodexBrownfieldSkillUsesSharedDispatchFramework(t *testing.T) {
 	t.Parallel()
 
-	content := readRepoFile(t, "../codex/skills/brownfield/SKILL.md")
+	content := renderGeneratedPSMSkill(t, "brownfield")
 	for _, needle := range []string{
 		"## Shared Codex Dispatch",
 		"## Codex Normalization Rules",
@@ -1509,14 +1536,18 @@ func TestInstalledCodexBrownfieldSkillMatchesRepresentativeClaudeScenarios(t *te
 
 	install := installCodexArtifacts(t)
 	installedContent := readFile(t, filepath.Join(install.codexHome, "skills", "prism-brownfield", "SKILL.md"))
+	sharedContent := readRepoFile(t, "../skills/brownfield/SKILL.md")
+	if installedContent != sharedContent {
+		t.Fatalf("expected installed Codex brownfield skill to match the shared repo skill")
+	}
 
 	for _, needle := range []string{
-		"psm brownfield",
-		"psm brownfield scan",
-		"psm brownfield defaults",
-		"psm brownfield set 6,18,19",
-		"Glob(pattern=\"**/skills/brownfield/SKILL.md\")",
-		"Follow that shared skill exactly.",
+		"# /prism:brownfield",
+		"/prism:brownfield scan",
+		"/prism:brownfield defaults",
+		"/prism:brownfield set 6,18,19",
+		"Tool: prism_brownfield",
+		"AskUserQuestion",
 	} {
 		if !strings.Contains(installedContent, needle) {
 			t.Fatalf("expected %q in installed Codex brownfield skill", needle)
@@ -1527,7 +1558,7 @@ func TestInstalledCodexBrownfieldSkillMatchesRepresentativeClaudeScenarios(t *te
 func TestCodexIncidentSkillDispatchesToSharedPrismWorkflow(t *testing.T) {
 	t.Parallel()
 
-	content := readRepoFile(t, "../codex/skills/incident/SKILL.md")
+	content := renderGeneratedPSMSkill(t, "incident")
 
 	for _, needle := range []string{
 		"name: prism-incident",
@@ -1556,9 +1587,9 @@ func TestCodexDevModeRoutesPSMIncidentThroughCodexSkill(t *testing.T) {
 
 	for _, needle := range []string{
 		"`psm incident`",
-		"`Glob(pattern=\"**/codex/skills/incident/SKILL.md\")`",
+		"`skills/incident/SKILL.md`",
 		"Treat `psm incident` as a command, not as natural language.",
-		"Reuse Prism's bundled MCP tools and Codex skill assets; do not reimplement the workflow ad hoc.",
+		"Reuse Prism's bundled MCP tools and skill assets; do not reimplement the workflow ad hoc.",
 	} {
 		if !strings.Contains(content, needle) {
 			t.Fatalf("expected %q in Codex dev-mode incident routing", needle)
@@ -1605,24 +1636,25 @@ func TestInstalledCodexIncidentSkillMatchesRepresentativeClaudeScenario(t *testi
 	}
 
 	for _, needle := range []string{
-		"`PRISM_REPO_PATH/skills/incident/SKILL.md` as the canonical shared skill path when it is available.",
-		"Follow that shared skill exactly.",
-		"`PRISM_REPO_PATH` when it points to a Prism repo containing `skills/incident/SKILL.md`.",
-		"`PRISM_REPO_PATH/skills/incident/templates/report.md`",
-		"`PRISM_REPO_PATH/skills/incident/perspectives/ux-impact.json`",
-		"Do not assume the command was launched from within `~/prism` or from the user's current working directory.",
-		"Do not reimplement or paraphrase the Prism incident workflow in this Codex wrapper.",
+		"# Incident RCA Analysis (Thin Wrapper for prism_analyze)",
+		"`~/.prism/state/analyze-{short-id}/`",
+		"`prism_analyze_result` when complete",
+		"templates/report.md",
+		"perspectives/ux-impact.json",
 	} {
 		if !strings.Contains(installedContent, needle) {
 			t.Fatalf("expected %q in installed Codex incident skill", needle)
 		}
+	}
+	if installedContent != sharedContent {
+		t.Fatalf("expected installed Codex incident skill to match the shared repo skill")
 	}
 }
 
 func TestCodexPRDSkillDispatchesToSharedPrismWorkflow(t *testing.T) {
 	t.Parallel()
 
-	content := readRepoFile(t, "../codex/skills/prd/SKILL.md")
+	content := renderGeneratedPSMSkill(t, "prd")
 
 	for _, needle := range []string{
 		"name: prism-prd",
@@ -1638,7 +1670,7 @@ func TestCodexPRDSkillDispatchesToSharedPrismWorkflow(t *testing.T) {
 		"invoke analyze as `psm analyze --config ~/.prism/state/prd-{short-id}/analyze-config.json`",
 		"require the post-processor to return that same report file path as its handoff result",
 		"{PRD_DIR}/prd-policy-review-report.md",
-		"`PM Decision Checklist`",
+		"PM Decision Checklist",
 		"`PRISM_REPO_PATH/skills/prd/prompts/post-processor.md`",
 		"`PRISM_REPO_PATH/skills/prd/templates/report.md`",
 		"Do not assume the command was launched from within `~/prism` or from the user's current working directory.",
@@ -1657,9 +1689,9 @@ func TestCodexDevModeRoutesPSMPRDThroughCodexSkill(t *testing.T) {
 
 	for _, needle := range []string{
 		"`psm prd`",
-		"`Glob(pattern=\"**/codex/skills/prd/SKILL.md\")`",
+		"`skills/prd/SKILL.md`",
 		"Treat `psm prd` as a command, not as natural language.",
-		"Reuse Prism's bundled MCP tools and Codex skill assets; do not reimplement the workflow ad hoc.",
+		"Reuse Prism's bundled MCP tools and skill assets; do not reimplement the workflow ad hoc.",
 	} {
 		if !strings.Contains(content, needle) {
 			t.Fatalf("expected %q in Codex dev-mode PRD routing", needle)
@@ -1705,12 +1737,16 @@ func TestInstalledCodexPRDSkillIsPortableAcrossWorkingDirectories(t *testing.T) 
 	}
 
 	installedContent := readFile(t, filepath.Join(install.codexHome, "skills", "prism-prd", "SKILL.md"))
+	sharedContent := readRepoFile(t, "../skills/prd/SKILL.md")
+	if installedContent != sharedContent {
+		t.Fatalf("expected installed Codex PRD skill to match the shared repo skill")
+	}
 	for _, needle := range []string{
-		"`PRISM_REPO_PATH` when it points to a Prism repo containing `skills/prd/SKILL.md`; otherwise fall back to `Glob(pattern=\"**/skills/prd/SKILL.md\")`.",
-		"Follow that shared skill exactly.",
-		"`Skill(skill=\"prism:analyze\", args=\"...\")` -> `psm analyze ...`",
-		"`PRISM_REPO_PATH/skills/prd/prompts/post-processor.md`",
-		"`PRISM_REPO_PATH/skills/prd/templates/report.md`",
+		"# PRD Policy Analysis (Wrapper for analyze)",
+		"Skill(skill=\"prism:analyze\", args=\"--config ~/.prism/state/prd-{short-id}/analyze-config.json\")",
+		"`~/.prism/state/prd-{short-id}/analyze-config.json`",
+		"~/.prism/state/prd-{short-id}/prd-policy-review-report.md",
+		"{PRD_DIR}/prd-policy-review-report.md",
 	} {
 		if !strings.Contains(installedContent, needle) {
 			t.Fatalf("expected %q in installed Codex PRD skill", needle)
@@ -1739,21 +1775,18 @@ func TestInstalledCodexPRDSkillMatchesRepresentativeClaudeScenario(t *testing.T)
 	}
 
 	for _, needle := range []string{
-		"`PRISM_REPO_PATH` when it points to a Prism repo containing `skills/prd/SKILL.md`; otherwise fall back to `Glob(pattern=\"**/skills/prd/SKILL.md\")`.",
-		"Follow that shared skill exactly.",
-		"`Skill(skill=\"prism:analyze\", args=\"...\")` -> `psm analyze ...`",
-		"Preserve the shared PRD wrapper phases exactly: PRD path intake, shared session/state setup, analyze config creation, analyze delegation, post-processing, report verification, and final report delivery.",
-		"`PRISM_REPO_PATH/skills/prd/prompts/post-processor.md`",
-		"`PRISM_REPO_PATH/skills/prd/templates/report.md`",
-		"invoke analyze as `psm analyze --config ~/.prism/state/prd-{short-id}/analyze-config.json`",
-		"require the post-processor to return that same report file path as its handoff result",
-		"`{PRD_DIR}/prd-policy-review-report.md`",
-		"Do not assume the command was launched from within `~/prism` or from the user's current working directory.",
-		"Do not reimplement or paraphrase the Prism PRD workflow in this Codex wrapper.",
+		"Skill(skill=\"prism:analyze\", args=\"--config ~/.prism/state/prd-{short-id}/analyze-config.json\")",
+		"`~/.prism/state/prd-{short-id}/analyze-config.json`",
+		"~/.prism/state/prd-{short-id}/prd-policy-review-report.md",
+		"{PRD_DIR}/prd-policy-review-report.md",
+		"PM Decision Checklist",
 	} {
 		if !strings.Contains(installedContent, needle) {
 			t.Fatalf("expected %q in installed Codex PRD skill", needle)
 		}
+	}
+	if installedContent != sharedContent {
+		t.Fatalf("expected installed Codex PRD skill to match the shared repo skill")
 	}
 }
 
@@ -1850,7 +1883,7 @@ func TestInstalledPSMSetupIsGloballyExecutableViaPATHFromUnrelatedDirectory(t *t
 func TestCodexSetupSkillDispatchesToSharedPrismWorkflow(t *testing.T) {
 	t.Parallel()
 
-	content := readRepoFile(t, "../codex/skills/setup/SKILL.md")
+	content := renderGeneratedPSMSkill(t, "setup")
 
 	for _, needle := range []string{
 		"name: prism-setup",
@@ -1874,7 +1907,7 @@ func TestCodexSetupSkillDispatchesToSharedPrismWorkflow(t *testing.T) {
 func TestCodexSetupSkillUsesSharedDispatchFramework(t *testing.T) {
 	t.Parallel()
 
-	content := readRepoFile(t, "../codex/skills/setup/SKILL.md")
+	content := renderGeneratedPSMSkill(t, "setup")
 	for _, needle := range []string{
 		"## Shared Codex Dispatch",
 		"## Codex Normalization Rules",
@@ -1932,14 +1965,17 @@ func TestInstalledCodexSetupSkillIsPortableAcrossWorkingDirectories(t *testing.T
 	}
 
 	installedContent := readFile(t, filepath.Join(install.codexHome, "skills", "prism-setup", "SKILL.md"))
+	sharedContent := readRepoFile(t, "../skills/setup/SKILL.md")
+	if installedContent != sharedContent {
+		t.Fatalf("expected installed Codex setup skill to match the shared repo skill")
+	}
 	for _, needle := range []string{
-		"Glob(pattern=\"**/skills/setup/SKILL.md\")",
-		"`PRISM_REPO_PATH` when it points to a Prism repo containing `skills/setup/SKILL.md`; otherwise fall back to `Glob(pattern=\"**/skills/setup/SKILL.md\")`.",
-		"Follow that shared skill exactly.",
-		"Reuse Prism's bundled MCP tools and shared skill content exactly.",
-		"## Shared Codex Dispatch",
-		"## Codex Normalization Rules",
-		"/prism:brownfield` -> `psm brownfield`",
+		"# Prism Setup",
+		"/prism:setup scan",
+		"/prism:setup defaults",
+		"/prism:setup set 6,18,19",
+		"`bash ${PRISM_REPO_PATH}/scripts/setup.sh --runtime codex`",
+		"`~/.prism/config.yaml`",
 	} {
 		if !strings.Contains(installedContent, needle) {
 			t.Fatalf("expected %q in installed Codex setup skill", needle)
@@ -1954,12 +1990,93 @@ func TestCodexDevModeRoutesPSMSetupThroughCodexSkill(t *testing.T) {
 
 	for _, needle := range []string{
 		"`psm setup`",
-		"`Glob(pattern=\"**/codex/skills/setup/SKILL.md\")`",
+		"`skills/setup/SKILL.md`",
 		"Treat `psm setup` as a command, not as natural language.",
-		"Reuse Prism's bundled MCP tools and Codex skill assets; do not reimplement the workflow ad hoc.",
+		"Reuse Prism's bundled MCP tools and skill assets; do not reimplement the workflow ad hoc.",
 	} {
 		if !strings.Contains(content, needle) {
 			t.Fatalf("expected %q in Codex dev-mode setup routing", needle)
+		}
+	}
+}
+
+func TestClaudeDevModeSlashCommandsResolveToRepoSkills(t *testing.T) {
+	t.Parallel()
+
+	claudeContent := readRepoFile(t, "../CLAUDE.md")
+	registry := readPSMRegistry(t, "../codex/lib/command-registry.tsv")
+
+	for _, entry := range registry {
+		entry := entry
+		t.Run(entry.Command, func(t *testing.T) {
+			t.Parallel()
+
+			slashCommand := fmt.Sprintf("`/prism:%s ...`", entry.Command)
+			sharedSkillPath := fmt.Sprintf("`skills/%s/SKILL.md`", entry.SkillDir)
+			if !strings.Contains(claudeContent, slashCommand) {
+				t.Fatalf("expected %q in CLAUDE.md slash-command routing", slashCommand)
+			}
+			if !strings.Contains(claudeContent, sharedSkillPath) {
+				t.Fatalf("expected %q in CLAUDE.md slash-command routing", sharedSkillPath)
+			}
+
+			commandContent := readRepoFile(t, filepath.Join("..", "commands", entry.Command+".md"))
+			if !strings.Contains(commandContent, fmt.Sprintf("skills/%s/SKILL.md", entry.SkillDir)) {
+				t.Fatalf("expected commands/%s.md to resolve the shared repo skill", entry.Command)
+			}
+		})
+	}
+}
+
+func TestClaudeSetupDoesNotInstallDuplicateSlashCommandArtifacts(t *testing.T) {
+	t.Parallel()
+
+	homeDir := t.TempDir()
+	repoRoot := filepath.Clean(filepath.Join(mustGetwd(t), ".."))
+	setupScript := filepath.Join(repoRoot, "scripts", "setup.sh")
+
+	cmd := exec.Command("bash", setupScript, "--runtime", "claude")
+	cmd.Dir = t.TempDir()
+	cmd.Env = append(
+		os.Environ(),
+		"HOME="+homeDir,
+	)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("setup.sh --runtime claude failed: %v\n%s", err, output)
+	}
+
+	outputText := string(output)
+	for _, needle := range []string{
+		"Prism runtime configured for Claude Code.",
+		"Claude uses the checked-in Prism commands/ and skills/ directories directly.",
+		"No duplicate Claude slash-command artifacts were installed or synced.",
+	} {
+		if !strings.Contains(outputText, needle) {
+			t.Fatalf("expected %q in Claude setup output\n%s", needle, outputText)
+		}
+	}
+
+	configPath := filepath.Join(homeDir, ".prism", "config.yaml")
+	configContent := readFile(t, configPath)
+	for _, needle := range []string{
+		"backend: claude",
+		"llm:",
+	} {
+		if !strings.Contains(configContent, needle) {
+			t.Fatalf("expected %q in Claude runtime config\n%s", needle, configContent)
+		}
+	}
+
+	for _, forbiddenPath := range []string{
+		filepath.Join(homeDir, ".prism", "commands"),
+		filepath.Join(homeDir, ".prism", "skills"),
+		filepath.Join(homeDir, ".claude", "commands"),
+		filepath.Join(homeDir, ".claude", "skills"),
+		filepath.Join(homeDir, ".codex", "skills", "prism-setup"),
+	} {
+		if _, err := os.Stat(forbiddenPath); !os.IsNotExist(err) {
+			t.Fatalf("expected no generated duplicate Claude command artifact at %s", forbiddenPath)
 		}
 	}
 }
@@ -1971,14 +2088,7 @@ func TestPRDCommandDispatchesToSharedSkill(t *testing.T) {
 
 	for _, needle := range []string{
 		`description: "Run Prism PRD policy analysis"`,
-		`Use ` + "`PRISM_REPO_PATH` as the source of truth for shared Prism assets",
-		`Glob(pattern="**/skills/prd/SKILL.md")`,
-		"post-processor prompt",
-		"`psm analyze --config ...` delegation",
-		"`~/.prism/state/prd-{short-id}/analyze-config.json`",
-		"`~/.prism/state/prd-{short-id}/prd-policy-review-report.md`",
-		"`{PRD_DIR}/prd-policy-review-report.md`",
-		"`PM Decision Checklist` verification",
+		"`${CLAUDE_PLUGIN_ROOT}/skills/prd/SKILL.md`",
 		"follow its instructions exactly",
 	} {
 		if !strings.Contains(content, needle) {
@@ -1994,9 +2104,7 @@ func TestSetupCommandDispatchesToSharedSkill(t *testing.T) {
 
 	for _, needle := range []string{
 		`description: "Run Prism setup workflow"`,
-		`Use ` + "`PRISM_REPO_PATH` as the source of truth for shared Prism assets",
-		`Glob(pattern="**/skills/setup/SKILL.md")`,
-		"Treat `psm setup`, `psm setup scan`, `psm setup defaults`, and `psm setup set <indices>` as exact command forms routed through that shared skill.",
+		"`${CLAUDE_PLUGIN_ROOT}/skills/setup/SKILL.md`",
 		"follow its instructions exactly",
 	} {
 		if !strings.Contains(content, needle) {
@@ -2012,10 +2120,7 @@ func TestBrownfieldCommandDispatchesToSharedSkill(t *testing.T) {
 
 	for _, needle := range []string{
 		`description: "Run Prism brownfield repository setup"`,
-		`Use ` + "`PRISM_REPO_PATH` as the source of truth for shared Prism assets",
-		`Glob(pattern="**/skills/brownfield/SKILL.md")`,
-		"Treat `psm brownfield`, `psm brownfield scan`, `psm brownfield defaults`, and `psm brownfield set <indices>` as exact command forms routed through that shared skill.",
-		"Preserve the default no-argument flow exactly: scan first, render the scan result, then prompt for default selection.",
+		"`${CLAUDE_PLUGIN_ROOT}/skills/brownfield/SKILL.md`",
 		"follow its instructions exactly",
 	} {
 		if !strings.Contains(content, needle) {
@@ -2039,12 +2144,6 @@ func TestPSMEntrypointsAreRenderedFromSharedFrameworkConfigs(t *testing.T) {
 		commandName := commandName
 		t.Run(commandName, func(t *testing.T) {
 			t.Parallel()
-
-			renderedSkill := renderPSMEntrypoint(t, repoRoot, psmSource, "prism_psm_render_codex_skill", commandName)
-			actualSkill := readRepoFile(t, filepath.Join("..", "codex", "skills", commandName, "SKILL.md"))
-			if actualSkill != renderedSkill {
-				t.Fatalf("codex skill entrypoint for %s drifted from shared framework renderer", commandName)
-			}
 
 			renderedCommand := renderPSMEntrypoint(t, repoRoot, psmSource, "prism_psm_render_command_markdown", commandName)
 			actualCommand := readRepoFile(t, filepath.Join("..", "commands", commandName+".md"))
@@ -2098,6 +2197,14 @@ func renderPSMEntrypoint(t *testing.T, repoRoot, psmSource, renderFunc, commandN
 	return string(output)
 }
 
+func renderGeneratedPSMSkill(t *testing.T, commandName string) string {
+	t.Helper()
+
+	repoRoot := filepath.Clean(filepath.Join(mustGetwd(t), ".."))
+	psmSource := filepath.Join(repoRoot, "codex", "lib", "psm.sh")
+	return renderPSMEntrypoint(t, repoRoot, psmSource, "prism_psm_render_codex_skill", commandName)
+}
+
 func mustGetwd(t *testing.T) string {
 	t.Helper()
 
@@ -2119,7 +2226,13 @@ type codexInstallPaths struct {
 func installCodexArtifacts(t *testing.T) codexInstallPaths {
 	t.Helper()
 
-	homeDir := t.TempDir()
+	homeDir, err := os.MkdirTemp("/tmp", "prism-codex-install-*")
+	if err != nil {
+		t.Fatalf("mktemp for codex install home: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.RemoveAll(homeDir)
+	})
 	codexHome := filepath.Join(homeDir, ".codex")
 	repoRoot := filepath.Clean(filepath.Join(mustGetwd(t), ".."))
 	installScript := filepath.Join(repoRoot, "scripts", "install-codex.sh")
@@ -2234,7 +2347,9 @@ func representativePSMInvocations() map[string]psmRepresentativeInvocation {
 			promptCommand: "psm brownfield defaults",
 			promptNeedles: []string{
 				"{REPO_ROOT}/skills/brownfield/SKILL.md",
+				"Treat installed `~/.codex/skills/prism-brownfield` entries as setup-refreshed mirrors of the shared repo skill, not as the authored workflow source.",
 				"Preserve the shared-skill subcommand behavior exactly: `scan` means scan only, `defaults` means show current defaults, and `set <indices>` means update defaults directly with the provided comma-separated indices.",
+				"Preserve the shared skill's user-facing status text and stop conditions: empty scans should surface `No GitHub repositories found in your home directory.`, clearing defaults should surface the shared greenfield-mode confirmation, and successful default updates should confirm the selected repository names.",
 			},
 		},
 		"incident": {
@@ -2259,6 +2374,15 @@ func representativePSMInvocations() map[string]psmRepresentativeInvocation {
 				"Preserve the shared-skill subcommand behavior exactly: `scan` means scan only, `defaults` means show current defaults, and `set <indices>` means update defaults directly with the provided comma-separated indices.",
 			},
 		},
+	}
+}
+
+func sharedBrownfieldUserFacingBehaviorNeedles() []string {
+	return []string{
+		"No GitHub repositories found in your home directory.",
+		"No default repos set. Run '/prism:brownfield' to configure.",
+		"No default repos set. Interviews will run in greenfield mode.",
+		"Brownfield defaults updated!",
 	}
 }
 

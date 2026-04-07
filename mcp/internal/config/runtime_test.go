@@ -44,3 +44,22 @@ func TestResolveRuntimeBackend_PrefersEnvironment(t *testing.T) {
 		t.Fatalf("ResolveRuntimeBackend() = %q, want codex", got)
 	}
 }
+
+func TestCodexPathHelpersHonorEnvironment(t *testing.T) {
+	t.Setenv("CODEX_HOME", "/tmp/custom-codex")
+	t.Setenv("PRISM_CODEX_SKILLS_ROOT", "/tmp/custom-codex-skills")
+	t.Setenv("PRISM_CODEX_RULES_ROOT", "/tmp/custom-codex-rules")
+
+	if got := CodexHomePath(); got != "/tmp/custom-codex" {
+		t.Fatalf("CodexHomePath() = %q, want /tmp/custom-codex", got)
+	}
+	if got := CodexSkillsPath(); got != "/tmp/custom-codex-skills" {
+		t.Fatalf("CodexSkillsPath() = %q, want /tmp/custom-codex-skills", got)
+	}
+	if got := CodexRulesPath(); got != "/tmp/custom-codex-rules" {
+		t.Fatalf("CodexRulesPath() = %q, want /tmp/custom-codex-rules", got)
+	}
+	if got := CodexRepoRootPointerPath(); got != "/tmp/custom-codex/lib/prism/repo-root" {
+		t.Fatalf("CodexRepoRootPointerPath() = %q, want /tmp/custom-codex/lib/prism/repo-root", got)
+	}
+}

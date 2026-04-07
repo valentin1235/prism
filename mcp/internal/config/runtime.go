@@ -49,6 +49,36 @@ func ConfigPath() string {
 	return filepath.Join(home, ".prism", "config.yaml")
 }
 
+func CodexHomePath() string {
+	if home := strings.TrimSpace(os.Getenv("CODEX_HOME")); home != "" {
+		return home
+	}
+
+	userHome, err := os.UserHomeDir()
+	if err != nil {
+		return filepath.Join(".codex")
+	}
+	return filepath.Join(userHome, ".codex")
+}
+
+func CodexSkillsPath() string {
+	if root := strings.TrimSpace(os.Getenv("PRISM_CODEX_SKILLS_ROOT")); root != "" {
+		return root
+	}
+	return filepath.Join(CodexHomePath(), "skills")
+}
+
+func CodexRulesPath() string {
+	if root := strings.TrimSpace(os.Getenv("PRISM_CODEX_RULES_ROOT")); root != "" {
+		return root
+	}
+	return filepath.Join(CodexHomePath(), "rules")
+}
+
+func CodexRepoRootPointerPath() string {
+	return filepath.Join(CodexHomePath(), "lib", "prism", "repo-root")
+}
+
 func LoadRuntimeConfig() RuntimeConfig {
 	cfg := DefaultRuntimeConfig()
 	data, err := os.ReadFile(ConfigPath())

@@ -12,6 +12,13 @@ description: >
 
 Run live end-to-end tests of the `prism:analyze` skill with real code analysis, real MCP verification, and automated grading.
 
+All test fixtures for this skill must remain self-contained under `skills/test-analyze/`:
+- `skills/test-analyze/evals/evals.json`
+- `skills/test-analyze/references/`
+- `skills/test-analyze/test-results/` when generated
+
+Treat paths in `evals/evals.json` as relative to this skill directory unless they are explicitly absolute target-codebase inputs.
+
 ## What This Skill Tests
 
 Three categories of assertions, each verified against real execution artifacts:

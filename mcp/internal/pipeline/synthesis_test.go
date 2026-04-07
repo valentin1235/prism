@@ -166,10 +166,10 @@ func TestBuildSynthesisSystemPromptDegradedMode(t *testing.T) {
 			{ID: "p2", Name: "P2", Scope: "scope2"},
 		},
 		CollectedFindings: &CollectedFindings{
-			Succeeded:     1,
-			Failed:        1,
-			TotalFindings: 2,
-			PartialFailure:      true,
+			Succeeded:      1,
+			Failed:         1,
+			TotalFindings:  2,
+			PartialFailure: true,
 			Results: []SpecialistResult{
 				{
 					PerspectiveID: "p1",
@@ -247,14 +247,18 @@ func TestBuildSynthesisUserPrompt(t *testing.T) {
 }
 
 func TestLoadReportTemplateUsesResolvedRepoAsset(t *testing.T) {
-	t.Setenv("PRISM_REPO_PATH", filepath.Clean(filepath.Join("..", "..")))
+	repoRoot, err := filepath.Abs(filepath.Join("..", "..", ".."))
+	if err != nil {
+		t.Fatalf("abs repo root: %v", err)
+	}
+	t.Setenv("PRISM_REPO_PATH", repoRoot)
 
 	got, err := loadReportTemplate(AnalysisConfig{})
 	if err != nil {
 		t.Fatalf("load default report template: %v", err)
 	}
 
-	wantPath := filepath.Clean(filepath.Join("..", "..", "skills", "analyze", "templates", "report.md"))
+	wantPath := filepath.Join(repoRoot, "skills", "analyze", "templates", "report.md")
 	wantBytes, err := os.ReadFile(wantPath)
 	if err != nil {
 		t.Fatalf("read expected template: %v", err)
@@ -266,7 +270,7 @@ func TestLoadReportTemplateUsesResolvedRepoAsset(t *testing.T) {
 }
 
 func TestResolveRepoAssetPathPrefersCodexRepoOverride(t *testing.T) {
-	repoRoot, err := filepath.Abs(filepath.Join("..", ".."))
+	repoRoot, err := filepath.Abs(filepath.Join("..", "..", ".."))
 	if err != nil {
 		t.Fatalf("abs repo root: %v", err)
 	}
@@ -276,6 +280,36 @@ func TestResolveRepoAssetPathPrefersCodexRepoOverride(t *testing.T) {
 	got, err := ResolveRepoAssetPath("skills/analyze/templates/report.md")
 	if err != nil {
 		t.Fatalf("resolve repo asset: %v", err)
+	}
+
+	want := filepath.Join(repoRoot, "skills", "analyze", "templates", "report.md")
+	if got != want {
+		t.Fatalf("resolved asset = %q, want %q", got, want)
+	}
+}
+
+func TestResolveRepoAssetPathFallsBackToInstalledCodexRepoRootPointer(t *testing.T) {
+	repoRoot, err := filepath.Abs(filepath.Join("..", "..", ".."))
+	if err != nil {
+		t.Fatalf("abs repo root: %v", err)
+	}
+
+	codexHome := t.TempDir()
+	repoRootPointer := filepath.Join(codexHome, "lib", "prism", "repo-root")
+	if err := os.MkdirAll(filepath.Dir(repoRootPointer), 0o755); err != nil {
+		t.Fatalf("mkdir repo-root pointer dir: %v", err)
+	}
+	if err := os.WriteFile(repoRootPointer, []byte(repoRoot+"\n"), 0o644); err != nil {
+		t.Fatalf("write repo-root pointer: %v", err)
+	}
+
+	t.Setenv("CODEX_HOME", codexHome)
+	t.Setenv("PRISM_REPO_PATH", "")
+	t.Setenv("PRISM_ROOT", t.TempDir())
+
+	got, err := ResolveRepoAssetPath("skills/analyze/templates/report.md")
+	if err != nil {
+		t.Fatalf("resolve repo asset via installed repo-root pointer: %v", err)
 	}
 
 	want := filepath.Join(repoRoot, "skills", "analyze", "templates", "report.md")
@@ -557,7 +591,7 @@ func TestBuildSynthesisSystemPromptMissingPerspectives(t *testing.T) {
 			Failed:           1,
 			TotalSpecialists: 3,
 			TotalFindings:    4,
-			PartialFailure:         true,
+			PartialFailure:   true,
 			Results: []SpecialistResult{
 				{PerspectiveID: "p1", Outcome: OutcomeSuccess, FindingsCount: 2,
 					Findings: &SpecialistFindings{Analyst: "p1", Findings: []SpecialistFinding{
@@ -579,7 +613,7 @@ func TestBuildSynthesisSystemPromptMissingPerspectives(t *testing.T) {
 			Succeeded:       1,
 			Failed:          1,
 			TotalInterviews: 2,
-			PartialFailure:        true,
+			PartialFailure:  true,
 			AverageScore:    0.80,
 			Results: []InterviewResult{
 				{PerspectiveID: "p1", Outcome: InterviewSuccess, Verdict: "pass", Score: 0.80,

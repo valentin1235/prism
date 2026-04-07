@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 
+	prismconfig "github.com/heechul/prism-mcp/internal/config"
 	"github.com/heechul/prism-mcp/internal/parallel"
 )
 
@@ -314,12 +315,15 @@ func LoadDASystemPrompt() (string, error) {
 
 // GetRepoRoot determines the repository root from the executable path or known markers.
 func GetRepoRoot() string {
-	marker := filepath.Join("agents", "devils-advocate.md")
+	markers := []string{
+		filepath.Join("skills", "setup", "SKILL.md"),
+		filepath.Join("agents", "devils-advocate.md"),
+	}
 	var tried []string
 
 	// First priority: Codex install path override.
 	if root := os.Getenv("PRISM_REPO_PATH"); root != "" {
-		if _, err := os.Stat(filepath.Join(root, marker)); err == nil {
+		if prismRepoRootMatches(root, markers...) {
 			return root
 		}
 		tried = append(tried, "PRISM_REPO_PATH="+root)
@@ -327,10 +331,25 @@ func GetRepoRoot() string {
 
 	// Second priority: legacy PRISM_ROOT environment variable.
 	if root := os.Getenv("PRISM_ROOT"); root != "" {
-		if _, err := os.Stat(filepath.Join(root, marker)); err == nil {
+		if prismRepoRootMatches(root, markers...) {
 			return root
 		}
 		tried = append(tried, "PRISM_ROOT="+root)
+	}
+
+	// Third priority: the repo-root pointer written into ~/.codex during setup.
+	if pointerPath := prismconfig.CodexRepoRootPointerPath(); pointerPath != "" {
+		if pointedRoot, err := os.ReadFile(pointerPath); err == nil {
+			root := strings.TrimSpace(string(pointedRoot))
+			if prismRepoRootMatches(root, markers...) {
+				return root
+			}
+			if root != "" {
+				tried = append(tried, pointerPath+"="+root)
+			}
+		} else {
+			tried = append(tried, pointerPath)
+		}
 	}
 
 	// Try from executable path (binary is in mcp/bin/ or mcp/)
@@ -343,7 +362,7 @@ func GetRepoRoot() string {
 			if absErr != nil {
 				continue
 			}
-			if _, err := os.Stat(filepath.Join(abs, marker)); err == nil {
+			if prismRepoRootMatches(abs, markers...) {
 				return abs
 			}
 			tried = append(tried, abs)
@@ -357,14 +376,33 @@ func GetRepoRoot() string {
 		if absErr != nil {
 			continue
 		}
-		if _, err := os.Stat(filepath.Join(abs, marker)); err == nil {
+		if prismRepoRootMatches(abs, markers...) {
 			return abs
 		}
 		tried = append(tried, abs)
 	}
 
-	log.Printf("WARNING: could not locate %s. Tried paths: %v. Set PRISM_REPO_PATH or PRISM_ROOT to override.", marker, tried)
+	log.Printf(
+		"WARNING: could not locate Prism repo markers %v. Tried paths: %v. Set PRISM_REPO_PATH or PRISM_ROOT to override.",
+		markers,
+		tried,
+	)
 	return cwd
+}
+
+func prismRepoRootMatches(root string, markers ...string) bool {
+	root = strings.TrimSpace(root)
+	if root == "" {
+		return false
+	}
+
+	for _, marker := range markers {
+		if _, err := os.Stat(filepath.Join(root, marker)); err != nil {
+			return false
+		}
+	}
+
+	return true
 }
 
 // ResolveRepoAssetPath resolves a repository-relative Prism asset path using the

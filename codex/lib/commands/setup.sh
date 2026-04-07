@@ -25,6 +25,7 @@ Normalize the command prefix from the Claude Code form to Codex where referenced
   `/prism:brownfield` -> `psm brownfield`
 Reuse Prism's bundled MCP tools and shared skill content exactly.
 When the shared setup skill configures Prism runtime, `psm setup` must run the shared `scripts/setup.sh --runtime codex` flow so the managed Codex installation artifacts and `~/.prism/config.yaml` stay aligned.
+Treat managed `~/.codex/skills/prism-*` entries as setup-refreshed mirrors of the repo `skills/` source, not as independently authored workflow definitions.
 Do not assume the command was launched from within `~/prism` or from the user's current working directory.
 Do not reimplement or paraphrase the Prism setup workflow in this Codex wrapper.
 EOF
@@ -59,6 +60,7 @@ prism_psm_setup_command_contract() {
     "- If Codex does need to glob for \`skills/setup/SKILL.md\`, prefer the Prism-owned path under \`${PRISM_REPO_PATH}\` over matches from the user's target repository or working directory." \
     "- Preserve the shared setup flow exactly, including the brownfield scan, default-selection prompt, MCP tool usage, and final confirmation messaging." \
     "- Preserve the shared runtime-configuration step exactly: in Codex, \`psm setup\` must run the shared \`scripts/setup.sh --runtime codex\` flow so the managed Codex install is refreshed and \`~/.prism/config.yaml\` is written with \`runtime.backend: codex\` before continuing." \
+    "- During that runtime-configuration step, treat the repo \`skills/\` directory as the single authored source of truth and refresh managed \`~/.codex/skills/prism-*\` copies from it." \
     "- Preserve the default no-argument flow exactly: scan first, render the scan result, then prompt for default selection." \
     "- Preserve the shared-skill subcommand behavior exactly: \`scan\` means scan only, \`defaults\` means show current defaults, and \`set <indices>\` means update defaults directly with the provided comma-separated indices." \
     "- Preserve the shared skill's user-facing status text and stop conditions: empty scans should surface \`No GitHub repositories found in your home directory.\`, clearing defaults should surface the shared greenfield-mode confirmation, and successful default updates should confirm the selected repository names." \
