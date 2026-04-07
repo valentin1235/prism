@@ -1,14 +1,14 @@
-## Prism Commands (Codex Dev Mode)
+## Prism Commands
 
-When the user types `psm analyze` or `psm analyze ...`, use `Glob(pattern="**/skills/analyze/SKILL.md")` to locate the Prism analyze skill file, then read the first match and follow its instructions exactly.
+When the user types `psm analyze` or `psm analyze ...`, read `skills/analyze/SKILL.md` and follow its instructions exactly.
 
-When the user types `psm brownfield` or `psm brownfield ...`, use `Glob(pattern="**/skills/brownfield/SKILL.md")` to locate the Prism brownfield skill file, then read the first match and follow its instructions exactly.
+When the user types `psm brownfield` or `psm brownfield ...`, read `skills/brownfield/SKILL.md` and follow its instructions exactly.
 
-When the user types `psm incident` or `psm incident ...`, use `Glob(pattern="**/skills/incident/SKILL.md")` to locate the Prism incident skill file, then read the first match and follow its instructions exactly.
+When the user types `psm incident` or `psm incident ...`, read `skills/incident/SKILL.md` and follow its instructions exactly.
 
-When the user types `psm prd` or `psm prd ...`, use `Glob(pattern="**/skills/prd/SKILL.md")` to locate the Prism PRD skill file, then read the first match and follow its instructions exactly.
+When the user types `psm prd` or `psm prd ...`, read `skills/prd/SKILL.md` and follow its instructions exactly.
 
-When the user types `psm setup`, use `Glob(pattern="**/skills/setup/SKILL.md")` to locate the Prism setup skill file, then read the first match and follow its instructions exactly.
+When the user types `psm setup`, read `skills/setup/SKILL.md` and follow its instructions exactly.
 
 Important:
 - Treat `psm analyze` as a command, not as natural language.
