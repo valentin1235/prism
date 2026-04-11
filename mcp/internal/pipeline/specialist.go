@@ -368,7 +368,7 @@ func BuildSpecialistCommand(sctx SpecialistContext, perspective Perspective) Spe
 		Adaptor:       sctx.Adaptor,
 		WorkDir:       sctx.WorkDir,
 		OutputPath:    findingsPath,
-		MaxTurns:      10,
+		MaxTurns:      0, // no turn limit — timeout controls duration
 		JSONSchema:    SpecialistFindingsSchema(),
 	}
 }

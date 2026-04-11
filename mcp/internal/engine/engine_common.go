@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -151,10 +150,6 @@ func composePrompt(prompt string, opts ClaudeOptions) string {
 
 	if toolingGuidance := buildToolingGuidance(opts); toolingGuidance != "" {
 		parts = append(parts, toolingGuidance)
-	}
-
-	if maxTurns := opts.MaxTurns; maxTurns > 0 {
-		parts = append(parts, fmt.Sprintf("## Execution Budget\nKeep the work within at most %d tool-assisted turns if possible.", maxTurns))
 	}
 
 	if userPrompt := strings.TrimSpace(prompt); userPrompt != "" {

@@ -61,8 +61,9 @@ func TestBuildInterviewCommand_BasicFields(t *testing.T) {
 	if cmd.Model != "claude-sonnet-4-6" {
 		t.Errorf("Model = %q, want %q", cmd.Model, "claude-sonnet-4-6")
 	}
-	if cmd.MaxTurns != 10 {
-		t.Errorf("MaxTurns = %d, want 10", cmd.MaxTurns)
+	// No turn limit — timeout controls duration
+	if cmd.MaxTurns != 0 {
+		t.Errorf("MaxTurns = %d, want 0", cmd.MaxTurns)
 	}
 	if cmd.WorkDir != "/tmp/workspace-root" {
 		t.Errorf("WorkDir = %q, want analysis work dir", cmd.WorkDir)

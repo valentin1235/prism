@@ -269,7 +269,7 @@ func BuildInterviewCommand(ictx InterviewContext, perspective Perspective, findi
 		Adaptor:       ictx.Adaptor,
 		WorkDir:       ictx.WorkDir,
 		OutputPath:    outputPath,
-		MaxTurns:      10,
+		MaxTurns:      0, // no turn limit — timeout controls duration
 		JSONSchema:    VerifiedFindingsSchema(),
 	}
 }

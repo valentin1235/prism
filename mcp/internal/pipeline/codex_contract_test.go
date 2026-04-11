@@ -41,7 +41,7 @@ func TestRunSpecialistSession_CodexInvocationContractAndArtifacts(t *testing.T) 
 		Model:         "claude-sonnet-4-6",
 		WorkDir:       workDir,
 		OutputPath:    FindingsPath(stateDir, "security-analysis"),
-		MaxTurns:      10,
+		MaxTurns:      0,
 		JSONSchema:    SpecialistFindingsSchema(),
 	}
 
@@ -108,7 +108,7 @@ func TestRunInterviewSession_CodexInvocationContractAndArtifacts(t *testing.T) {
 		Model:         "claude-sonnet-4-6",
 		WorkDir:       workDir,
 		OutputPath:    filepath.Join(workDir, "verified-findings.json"),
-		MaxTurns:      10,
+		MaxTurns:      0,
 		JSONSchema:    VerifiedFindingsSchema(),
 	}
 
@@ -269,7 +269,6 @@ func TestRunSynthesisSession_CodexInvocationContractAndArtifacts(t *testing.T) {
 	assertCodexArgsNotContain(t, argsPath, "--model claude-sonnet-4-6")
 	assertFileContainsAll(t, stdinPath,
 		"## Tooling Guidance\nDo NOT use any tools, shell commands, or MCP calls. Respond with plain text only from the provided context.",
-		"## Execution Budget\nKeep the work within at most 1 tool-assisted turns if possible.",
 		"REPORT SYNTHESIZER",
 		"Analyze checkout reliability",
 		"Fill the report template",
