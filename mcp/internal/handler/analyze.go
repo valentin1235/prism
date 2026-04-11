@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/heechul/prism-mcp/internal/analysisstore"
 	prismconfig "github.com/heechul/prism-mcp/internal/config"
 	"github.com/heechul/prism-mcp/internal/brownfield"
 	"github.com/heechul/prism-mcp/internal/pipeline"
@@ -58,11 +59,8 @@ func HandleAnalyze(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallT
 	}
 
 	adaptor, _ := request.Params.Arguments["adaptor"].(string)
-	adaptor = strings.ToLower(strings.TrimSpace(adaptor))
+	adaptor = resolveRequestedAdaptor(adaptor)
 	if adaptor == "" {
-		adaptor = prismconfig.ResolveRuntimeBackend()
-	}
-	if adaptor != "codex" && adaptor != "claude" {
 		return mcp.NewToolResultError(fmt.Sprintf("invalid adaptor %q", adaptor)), nil
 	}
 
@@ -189,6 +187,25 @@ func HandleAnalyze(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallT
 		return mcp.NewToolResultError(fmt.Sprintf("failed to write config.json: %v", err)), nil
 	}
 
+	if err := analysisstore.SaveAnalysisConfig(PrismBaseDir, analysisstore.AnalysisConfigRecord{
+		TaskID:               task.ID,
+		Topic:                topic,
+		Model:                model,
+		Adaptor:              adaptor,
+		ContextID:            contextID,
+		StateDir:             stateDir,
+		ReportDir:            reportDir,
+		InputContext:         inputContext,
+		OntologyScope:        ontologyScope,
+		SeedHints:            seedHints,
+		ReportTemplate:       reportTemplate,
+		Language:             language,
+		PerspectiveInjection: perspectiveInjection,
+	}); err != nil {
+		TaskStore.Remove(task.ID)
+		return mcp.NewToolResultError(fmt.Sprintf("failed to persist analysis config: %v", err)), nil
+	}
+
 	// --- Write ontology-scope.json to state directory ---
 	// The ontology_scope parameter is a JSON string in canonical {"sources": [...]} format.
 	// Write it as ontology-scope.json so LoadOntologyScopeText() can read it in all stages.
@@ -225,6 +242,22 @@ func HandleAnalyze(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallT
 	}
 
 	return mcp.NewToolResultText(string(resultBytes)), nil
+}
+
+func resolveRequestedAdaptor(raw string) string {
+	adaptor := strings.ToLower(strings.TrimSpace(raw))
+	switch adaptor {
+	case "codex", "claude":
+		return adaptor
+	case "":
+		adaptor = strings.ToLower(strings.TrimSpace(prismconfig.ResolveRuntimeBackend()))
+		if adaptor == "codex" || adaptor == "claude" {
+			return adaptor
+		}
+		return "claude"
+	default:
+		return ""
+	}
 }
 
 func isSupportedModelAlias(model string) bool {

@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/heechul/prism-mcp/internal/analysisstore"
 	prismconfig "github.com/heechul/prism-mcp/internal/config"
 	"github.com/heechul/prism-mcp/internal/parallel"
 )
@@ -40,6 +41,12 @@ type ontologyScopeSource struct {
 // ReadAnalysisConfig reads config.json from the task's state directory.
 func ReadAnalysisConfig(stateDir string) (AnalysisConfig, error) {
 	var cfg AnalysisConfig
+	if persisted, ok, err := readPersistedAnalysisConfig(stateDir); err != nil {
+		return cfg, err
+	} else if ok {
+		return persisted, nil
+	}
+
 	data, err := os.ReadFile(filepath.Join(stateDir, "config.json"))
 	if err != nil {
 		return cfg, fmt.Errorf("read config.json: %w", err)
@@ -48,6 +55,38 @@ func ReadAnalysisConfig(stateDir string) (AnalysisConfig, error) {
 		return cfg, fmt.Errorf("parse config.json: %w", err)
 	}
 	return cfg, nil
+}
+
+func readPersistedAnalysisConfig(stateDir string) (AnalysisConfig, bool, error) {
+	taskID := strings.TrimSpace(filepath.Base(filepath.Clean(stateDir)))
+	if taskID == "" || taskID == "." || taskID == string(filepath.Separator) {
+		return AnalysisConfig{}, false, nil
+	}
+
+	baseDir := filepath.Dir(filepath.Dir(filepath.Clean(stateDir)))
+	record, ok, err := analysisstore.LoadAnalysisConfig(baseDir, taskID)
+	if err != nil {
+		return AnalysisConfig{}, false, fmt.Errorf("load analysis config from sqlite: %w", err)
+	}
+	if !ok {
+		return AnalysisConfig{}, false, nil
+	}
+
+	return AnalysisConfig{
+		Topic:                record.Topic,
+		Model:                record.Model,
+		Adaptor:              record.Adaptor,
+		TaskID:               record.TaskID,
+		ContextID:            record.ContextID,
+		StateDir:             record.StateDir,
+		ReportDir:            record.ReportDir,
+		InputContext:         record.InputContext,
+		OntologyScope:        record.OntologyScope,
+		SeedHints:            record.SeedHints,
+		ReportTemplate:       record.ReportTemplate,
+		Language:             record.Language,
+		PerspectiveInjection: record.PerspectiveInjection,
+	}, true, nil
 }
 
 // ResolveAnalysisWorkDir picks a filesystem workspace root for tool-driven Codex

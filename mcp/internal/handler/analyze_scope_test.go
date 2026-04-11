@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/heechul/prism-mcp/internal/brownfield"
 	"github.com/heechul/prism-mcp/internal/pipeline"
@@ -77,6 +78,18 @@ func makeAnalyzeRequest(args map[string]interface{}) mcp.CallToolRequest {
 	}
 }
 
+func cancelTaskIfPresent(taskID string) {
+	if TaskStore == nil {
+		return
+	}
+	task := TaskStore.Get(taskID)
+	if task == nil || task.Cancel == nil {
+		return
+	}
+	task.Cancel()
+	time.Sleep(10 * time.Millisecond)
+}
+
 // TestMultipleDefaultReposMerge verifies that multiple is_default=1 repos
 // are merged into a single ontology scope with all paths as sources.
 func TestMultipleDefaultReposMerge(t *testing.T) {
@@ -115,6 +128,7 @@ func TestMultipleDefaultReposMerge(t *testing.T) {
 	if err := json.Unmarshal([]byte(text), &snap); err != nil {
 		t.Fatalf("parse response: %v", err)
 	}
+	defer cancelTaskIfPresent(snap.ID)
 
 	// Read the ontology-scope.json written by the handler
 	stateDir := filepath.Join(dir, "state", snap.ID)
@@ -200,6 +214,7 @@ func TestExplicitOntologyScopeTakesPriority(t *testing.T) {
 	if err := json.Unmarshal([]byte(text), &snap); err != nil {
 		t.Fatalf("parse response: %v", err)
 	}
+	defer cancelTaskIfPresent(snap.ID)
 
 	// Read the ontology-scope.json
 	stateDir := filepath.Join(dir, "state", snap.ID)
@@ -359,6 +374,7 @@ func TestHandleAnalyze_DefaultModelUsesRuntimeDefaultAlias(t *testing.T) {
 	if err := json.Unmarshal([]byte(result.Content[0].(mcp.TextContent).Text), &snap); err != nil {
 		t.Fatalf("parse response: %v", err)
 	}
+	defer cancelTaskIfPresent(snap.ID)
 
 	stateDir := filepath.Join(dir, "state", snap.ID)
 	configData, err := os.ReadFile(filepath.Join(stateDir, "config.json"))
@@ -405,6 +421,7 @@ func TestHandleAnalyze_ExplicitAdaptorPersistsToConfig(t *testing.T) {
 	if err := json.Unmarshal([]byte(result.Content[0].(mcp.TextContent).Text), &snap); err != nil {
 		t.Fatalf("parse response: %v", err)
 	}
+	defer cancelTaskIfPresent(snap.ID)
 
 	cfg, err := pipeline.ReadAnalysisConfig(filepath.Join(dir, "state", snap.ID))
 	if err != nil {
@@ -412,5 +429,30 @@ func TestHandleAnalyze_ExplicitAdaptorPersistsToConfig(t *testing.T) {
 	}
 	if cfg.Adaptor != "codex" {
 		t.Fatalf("config adaptor = %q, want %q", cfg.Adaptor, "codex")
+	}
+}
+
+func TestResolveRequestedAdaptorFallbackOrder(t *testing.T) {
+	t.Setenv("PRISM_AGENT_RUNTIME", "")
+	t.Setenv("PRISM_LLM_BACKEND", "")
+	t.Setenv("CODEX_HOME", "")
+	t.Setenv("CLAUDECODE", "")
+	t.Setenv("CLAUDE_CODE_ENTRYPOINT", "")
+	t.Setenv("PATH", "")
+	t.Setenv("HOME", t.TempDir())
+
+	if got := resolveRequestedAdaptor("codex"); got != "codex" {
+		t.Fatalf("resolveRequestedAdaptor(explicit codex) = %q, want codex", got)
+	}
+
+	t.Setenv("PRISM_AGENT_RUNTIME", "codex")
+	if got := resolveRequestedAdaptor(""); got != "codex" {
+		t.Fatalf("resolveRequestedAdaptor(empty) with runtime codex = %q, want codex", got)
+	}
+
+	t.Setenv("PRISM_AGENT_RUNTIME", "")
+	t.Setenv("PRISM_LLM_BACKEND", "")
+	if got := resolveRequestedAdaptor(""); got != "claude" {
+		t.Fatalf("resolveRequestedAdaptor(empty) final fallback = %q, want claude", got)
 	}
 }

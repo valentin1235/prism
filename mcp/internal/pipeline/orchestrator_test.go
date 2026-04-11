@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	taskpkg "github.com/heechul/prism-mcp/internal/task"
+	_ "modernc.org/sqlite"
 )
 
 // --- Helper: create a task with temp state/report dirs and a valid config.json ---
@@ -509,6 +511,77 @@ func TestReadAnalysisConfigAdaptor(t *testing.T) {
 	got, err := ReadAnalysisConfig(tmpDir)
 	if err != nil {
 		t.Fatalf("ReadAnalysisConfig() error = %v", err)
+	}
+	if got.Adaptor != "codex" {
+		t.Fatalf("Adaptor = %q, want %q", got.Adaptor, "codex")
+	}
+}
+
+func TestReadAnalysisConfigPrefersSQLite(t *testing.T) {
+	baseDir := t.TempDir()
+	stateDir := filepath.Join(baseDir, "state", "analyze-db")
+	if err := os.MkdirAll(stateDir, 0o755); err != nil {
+		t.Fatalf("mkdir state dir: %v", err)
+	}
+
+	fileCfg := AnalysisConfig{
+		Topic:     "from-file",
+		Model:     "default",
+		Adaptor:   "claude",
+		TaskID:    "analyze-db",
+		ContextID: "analyze-db",
+		StateDir:  stateDir,
+		ReportDir: filepath.Join(baseDir, "reports"),
+	}
+	fileData, _ := json.Marshal(fileCfg)
+	if err := os.WriteFile(filepath.Join(stateDir, "config.json"), fileData, 0o644); err != nil {
+		t.Fatalf("write config.json: %v", err)
+	}
+
+	db, err := sql.Open("sqlite", filepath.Join(baseDir, "prism.db")+"?_pragma=journal_mode(wal)")
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	defer db.Close()
+
+	_, err = db.Exec(`
+CREATE TABLE IF NOT EXISTS analysis_tasks (
+    task_id TEXT PRIMARY KEY,
+    topic TEXT NOT NULL,
+    model TEXT NOT NULL,
+    adaptor TEXT NOT NULL,
+    context_id TEXT NOT NULL,
+    state_dir TEXT NOT NULL,
+    report_dir TEXT NOT NULL,
+    input_context TEXT,
+    ontology_scope TEXT,
+    seed_hints TEXT,
+    report_template TEXT,
+    language TEXT,
+    perspective_injection TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CHECK (adaptor IN ('claude', 'codex'))
+);`)
+	if err != nil {
+		t.Fatalf("create analysis_tasks: %v", err)
+	}
+
+	_, err = db.Exec(`
+		INSERT INTO analysis_tasks (
+			task_id, topic, model, adaptor, context_id, state_dir, report_dir
+		) VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, "analyze-db", "from-db", "default", "codex", "analyze-db", stateDir, filepath.Join(baseDir, "reports"))
+	if err != nil {
+		t.Fatalf("insert analysis task: %v", err)
+	}
+
+	got, err := ReadAnalysisConfig(stateDir)
+	if err != nil {
+		t.Fatalf("ReadAnalysisConfig() error = %v", err)
+	}
+	if got.Topic != "from-db" {
+		t.Fatalf("Topic = %q, want %q", got.Topic, "from-db")
 	}
 	if got.Adaptor != "codex" {
 		t.Fatalf("Adaptor = %q, want %q", got.Adaptor, "codex")
