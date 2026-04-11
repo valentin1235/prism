@@ -47,6 +47,52 @@ Before brownfield scanning, ensure Prism's runtime config matches the current su
 After the command completes, tell the user which backend is active and where the config lives:
 `Prism runtime configured: <backend> (~/.prism/config.yaml)`
 
+## Step 0.5: CLAUDE.md Integration (Optional but Recommended for Claude Code)
+
+If this skill was invoked inside Claude Code, ask whether to add a Prism quick-reference block to the current project's `CLAUDE.md`.
+
+Explain the value clearly:
+- `/prism:*` continues to work through the Prism plugin
+- adding the block also makes plain-text `psm analyze`, `psm incident`, `psm prd`, and `psm setup` work as command-style inputs inside that Claude Code project context
+- the block is a lightweight command-routing reference, not a duplicate workflow definition
+
+Offer:
+- `Integrate`
+- `Skip`
+- `Preview first`
+
+If the user asks to preview, show this exact block:
+
+````markdown
+<!-- prism:START -->
+<!-- prism:VERSION:2.16.0 -->
+# Prism — Shared Analysis Commands
+
+Use these command-style inputs inside Claude Code to route directly to Prism's shared workflows:
+
+| Input | Action |
+|-------|--------|
+| `psm analyze ...` | Read `skills/analyze/SKILL.md` and follow it |
+| `psm brownfield ...` | Read `skills/brownfield/SKILL.md` and follow it |
+| `psm incident ...` | Read `skills/incident/SKILL.md` and follow it |
+| `psm prd ...` | Read `skills/prd/SKILL.md` and follow it |
+| `psm setup ...` | Read `skills/setup/SKILL.md` and follow it |
+
+Treat `psm ...` inputs as commands, not natural language.
+Reuse Prism's bundled MCP tools and shared skill assets exactly.
+Do not use the Skill tool; read the file directly and execute it.
+<!-- prism:END -->
+````
+
+If the user chooses `Integrate`:
+1. Determine the target `CLAUDE.md` in the current working directory.
+2. If `CLAUDE.md` already exists, create a backup at `CLAUDE.md.bak` before editing it.
+3. If a Prism block already exists between `<!-- prism:START -->` and `<!-- prism:END -->`, replace that block in place.
+4. Otherwise append the block above to the end of `CLAUDE.md`, preserving existing content.
+5. Confirm that `psm ...` commands will now be recognized inside Claude Code for this project context.
+
+If the user chooses `Skip`, continue with the rest of setup unchanged.
+
 ## Step 1: Brownfield Repository Scan
 
 Scan the user's home directory for existing git repositories and register them in the prism DB. This enables interviews to use brownfield context for existing projects.

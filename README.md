@@ -167,6 +167,8 @@ Then open Claude Code and run:
 This keeps `~/.prism/config.yaml` aligned with Claude Code and configures the MCP tools (`prism_interview`) used by the analyze skill's Socratic verification. Claude uses the checked-in repo `commands/` and `skills/` directories directly, so this step does not install or sync duplicate slash-command copies.
 The repo `skills/` tree remains the canonical shared source for both runtimes: Claude reads it directly from the repo, while Codex gets setup-managed mirror copies under `~/.codex/skills`.
 
+If you also want plain-text `psm analyze`, `psm incident`, `psm prd`, and `psm setup` to work inside Claude Code, let `/prism:setup` integrate the Prism quick-reference block into your current project's `CLAUDE.md`. That block gives Claude a local command-routing hint similar to Ouroboros' `ooo` commands.
+
 #### Step 5: Verify installation
 
 Restart Claude Code, then type:
