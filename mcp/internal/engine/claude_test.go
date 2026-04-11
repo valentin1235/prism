@@ -107,6 +107,22 @@ func TestBuildCLIArgs_OmitsLegacyClaudeModelAliases(t *testing.T) {
 	}
 }
 
+func TestBuildCLIArgs_CodexIgnoresHostClaudeRuntimeForModelNormalization(t *testing.T) {
+	t.Setenv("PRISM_AGENT_RUNTIME", "claude")
+	args := CodexAdaptor{}.BuildCLIArgs(LLMRequest{
+		Model: "claude-sonnet-4-6",
+		Cwd:   "/tmp/prism-state",
+		Env: map[string]string{
+			"PRISM_AGENT_RUNTIME": "codex",
+		},
+	}, "/tmp/out.txt", "")
+
+	got := strings.Join(args, " ")
+	if strings.Contains(got, "--model claude-sonnet-4-6") {
+		t.Fatalf("command %q should not inherit host Claude runtime when explicit codex adaptor is selected", got)
+	}
+}
+
 func TestBuildPermissionArgs(t *testing.T) {
 	tests := []struct {
 		name string

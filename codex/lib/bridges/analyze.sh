@@ -174,6 +174,7 @@ Follow the shared Prism analyze skill as the source of truth, but apply this Cod
 - Preserve the full shared-skill decision flow and exit gates, not just the MCP payload shape.
 - If the command includes `--config`, the `psm` wrapper may substitute an adapter-generated temporary config path. Treat that file as a compatible copy of the user config with only path normalization applied.
 - Preserve the shared analyze config schema and MCP payload contract exactly. Do not rename, drop, or reinterpret fields such as `topic`, `input_context`, `report_template`, `seed_hints`, `session_id`, `model`, `ontology_scope`, or `perspective_injection`.
+- Because this bridge is Codex-specific, always include `adaptor: "codex"` when calling `prism_analyze`. Do not rely on server-side runtime inference when the bridge already knows it is running under Codex.
 - Path-valued analyze config fields have already been normalized for Codex execution context. Pass them through unchanged once read.
 - Use Codex-native equivalents for Claude Code tool names mentioned by the shared skill:
   Read -> inspect files directly

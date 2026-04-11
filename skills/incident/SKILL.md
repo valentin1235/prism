@@ -22,6 +22,8 @@ All incident-owned assets must remain under this skill directory:
 - `skills/incident/templates/report.md`
 - `skills/incident/perspectives/ux-impact.json`
 
+When this skill runs from Codex, pass `adaptor: "codex"` in the `prism_analyze` call. When it runs from Claude Code, pass `adaptor: "claude"`. Do not rely on process-global runtime defaults when the caller already knows the host runtime.
+
 Do not depend on `~/.codex`, cloned copies of this skill elsewhere, or repo-external prompt/template paths.
 
 ---
@@ -101,6 +103,7 @@ Generate a short-id via `Bash(uuidgen | tr '[:upper:]' '[:lower:]' | cut -c1-8)`
 ```
 mcp__prism__prism_analyze(
   topic: "Incident root cause analysis: {first 80 chars of INCIDENT_DESCRIPTION} — multi-perspective analysis of root cause, contributing factors, and user-facing UX impact\n\n{full INCIDENT_DESCRIPTION with inlined screenshot descriptions}",
+  adaptor: "{host runtime adaptor: codex in Codex, claude in Claude Code}",
   session_id: "{short-id}",
   ontology_scope: "{ontology scope JSON string or omit if null}",
   seed_hints: "This is an incident/outage analysis. Research directions: (1) Identify the trigger — the immediate event or change that initiated the incident (recent deploys, config changes, dependency updates). (2) Trace the root cause chain — follow error propagation from the trigger through the system to understand why it caused failure. (3) Map contributing factors — discover code areas with missing error handling, absent monitoring/alerting, inadequate fallbacks, or insufficient test coverage that allowed the incident to escalate. (4) Reconstruct timeline evidence — look for logs, metrics, deployment timestamps, and commit history that establish when the incident started, escalated, was detected, and resolved. (5) Discover user-facing impact paths — trace how the technical failure propagated to user-facing components (API responses, UI rendering, data consistency). Perspectives should cover technical root cause, system architecture implications, operational gaps, and error handling resilience. Use available tools (Grep, Read, Bash, MCP) to trace the incident through the codebase. Prioritize breadth: discover as many distinct affected code areas and systems as possible.",

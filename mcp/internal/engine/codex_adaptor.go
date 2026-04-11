@@ -265,7 +265,7 @@ func (CodexAdaptor) BuildCLIArgs(req LLMRequest, outputPath, schemaPath string) 
 		"--output-last-message", outputPath,
 	}
 
-	if model := normalizeModel(req.Model); model != "" {
+	if model := normalizeModelForBackend(req.Model, "codex"); model != "" {
 		args = append(args, "--model", model)
 	}
 

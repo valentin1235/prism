@@ -117,10 +117,6 @@ func expandPath(path string) string {
 	return path
 }
 
-func normalizeModel(model string) string {
-	return normalizeModelForBackend(model, resolveRuntimeBackend(ClaudeOptions{}))
-}
-
 func normalizeModelForBackend(model, backend string) string {
 	candidate := strings.TrimSpace(model)
 	if candidate == "" || candidate == "default" {

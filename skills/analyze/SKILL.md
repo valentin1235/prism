@@ -30,6 +30,8 @@ No user interaction is required for ontology scope mapping. Use `prism:brownfiel
 
 Wrapper skills (e.g., `/prd`) can customize analyze behavior by providing a config file. The config path is passed via `$ARGUMENTS` as `--config <path>`.
 
+When this skill runs from Codex, pass `adaptor: "codex"` in the `prism_analyze` call. When it runs from Claude Code, pass `adaptor: "claude"`. Do not rely on process-global runtime defaults when the caller knows the host runtime.
+
 ### Config Schema
 
 ```json
@@ -74,6 +76,7 @@ Store the resolved description and config values.
 ```
 mcp__prism__prism_analyze(
   topic: "{resolved description}",
+  adaptor: "{host runtime adaptor: codex in Codex, claude in Claude Code}",
   session_id: "{config.session_id if provided, otherwise omit}",
   model: "{config.model if provided, otherwise omit to use server default}",
   input_context: "{config.input_context if provided}",
