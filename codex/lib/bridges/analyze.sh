@@ -171,35 +171,15 @@ prism_psm_analyze_bridge_prompt() {
 Follow the shared Prism analyze skill as the source of truth, but apply this Codex adapter contract while doing so:
 
 - Treat `psm analyze ...` as the exact Codex equivalent of Claude Code `/prism:analyze ...`.
-- Preserve the full shared-skill decision flow and exit gates, not just the MCP payload shape.
 - If the command includes `--config`, the `psm` wrapper may substitute an adapter-generated temporary config path. Treat that file as a compatible copy of the user config with only path normalization applied.
-- Preserve the shared analyze config schema and MCP payload contract exactly. Do not rename, drop, or reinterpret fields such as `topic`, `input_context`, `report_template`, `seed_hints`, `session_id`, `model`, `ontology_scope`, or `perspective_injection`.
-- Because this bridge is Codex-specific, always include `adaptor: "codex"` when calling `prism_analyze`. Do not rely on server-side runtime inference when the bridge already knows it is running under Codex.
+- The shared skill is the only workflow definition. Do not restate, paraphrase, or reorder its phases, exit gates, or MCP contract in the Codex layer.
 - Path-valued analyze config fields have already been normalized for Codex execution context. Pass them through unchanged once read.
 - Use Codex-native equivalents for Claude Code tool names mentioned by the shared skill:
   Read -> inspect files directly
   ToolSearch -> use local search tools such as glob and ripgrep
   AskUserQuestion -> ask the user directly in chat
   mcp__prism__* -> call the same Prism MCP tools unchanged
-- Execute the shared intake branch exactly:
-  if `--config <path>` is present, read that config and use `config.topic` as the description when present, otherwise fall back to remaining arguments;
-  if no config is present, use the remaining command arguments as the description;
-  if the description is still empty, ask the user directly for what to analyze.
-- Execute the shared adaptor-selection branch exactly:
-  SELECT who you are: codex | claude;
-  because this bridge is Codex-specific, the selected value must be `codex`;
-  store it as `{ADAPTOR}` and pass `adaptor: "{ADAPTOR}"` to `prism_analyze`.
-- Honor the shared Phase 1 exit gate before starting analysis: do not call `prism_analyze` until the description has been collected.
-- Honor the shared Phase 2 exit gate before starting analysis: do not call `prism_analyze` until `{ADAPTOR}` has been selected.
-- When calling `prism_analyze`, preserve the shared optional-field behavior exactly:
-  omit optional MCP fields when the shared skill says to omit them rather than inventing defaults in the wrapper layer.
-- Honor the shared Phase 3 exit gate: do not proceed to polling until `prism_analyze` returns a `task_id`.
-- During Phase 4, poll `prism_task_status` every 30 seconds until the task reaches `completed` or `failed`, and surface brief progress updates that include the current stage and progress text.
-- Preserve the shared polling branches exactly:
-  if the user cancels during polling, call `prism_cancel_task(task_id)` and report the cancellation result;
-  if the task status is `failed`, report the error and stop without calling `prism_analyze_result`;
-  only continue to result retrieval after a `completed` status.
-- Preserve the shared output contract: poll progress via `prism_task_status`, then present the `summary` and `report_path` returned by `prism_analyze_result`.
-- Honor the shared Phase 5 exit gate: after completion, call `prism_analyze_result(task_id)`, present the returned `summary`, and communicate the returned `report_path`.
+- When the shared skill asks `SELECT who you are: codex | claude`, choose `codex`, store it as `{ADAPTOR}`, and pass `adaptor: "{ADAPTOR}"` to `prism_analyze`.
+- Preserve the shared analyze config schema and MCP payload contract exactly. Do not rename, drop, or reinterpret fields such as `topic`, `input_context`, `report_template`, `seed_hints`, `session_id`, `model`, `ontology_scope`, or `perspective_injection`.
 EOF
 }

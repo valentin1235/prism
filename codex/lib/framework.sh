@@ -442,6 +442,32 @@ prism_psm_render_usage_block() {
   done < <("${function_name}")
 }
 
+prism_psm_resolve_skill_version() {
+  local command_name="${1:-}"
+  local repo_root
+  local shared_skill_relative_path
+  local shared_skill_path
+
+  repo_root="$(prism_psm_resolve_repo_root "${command_name}")"
+  shared_skill_relative_path="$(prism_psm_require_command_config "${command_name}" "shared_skill_relative_path")"
+  shared_skill_path="${repo_root}/${shared_skill_relative_path}"
+
+  if [ ! -f "${shared_skill_path}" ]; then
+    return 0
+  fi
+
+  python3 - "${shared_skill_path}" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+text = Path(sys.argv[1]).read_text(encoding="utf-8")
+match = re.search(r"(?m)^version:\s*(.+?)\s*$", text)
+if match:
+    print(match.group(1).strip())
+PY
+}
+
 prism_psm_render_codex_skill() {
   local command_name="${1:-}"
   local skill_id
@@ -453,7 +479,7 @@ prism_psm_render_codex_skill() {
 
   skill_id="$(prism_psm_command_skill_id "${command_name}")" || prism_psm_die "unsupported command '${command_name}'."
   skill_description="$(prism_psm_require_command_config "${command_name}" "skill_description")"
-  skill_version="$(prism_psm_command_config "${command_name}" "skill_version")"
+  skill_version="$(prism_psm_resolve_skill_version "${command_name}")"
   usage_function="$(prism_psm_require_command_config "${command_name}" "usage_function")"
   dispatch_function="$(prism_psm_require_command_config "${command_name}" "skill_dispatch_function")"
   normalization_function="$(prism_psm_require_command_config "${command_name}" "skill_normalization_function")"

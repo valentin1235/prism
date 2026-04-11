@@ -78,8 +78,6 @@ assert_eq "$(prism_psm_command_skill_id brownfield)" "prism-brownfield" "brownfi
 assert_eq "$(prism_psm_command_skill_id incident)" "prism-incident" "incident should resolve to the shared skill id"
 assert_eq "$(prism_psm_command_skill_id prd)" "prism-prd" "prd should resolve to the shared skill id"
 assert_eq "$(prism_psm_command_skill_id setup)" "prism-setup" "setup should resolve to the shared skill id"
-assert_eq "$(prism_psm_require_command_config brownfield skill_version)" "2.0.0" "brownfield should expose its shared skill version through the command config contract"
-
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "${tmpdir}"' EXIT
 test_tmpdir="${tmpdir}/tmp"
@@ -348,18 +346,11 @@ fi
 
 assert_file_contains "${captured_prompt}" "psm analyze"
 assert_file_contains "${captured_prompt}" "Prism Analyze Compatibility Bridge"
-assert_file_contains "${captured_prompt}" "Preserve the full shared-skill decision flow and exit gates, not just the MCP payload shape."
 assert_file_contains "${captured_prompt}" "adapter-generated temporary config path"
-assert_file_contains "${captured_prompt}" "Preserve the shared analyze config schema and MCP payload contract exactly."
+assert_file_contains "${captured_prompt}" "The shared skill is the only workflow definition."
 assert_file_contains "${captured_prompt}" "Path-valued analyze config fields have already been normalized for Codex execution context. Pass them through unchanged once read."
-assert_file_contains "${captured_prompt}" "if \`--config <path>\` is present, read that config and use \`config.topic\` as the description when present, otherwise fall back to remaining arguments;"
-assert_file_contains "${captured_prompt}" "if no config is present, use the remaining command arguments as the description;"
-assert_file_contains "${captured_prompt}" "if the description is still empty, ask the user directly for what to analyze."
-assert_file_contains "${captured_prompt}" "Honor the shared Phase 1 exit gate before starting analysis: do not call \`prism_analyze\` until the description has been collected."
-assert_file_contains "${captured_prompt}" "Honor the shared Phase 2 exit gate: do not proceed to polling until \`prism_analyze\` returns a \`task_id\`."
-assert_file_contains "${captured_prompt}" "During Phase 3, poll \`prism_task_status\` every 30 seconds until the task reaches \`completed\` or \`failed\`"
-assert_file_contains "${captured_prompt}" "if the task status is \`failed\`, report the error and stop without calling \`prism_analyze_result\`;"
-assert_file_contains "${captured_prompt}" "Honor the shared Phase 4 exit gate: after completion, call \`prism_analyze_result(task_id)\`, present the returned \`summary\`, and communicate the returned \`report_path\`."
+assert_file_contains "${captured_prompt}" 'When the shared skill asks `SELECT who you are: codex | claude`, choose `codex`'
+assert_file_contains "${captured_prompt}" "Preserve the shared analyze config schema and MCP payload contract exactly."
 assert_file_contains "${captured_prompt}" "The user's original working directory is:"
 assert_file_contains "${captured_prompt}" "${invoke_dir}"
 assert_file_contains "${captured_prompt}" "${REPO_ROOT}/skills/analyze/SKILL.md"
@@ -447,10 +438,11 @@ assert_file_contains "${captured_prompt}" "successful default updates should con
 
 assert_file_contains "${captured_prompt}" "psm incident checkout outage"
 assert_file_contains "${captured_prompt}" "${REPO_ROOT}/skills/incident/SKILL.md"
-assert_file_contains "${captured_prompt}" "For psm incident, dispatch to the shared Prism incident workflow entrypoint and preserve its full RCA flow:"
+assert_file_contains "${captured_prompt}" "For psm incident, dispatch to the shared Prism incident workflow entrypoint:"
 assert_file_contains "${captured_prompt}" "Prism Incident Compatibility Bridge"
 assert_file_contains "${captured_prompt}" 'Treat `psm incident ...` as the exact Codex equivalent of Claude Code `/prism:incident ...`.'
 assert_file_contains "${captured_prompt}" 'Resolve the shared incident workflow entrypoint from `PRISM_REPO_PATH` first: `${PRISM_REPO_PATH}/skills/incident/SKILL.md`.'
+assert_file_contains "${captured_prompt}" 'The shared skill is the only workflow definition.'
 assert_file_contains "${captured_prompt}" 'When the shared incident skill dispatches analysis, preserve its asset contract exactly by passing through the shared incident report template and UX perspective injection assets unchanged.'
 
 (
@@ -463,16 +455,9 @@ assert_file_contains "${captured_prompt}" "${REPO_ROOT}/skills/prd/SKILL.md"
 assert_file_contains "${captured_prompt}" "${REPO_ROOT}/skills/prd/prompts/post-processor.md"
 assert_file_contains "${captured_prompt}" "${REPO_ROOT}/skills/prd/templates/report.md"
 assert_file_contains "${captured_prompt}" "${REPO_ROOT}/skills/analyze/SKILL.md"
-assert_file_contains "${captured_prompt}" 'When the shared PRD skill refers to files relative to its own `SKILL.md`, resolve them from `'
 assert_file_contains "${captured_prompt}" 'The wrapper has already exported `PRISM_REPO_PATH='
 assert_file_contains "${captured_prompt}" "Prism PRD Compatibility Bridge"
 assert_file_contains "${captured_prompt}" 'Treat `psm prd ...` as the exact Codex equivalent of Claude Code `/prism:prd ...`.'
-assert_file_contains "${captured_prompt}" 'Preserve the full shared PRD decision flow and exit gates, not just the eventual analyze handoff or report artifact.'
-assert_file_contains "${captured_prompt}" 'write `~/.prism/state/prd-{short-id}/analyze-config.json` with the shared `topic`, `input_context`, `seed_hints`, and `session_id` contract;'
-assert_file_contains "${captured_prompt}" 'keep `~/.prism/state/prd-{short-id}/analyze-config.json` as the concrete handoff artifact and do not substitute a different filename or directory.'
-assert_file_contains "${captured_prompt}" 'require `analyst-findings.md` before post-processing;'
-assert_file_contains "${captured_prompt}" 'require the post-processor handoff result to be that exact report path.'
-assert_file_contains "${captured_prompt}" 'verify the generated report contains `PM Decision Checklist` before presenting success.'
-assert_file_contains "${captured_prompt}" 'preserve that three-line handoff format because existing Prism workflows expect those locations and filenames.'
+assert_file_contains "${captured_prompt}" 'The shared skill is the only workflow definition.'
 
 printf 'psm registry test passed\n'
