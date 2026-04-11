@@ -128,6 +128,16 @@ func HandleAnalyze(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallT
 	stateBase := filepath.Join(PrismBaseDir, "state")
 	reportBase := filepath.Join(PrismBaseDir, "reports")
 
+	if sessionID != "" {
+		taskID := "analyze-" + sessionID
+		if existing := TaskStore.Get(taskID); existing != nil {
+			if snapshot := existing.Snapshot(); !snapshot.Status.IsTerminal() {
+				return mcp.NewToolResultError(fmt.Sprintf("task %s is already %s — deterministic rerun requires the previous in-memory run to finish or be cancelled first", taskID, snapshot.Status)), nil
+			}
+			TaskStore.Remove(taskID)
+		}
+	}
+
 	// Create a task to get the generated ID
 	// We use a temporary contextID first, then derive directories from task ID
 	// When session_id is provided, task_id becomes "analyze-{session_id}"
@@ -222,8 +232,8 @@ func HandleAnalyze(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallT
 		markSnapshotFailed(&snapshot, fmt.Sprintf("failed to persist task snapshot: %v", persistErr))
 		if err := analysisstore.SaveTaskSnapshot(PrismBaseDir, snapshot, pollCount); err != nil {
 			log.Printf("[%s] failed to persist terminal snapshot after persistence error: %v", task.ID, err)
-			if delErr := analysisstore.DeleteAnalysisTask(PrismBaseDir, task.ID); delErr != nil {
-				log.Printf("[%s] failed to delete stale persisted task after persistence error: %v", task.ID, delErr)
+			if fileErr := savePersistenceFailureSnapshot(task.StateDir, snapshot, pollCount); fileErr != nil {
+				log.Printf("[%s] failed to persist fallback persistence-error snapshot: %v", task.ID, fileErr)
 			}
 		}
 		task.DisablePersistence()
@@ -237,6 +247,10 @@ func HandleAnalyze(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallT
 	}); err != nil {
 		task.DisablePersistence()
 		return analyzeCreationError(task.ID, stateDir, reportDir, backup, fmt.Sprintf("failed to persist initial task snapshot: %v", err)), nil
+	}
+	if err := removePersistenceFailureSnapshot(stateDir); err != nil {
+		task.DisablePersistence()
+		return analyzeCreationError(task.ID, stateDir, reportDir, backup, fmt.Sprintf("failed to clear stale persistence failure snapshot: %v", err)), nil
 	}
 
 	// --- Write ontology-scope.json to state directory ---
@@ -580,24 +594,45 @@ type analysisCreationBackup struct {
 	configPathContent []byte
 	scopePathExists   bool
 	scopePathContent  []byte
+	persistErrExists  bool
+	persistErrContent []byte
 }
 
 func captureExistingAnalysisArtifacts(taskID, stateDir, reportDir string) (analysisCreationBackup, error) {
+	stateDirExists, err := pathExists(stateDir)
+	if err != nil {
+		return analysisCreationBackup{}, fmt.Errorf("stat state dir: %w", err)
+	}
+	reportDirExists, err := pathExists(reportDir)
+	if err != nil {
+		return analysisCreationBackup{}, fmt.Errorf("stat report dir: %w", err)
+	}
 	backup := analysisCreationBackup{
-		stateDirExists:  pathExists(stateDir),
-		reportDirExists: pathExists(reportDir),
+		stateDirExists:  stateDirExists,
+		reportDirExists: reportDirExists,
 	}
 
 	configPath := filepath.Join(stateDir, "config.json")
-	if content, err := os.ReadFile(configPath); err == nil {
+	if content, ok, err := readOptionalFile(configPath); err != nil {
+		return backup, fmt.Errorf("read config backup: %w", err)
+	} else if ok {
 		backup.configPathExists = true
 		backup.configPathContent = content
 	}
 
 	scopePath := filepath.Join(stateDir, "ontology-scope.json")
-	if content, err := os.ReadFile(scopePath); err == nil {
+	if content, ok, err := readOptionalFile(scopePath); err != nil {
+		return backup, fmt.Errorf("read ontology scope backup: %w", err)
+	} else if ok {
 		backup.scopePathExists = true
 		backup.scopePathContent = content
+	}
+	persistErrPath := persistenceFailureSnapshotPath(stateDir)
+	if content, ok, err := readOptionalFile(persistErrPath); err != nil {
+		return backup, fmt.Errorf("read persistence failure backup: %w", err)
+	} else if ok {
+		backup.persistErrExists = true
+		backup.persistErrContent = content
 	}
 
 	rec, ok, err := analysisstore.LoadAnalysisConfig(PrismBaseDir, taskID)
@@ -662,6 +697,16 @@ func cleanupFailedAnalysisTask(taskID, stateDir, reportDir string, backup analys
 			cleanupErrs = append(cleanupErrs, fmt.Sprintf("remove ontology-scope.json: %v", err))
 		}
 	}
+	persistErrPath := persistenceFailureSnapshotPath(stateDir)
+	if backup.persistErrExists {
+		if err := os.WriteFile(persistErrPath, backup.persistErrContent, 0o644); err != nil {
+			cleanupErrs = append(cleanupErrs, fmt.Sprintf("restore persistence-error snapshot: %v", err))
+		}
+	} else {
+		if err := os.Remove(persistErrPath); err != nil && !os.IsNotExist(err) {
+			cleanupErrs = append(cleanupErrs, fmt.Sprintf("remove persistence-error snapshot: %v", err))
+		}
+	}
 
 	if stateDir != "" && !backup.stateDirExists {
 		if err := os.RemoveAll(stateDir); err != nil {
@@ -681,12 +726,23 @@ func cleanupFailedAnalysisTask(taskID, stateDir, reportDir string, backup analys
 }
 
 func loadPersistedTaskSnapshot(taskID string) (taskpkg.TaskSnapshot, int, bool, error) {
+	if snapshot, pollCount, ok, err := loadPersistenceFailureSnapshot(filepath.Join(PrismBaseDir, "state", taskID)); err != nil {
+		return taskpkg.TaskSnapshot{}, 0, false, err
+	} else if ok {
+		return snapshot, pollCount, true, nil
+	}
 	return analysisstore.LoadTaskSnapshot(PrismBaseDir, taskID)
 }
 
-func pathExists(path string) bool {
+func pathExists(path string) (bool, error) {
 	_, err := os.Stat(path)
-	return err == nil
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
 }
 
 func analyzeCreationError(taskID, stateDir, reportDir string, backup analysisCreationBackup, message string) *mcp.CallToolResult {
@@ -734,6 +790,63 @@ func mergeStageDetail(existing, detail string) string {
 	default:
 		return existing + "; " + detail
 	}
+}
+
+type persistenceFailureSnapshot struct {
+	Snapshot  taskpkg.TaskSnapshot `json:"snapshot"`
+	PollCount int                  `json:"poll_count"`
+}
+
+func persistenceFailureSnapshotPath(stateDir string) string {
+	return filepath.Join(stateDir, "persistence-error-snapshot.json")
+}
+
+func savePersistenceFailureSnapshot(stateDir string, snapshot taskpkg.TaskSnapshot, pollCount int) error {
+	if stateDir == "" {
+		return fmt.Errorf("state dir is required")
+	}
+	if err := os.MkdirAll(stateDir, 0o755); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(persistenceFailureSnapshot{
+		Snapshot:  snapshot,
+		PollCount: pollCount,
+	}, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(persistenceFailureSnapshotPath(stateDir), data, 0o644)
+}
+
+func loadPersistenceFailureSnapshot(stateDir string) (taskpkg.TaskSnapshot, int, bool, error) {
+	var payload persistenceFailureSnapshot
+	data, ok, err := readOptionalFile(persistenceFailureSnapshotPath(stateDir))
+	if err != nil || !ok {
+		return taskpkg.TaskSnapshot{}, 0, ok, err
+	}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return taskpkg.TaskSnapshot{}, 0, false, fmt.Errorf("parse persistence failure snapshot: %w", err)
+	}
+	return payload.Snapshot, payload.PollCount, true, nil
+}
+
+func removePersistenceFailureSnapshot(stateDir string) error {
+	err := os.Remove(persistenceFailureSnapshotPath(stateDir))
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
+func readOptionalFile(path string) ([]byte, bool, error) {
+	data, err := os.ReadFile(path)
+	if err == nil {
+		return data, true, nil
+	}
+	if os.IsNotExist(err) {
+		return nil, false, nil
+	}
+	return nil, false, err
 }
 
 // resolveOntologyScopeFromBrownfield opens the brownfield store at the given

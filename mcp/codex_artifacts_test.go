@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -2186,11 +2187,11 @@ func renderGeneratedPSMSkill(t *testing.T, commandName string) string {
 func mustGetwd(t *testing.T) string {
 	t.Helper()
 
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("resolve current test file path")
 	}
-	return wd
+	return filepath.Dir(file)
 }
 
 type codexInstallPaths struct {

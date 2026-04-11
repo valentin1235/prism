@@ -270,6 +270,65 @@ func TestHandleTaskStatusServerRestartConsumesPersistedPollBudget(t *testing.T) 
 	}
 }
 
+func TestHandleTaskStatusPrefersPersistenceFailureSnapshotOverStaleSQLite(t *testing.T) {
+	prismDir := t.TempDir()
+	origBase := PrismBaseDir
+	PrismBaseDir = prismDir
+	defer func() { PrismBaseDir = origBase }()
+
+	TaskStore = taskpkg.NewTaskStore()
+	taskID := "analyze-persist-failure"
+	stateDir := filepath.Join(prismDir, "state", taskID)
+	reportDir := filepath.Join(prismDir, "reports", taskID)
+	if err := analysisstore.SaveAnalysisConfig(prismDir, analysisstore.AnalysisConfigRecord{
+		TaskID:    taskID,
+		Topic:     "persist failure",
+		Model:     "default",
+		Adaptor:   "codex",
+		CreatedAt: time.Now().UTC(),
+		ContextID: taskID,
+		StateDir:  stateDir,
+		ReportDir: reportDir,
+	}); err != nil {
+		t.Fatalf("persist config: %v", err)
+	}
+
+	runningTask := taskpkg.NewAnalysisTask(taskID, "default", stateDir, reportDir, "persist-failure")
+	runningTask.SetStatus(taskpkg.TaskStatusRunning)
+	runningTask.StartStage(taskpkg.StageScope, "stale running row")
+	if err := analysisstore.SaveTaskSnapshot(prismDir, runningTask.Snapshot(), 3); err != nil {
+		t.Fatalf("persist stale running snapshot: %v", err)
+	}
+
+	failedSnapshot := runningTask.Snapshot()
+	markSnapshotFailed(&failedSnapshot, "failed to persist task snapshot: disk full")
+	if err := savePersistenceFailureSnapshot(stateDir, failedSnapshot, 3); err != nil {
+		t.Fatalf("save persistence failure snapshot: %v", err)
+	}
+
+	result, err := HandleTaskStatus(context.Background(), makeStatusRequest(taskID))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("unexpected error result: %s", result.Content[0].(mcp.TextContent).Text)
+	}
+
+	var snap taskpkg.TaskSnapshot
+	if err := json.Unmarshal([]byte(result.Content[0].(mcp.TextContent).Text), &snap); err != nil {
+		t.Fatalf("unmarshal snapshot: %v", err)
+	}
+	if snap.Status != taskpkg.TaskStatusFailed {
+		t.Fatalf("expected failed status from persistence failure snapshot, got %s", snap.Status)
+	}
+	if !strings.Contains(snap.Error, "failed to persist task snapshot") {
+		t.Fatalf("expected persistence failure error, got %q", snap.Error)
+	}
+	if len(snap.Stages) == 0 || snap.Stages[0].Status != taskpkg.StageStatusFailed {
+		t.Fatalf("expected stage failed from sidecar snapshot, got %+v", snap.Stages)
+	}
+}
+
 func TestHandleTaskStatusQueued(t *testing.T) {
 	TaskStore = taskpkg.NewTaskStore()
 	task := TaskStore.Create("ctx-test", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")

@@ -631,3 +631,37 @@ func TestHandleAnalyzeFailsFastOnExistingBackupReadError(t *testing.T) {
 		t.Fatalf("expected report dir to remain absent, stat err=%v", err)
 	}
 }
+
+func TestHandleAnalyzeRejectsDeterministicRerunWhileTaskIsRunning(t *testing.T) {
+	dir := t.TempDir()
+
+	origBase := PrismBaseDir
+	PrismBaseDir = dir
+	defer func() { PrismBaseDir = origBase }()
+
+	TaskStore = taskpkg.NewTaskStore()
+
+	task := TaskStore.Create("", "default", "", "", "same-session")
+	task.SetStatus(taskpkg.TaskStatusRunning)
+	task.StartStage(taskpkg.StageScope, "already running")
+
+	result, err := HandleAnalyze(context.Background(), makeAnalyzeRequest(map[string]interface{}{
+		"topic":          "rerun while running",
+		"session_id":     "same-session",
+		"ontology_scope": `{"sources":[],"totals":{"doc":0}}`,
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.IsError {
+		t.Fatal("expected deterministic rerun to fail while previous task is running")
+	}
+
+	errText := result.Content[0].(mcp.TextContent).Text
+	if !strings.Contains(errText, "already running") {
+		t.Fatalf("expected running task rejection, got %q", errText)
+	}
+	if TaskStore.Get(task.ID) == nil {
+		t.Fatalf("expected existing running task %s to remain registered", task.ID)
+	}
+}
