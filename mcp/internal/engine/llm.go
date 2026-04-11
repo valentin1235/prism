@@ -49,7 +49,7 @@ func QueryLLM(ctx context.Context, prompt string) (string, error) {
 	return QuerySync(ctx, prompt, ClaudeOptions{
 		Env:          runtimeEnvOverrides(""),
 		AllowedTools: []string{},
-		MaxTurns:     1,
+
 	})
 }
 
@@ -59,7 +59,7 @@ func QueryLLMWithSystemPrompt(ctx context.Context, systemPrompt, userPrompt stri
 		SystemPrompt: systemPrompt,
 		Env:          runtimeEnvOverrides(""),
 		AllowedTools: []string{},
-		MaxTurns:     1,
+
 	})
 }
 
@@ -70,7 +70,7 @@ func QueryLLMScoped(ctx context.Context, stateDir, model, prompt string) (string
 		Cwd:          stateDir,
 		Env:          runtimeEnvOverrides(""),
 		AllowedTools: []string{},
-		MaxTurns:     1,
+
 	})
 }
 
@@ -87,7 +87,7 @@ func QueryLLMScopedWithSystemPromptAdaptor(ctx context.Context, stateDir, model,
 		Cwd:          stateDir,
 		Env:          runtimeEnvOverrides(adaptor),
 		AllowedTools: []string{},
-		MaxTurns:     1,
+
 	})
 }
 
@@ -104,18 +104,17 @@ func QueryLLMScopedWithSchemaAdaptor(ctx context.Context, stateDir, model, adapt
 		Cwd:          stateDir,
 		Env:          runtimeEnvOverrides(adaptor),
 		AllowedTools: []string{},
-		MaxTurns:     1,
+
 	})
 }
 
-// QueryLLMScopedWithToolsAndSchema calls the Codex CLI with tool access and
-// --json-schema for structured output. Multi-turn mode — timeout controls duration,
-// while maxTurns is still surfaced as an execution-budget hint in the prompt.
-func QueryLLMScopedWithToolsAndSchema(ctx context.Context, stateDir, model, jsonSchema, systemPrompt, userPrompt string, maxTurns int) (string, error) {
-	return QueryLLMScopedWithToolsAndSchemaAdaptor(ctx, stateDir, model, "", jsonSchema, systemPrompt, userPrompt, maxTurns)
+// QueryLLMScopedWithToolsAndSchema calls the CLI with tool access and
+// --json-schema for structured output. Multi-turn mode — timeout controls duration.
+func QueryLLMScopedWithToolsAndSchema(ctx context.Context, stateDir, model, jsonSchema, systemPrompt, userPrompt string) (string, error) {
+	return QueryLLMScopedWithToolsAndSchemaAdaptor(ctx, stateDir, model, "", jsonSchema, systemPrompt, userPrompt)
 }
 
-func QueryLLMScopedWithToolsAndSchemaAdaptor(ctx context.Context, stateDir, model, adaptor, jsonSchema, systemPrompt, userPrompt string, maxTurns int) (string, error) {
+func QueryLLMScopedWithToolsAndSchemaAdaptor(ctx context.Context, stateDir, model, adaptor, jsonSchema, systemPrompt, userPrompt string) (string, error) {
 	return QuerySync(ctx, userPrompt, ClaudeOptions{
 		Model:           model,
 		SystemPrompt:    systemPrompt,
@@ -125,7 +124,6 @@ func QueryLLMScopedWithToolsAndSchemaAdaptor(ctx context.Context, stateDir, mode
 		AllowedTools:    analysisFilesystemTools,
 		DisallowedTools: nonFilesystemToolRoutes,
 		Cwd:             stateDir,
-		MaxTurns:        maxTurns,
 	})
 }
 

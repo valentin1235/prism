@@ -10,7 +10,6 @@ type LLMRequest struct {
 	Model           string
 	SystemPrompt    string
 	PermissionMode  string
-	MaxTurns        int
 	JSONSchema      string
 	AllowedTools    []string
 	DisallowedTools []string

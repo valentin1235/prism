@@ -46,8 +46,6 @@ type SpecialistCommand struct {
 	// OutputPath is the expected location of findings.json after the specialist completes.
 	OutputPath string
 
-	// MaxTurns is the maximum number of agentic turns for tool use.
-	MaxTurns int
 
 	// JSONSchema is the schema string for --json-schema structured output enforcement.
 	JSONSchema string
@@ -368,7 +366,6 @@ func BuildSpecialistCommand(sctx SpecialistContext, perspective Perspective) Spe
 		Adaptor:       sctx.Adaptor,
 		WorkDir:       sctx.WorkDir,
 		OutputPath:    findingsPath,
-		MaxTurns:      0, // no turn limit — timeout controls duration
 		JSONSchema:    SpecialistFindingsSchema(),
 	}
 }
@@ -514,8 +511,8 @@ func TruncateForPrompt(s string, maxLen int) string {
 // does NOT create its own timeout — the executor manages timeouts centrally to ensure
 // consistent behavior across all parallel jobs.
 func RunSpecialistSession(ctx context.Context, task *taskpkg.AnalysisTask, cmd SpecialistCommand) error {
-	log.Printf("[%s] Specialist %s: starting CLI subprocess (model=%s, maxTurns=%d, workDir=%s)",
-		task.ID, cmd.PerspectiveID, cmd.Model, cmd.MaxTurns, cmd.WorkDir)
+	log.Printf("[%s] Specialist %s: starting CLI subprocess (model=%s, workDir=%s)",
+		task.ID, cmd.PerspectiveID, cmd.Model, cmd.WorkDir)
 
 	// Run claude CLI with tool access and structured output.
 	// The ctx already carries a per-job timeout from the ParallelExecutor.
@@ -527,7 +524,6 @@ func RunSpecialistSession(ctx context.Context, task *taskpkg.AnalysisTask, cmd S
 		cmd.JSONSchema,
 		cmd.SystemPrompt,
 		cmd.UserPrompt,
-		cmd.MaxTurns,
 	)
 	if err != nil {
 		return fmt.Errorf("specialist %s subprocess: %w", cmd.PerspectiveID, err)

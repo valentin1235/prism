@@ -46,8 +46,6 @@ type InterviewCommand struct {
 	// OutputPath is the expected location of verified-findings.json after completion.
 	OutputPath string
 
-	// MaxTurns is the maximum number of agentic turns for tool use during verification.
-	MaxTurns int
 
 	// JSONSchema is the schema string for --json-schema structured output enforcement.
 	JSONSchema string
@@ -269,7 +267,6 @@ func BuildInterviewCommand(ictx InterviewContext, perspective Perspective, findi
 		Adaptor:       ictx.Adaptor,
 		WorkDir:       ictx.WorkDir,
 		OutputPath:    outputPath,
-		MaxTurns:      0, // no turn limit — timeout controls duration
 		JSONSchema:    VerifiedFindingsSchema(),
 	}
 }

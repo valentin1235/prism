@@ -353,8 +353,8 @@ func runInterviewStage(task *taskpkg.AnalysisTask, cfg AnalysisConfig, perspecti
 // does NOT create its own timeout — the executor manages timeouts centrally to ensure
 // consistent behavior across all parallel jobs.
 func runInterviewSession(ctx context.Context, task *taskpkg.AnalysisTask, cmd InterviewCommand) error {
-	log.Printf("[%s] Interview %s: starting CLI subprocess (model=%s, maxTurns=%d, workDir=%s)",
-		task.ID, cmd.PerspectiveID, cmd.Model, cmd.MaxTurns, cmd.WorkDir)
+	log.Printf("[%s] Interview %s: starting CLI subprocess (model=%s, workDir=%s)",
+		task.ID, cmd.PerspectiveID, cmd.Model, cmd.WorkDir)
 
 	// Run claude CLI with tool access and structured output.
 	// The ctx already carries a per-job timeout from the ParallelExecutor.
@@ -366,7 +366,6 @@ func runInterviewSession(ctx context.Context, task *taskpkg.AnalysisTask, cmd In
 		cmd.JSONSchema,
 		cmd.SystemPrompt,
 		cmd.UserPrompt,
-		cmd.MaxTurns,
 	)
 	if err != nil {
 		return fmt.Errorf("interview %s subprocess: %w", cmd.PerspectiveID, err)

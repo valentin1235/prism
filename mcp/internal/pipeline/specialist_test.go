@@ -61,11 +61,6 @@ func TestBuildSpecialistCommand_BasicStructure(t *testing.T) {
 		t.Errorf("OutputPath = %q, want %q", cmd.OutputPath, expectedOutput)
 	}
 
-	// Check MaxTurns — no turn limit, timeout controls duration
-	if cmd.MaxTurns != 0 {
-		t.Errorf("MaxTurns = %d, want 0", cmd.MaxTurns)
-	}
-
 	// Check JSONSchema is set
 	if cmd.JSONSchema == "" {
 		t.Error("JSONSchema must be non-empty")

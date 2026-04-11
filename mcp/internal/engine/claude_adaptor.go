@@ -164,8 +164,6 @@ func (ClaudeAdaptor) BuildCLIArgs(req LLMRequest, outputPath, schemaPath string)
 	if req.PermissionMode != "" {
 		args = append(args, "--permission-mode", req.PermissionMode)
 	}
-	// --max-turns is not in Claude Code 2.1.92 help output (hidden/deprecated).
-	// Timeout via context controls duration instead.
 	if req.JSONSchema != "" {
 		args = append(args, "--json-schema", req.JSONSchema)
 	}

@@ -41,7 +41,7 @@ func TestRunSpecialistSession_CodexInvocationContractAndArtifacts(t *testing.T) 
 		Model:         "claude-sonnet-4-6",
 		WorkDir:       workDir,
 		OutputPath:    FindingsPath(stateDir, "security-analysis"),
-		MaxTurns:      0,
+
 		JSONSchema:    SpecialistFindingsSchema(),
 	}
 
@@ -108,7 +108,7 @@ func TestRunInterviewSession_CodexInvocationContractAndArtifacts(t *testing.T) {
 		Model:         "claude-sonnet-4-6",
 		WorkDir:       workDir,
 		OutputPath:    filepath.Join(workDir, "verified-findings.json"),
-		MaxTurns:      0,
+
 		JSONSchema:    VerifiedFindingsSchema(),
 	}
 
