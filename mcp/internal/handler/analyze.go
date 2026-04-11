@@ -137,7 +137,13 @@ func HandleAnalyze(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallT
 	contextID := task.ID
 	stateDir := filepath.Join(stateBase, contextID)
 	reportDir := filepath.Join(reportBase, contextID)
-	backup := captureExistingAnalysisArtifacts(task.ID, stateDir, reportDir)
+	backup, err := captureExistingAnalysisArtifacts(task.ID, stateDir, reportDir)
+	if err != nil {
+		if TaskStore != nil {
+			TaskStore.Remove(task.ID)
+		}
+		return mcp.NewToolResultError(fmt.Sprintf("failed to load existing analysis backup: %v", err)), nil
+	}
 
 	// Update task fields now that we have the directories
 	task.UpdateDirs(contextID, stateDir, reportDir)
@@ -213,10 +219,12 @@ func HandleAnalyze(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallT
 	task.Cancel = pipelineCancel
 	task.SetPersistenceErrorHook(func(persistErr error) {
 		snapshot, pollCount := task.SnapshotWithPollCount()
-		snapshot.Status = taskpkg.TaskStatusFailed
-		snapshot.Error = fmt.Sprintf("failed to persist task snapshot: %v", persistErr)
+		markSnapshotFailed(&snapshot, fmt.Sprintf("failed to persist task snapshot: %v", persistErr))
 		if err := analysisstore.SaveTaskSnapshot(PrismBaseDir, snapshot, pollCount); err != nil {
 			log.Printf("[%s] failed to persist terminal snapshot after persistence error: %v", task.ID, err)
+			if delErr := analysisstore.DeleteAnalysisTask(PrismBaseDir, task.ID); delErr != nil {
+				log.Printf("[%s] failed to delete stale persisted task after persistence error: %v", task.ID, delErr)
+			}
 		}
 		task.DisablePersistence()
 		if task.Cancel != nil {
@@ -308,8 +316,7 @@ func HandleTaskStatus(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 				return mcp.NewToolResultError(fmt.Sprintf("failed to update task poll count: %v", err)), nil
 			}
 			if pollCount > taskpkg.MaxPollIterations {
-				snapshot.Status = taskpkg.TaskStatusFailed
-				snapshot.Error = fmt.Sprintf("poll limit exceeded: %d polls (max %d) — task timed out after prolonged execution", pollCount, taskpkg.MaxPollIterations)
+				markSnapshotFailed(&snapshot, fmt.Sprintf("poll limit exceeded: %d polls (max %d) — task timed out after prolonged execution", pollCount, taskpkg.MaxPollIterations))
 				if err := analysisstore.SaveTaskSnapshot(PrismBaseDir, snapshot, pollCount); err != nil {
 					return mcp.NewToolResultError(fmt.Sprintf("failed to persist timed-out task status: %v", err)), nil
 				}
@@ -330,7 +337,7 @@ func HandleTaskStatus(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 				if task.Cancel != nil {
 					task.Cancel()
 				}
-				task.SetError(fmt.Sprintf("poll limit exceeded: %d polls (max %d) — task timed out after prolonged execution", pollCount, taskpkg.MaxPollIterations))
+				failTaskWithDetail(task, fmt.Sprintf("poll limit exceeded: %d polls (max %d) — task timed out after prolonged execution", pollCount, taskpkg.MaxPollIterations))
 				// Re-take snapshot after failure
 				snapshot = task.Snapshot()
 			}
@@ -575,7 +582,7 @@ type analysisCreationBackup struct {
 	scopePathContent  []byte
 }
 
-func captureExistingAnalysisArtifacts(taskID, stateDir, reportDir string) analysisCreationBackup {
+func captureExistingAnalysisArtifacts(taskID, stateDir, reportDir string) (analysisCreationBackup, error) {
 	backup := analysisCreationBackup{
 		stateDirExists:  pathExists(stateDir),
 		reportDirExists: pathExists(reportDir),
@@ -593,17 +600,25 @@ func captureExistingAnalysisArtifacts(taskID, stateDir, reportDir string) analys
 		backup.scopePathContent = content
 	}
 
-	if rec, ok, err := analysisstore.LoadAnalysisConfig(PrismBaseDir, taskID); err == nil && ok {
+	rec, ok, err := analysisstore.LoadAnalysisConfig(PrismBaseDir, taskID)
+	if err != nil {
+		return backup, fmt.Errorf("load persisted config: %w", err)
+	}
+	if ok {
 		backup.rowExists = true
 		backup.configRecord = rec
 	}
-	if snapshot, pollCount, ok, err := analysisstore.LoadTaskSnapshot(PrismBaseDir, taskID); err == nil && ok {
+	snapshot, pollCount, ok, err := analysisstore.LoadTaskSnapshot(PrismBaseDir, taskID)
+	if err != nil {
+		return backup, fmt.Errorf("load persisted snapshot: %w", err)
+	}
+	if ok {
 		backup.snapshotExists = true
 		backup.snapshot = snapshot
 		backup.pollCount = pollCount
 	}
 
-	return backup
+	return backup, nil
 }
 
 func cleanupFailedAnalysisTask(taskID, stateDir, reportDir string, backup analysisCreationBackup) error {
@@ -679,6 +694,46 @@ func analyzeCreationError(taskID, stateDir, reportDir string, backup analysisCre
 		message = fmt.Sprintf("%s; cleanup failed: %v", message, err)
 	}
 	return mcp.NewToolResultError(message)
+}
+
+func failTaskWithDetail(task *taskpkg.AnalysisTask, detail string) {
+	snapshot := task.Snapshot()
+	for _, stage := range snapshot.Stages {
+		if stage.Status == taskpkg.StageStatusRunning {
+			task.FailStage(stage.Name, mergeStageDetail(stage.Detail, detail))
+		}
+	}
+	task.SetError(detail)
+}
+
+func markSnapshotFailed(snapshot *taskpkg.TaskSnapshot, detail string) {
+	now := time.Now().UTC()
+	snapshot.Status = taskpkg.TaskStatusFailed
+	snapshot.Error = detail
+	snapshot.UpdatedAt = now
+	for i := range snapshot.Stages {
+		if snapshot.Stages[i].Status != taskpkg.StageStatusRunning {
+			continue
+		}
+		snapshot.Stages[i].Status = taskpkg.StageStatusFailed
+		snapshot.Stages[i].EndedAt = &now
+		snapshot.Stages[i].Detail = mergeStageDetail(snapshot.Stages[i].Detail, detail)
+	}
+}
+
+func mergeStageDetail(existing, detail string) string {
+	existing = strings.TrimSpace(existing)
+	detail = strings.TrimSpace(detail)
+	switch {
+	case existing == "":
+		return detail
+	case detail == "":
+		return existing
+	case strings.Contains(existing, detail):
+		return existing
+	default:
+		return existing + "; " + detail
+	}
 }
 
 // resolveOntologyScopeFromBrownfield opens the brownfield store at the given

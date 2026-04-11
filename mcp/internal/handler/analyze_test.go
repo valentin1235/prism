@@ -262,6 +262,12 @@ func TestHandleTaskStatusServerRestartConsumesPersistedPollBudget(t *testing.T) 
 	if pollCount != taskpkg.MaxPollIterations+1 {
 		t.Fatalf("expected poll count %d, got %d", taskpkg.MaxPollIterations+1, pollCount)
 	}
+	if len(persisted.Stages) == 0 || persisted.Stages[0].Status != taskpkg.StageStatusFailed {
+		t.Fatalf("expected running stage to be marked failed, got %+v", persisted.Stages)
+	}
+	if !strings.Contains(persisted.Stages[0].Detail, "poll limit exceeded") {
+		t.Fatalf("expected timed-out stage detail to mention poll limit, got %q", persisted.Stages[0].Detail)
+	}
 }
 
 func TestHandleTaskStatusQueued(t *testing.T) {

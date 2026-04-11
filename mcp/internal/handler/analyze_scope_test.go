@@ -589,3 +589,45 @@ func TestHandleAnalyzeInvalidOntologyScopePreservesExistingDeterministicRun(t *t
 		t.Fatalf("expected poll count 4 to remain, got %d", pollCount)
 	}
 }
+
+func TestHandleAnalyzeFailsFastOnExistingBackupReadError(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "prism.db"), []byte("not-a-sqlite-db"), 0o644); err != nil {
+		t.Fatalf("write corrupt prism db: %v", err)
+	}
+
+	origBase := PrismBaseDir
+	PrismBaseDir = dir
+	defer func() { PrismBaseDir = origBase }()
+
+	TaskStore = taskpkg.NewTaskStore()
+
+	sessionID := "backup-read-error"
+	result, err := HandleAnalyze(context.Background(), makeAnalyzeRequest(map[string]interface{}{
+		"topic":          "backup read error",
+		"session_id":     sessionID,
+		"ontology_scope": `{"sources":[],"totals":{"doc":0}}`,
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.IsError {
+		t.Fatal("expected corrupt sqlite backup read to fail")
+	}
+
+	errText := result.Content[0].(mcp.TextContent).Text
+	if !strings.Contains(errText, "failed to load existing analysis backup") {
+		t.Fatalf("expected backup read failure, got %q", errText)
+	}
+
+	taskID := "analyze-" + sessionID
+	if TaskStore.Get(taskID) != nil {
+		t.Fatalf("expected task %s to be removed from memory", taskID)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "state", taskID)); !os.IsNotExist(err) {
+		t.Fatalf("expected state dir to remain absent, stat err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "reports", taskID)); !os.IsNotExist(err) {
+		t.Fatalf("expected report dir to remain absent, stat err=%v", err)
+	}
+}
