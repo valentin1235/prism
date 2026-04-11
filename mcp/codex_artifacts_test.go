@@ -130,6 +130,8 @@ func TestInstalledCodexAnalyzeSkillIsPortableAcrossWorkingDirectories(t *testing
 	canonicalCodexHome := canonicalPath(t, install.codexHome)
 	for _, needle := range []string{
 		`command = "` + install.runScript + `"`,
+		`PRISM_AGENT_RUNTIME = "codex"`,
+		`PRISM_LLM_BACKEND = "codex"`,
 		`PRISM_REPO_PATH = "` + install.repoRoot + `"`,
 		`# PRISM_REPO_PATH is the source of truth for shared Prism skill, prompt, template, and MCP assets.`,
 		`PRISM_SHARED_SKILLS_ROOT = "` + filepath.Join(install.repoRoot, "skills") + `"`,
@@ -199,6 +201,8 @@ func TestInstallCodexScriptUsesAbsolutePrismRepoPath(t *testing.T) {
 	for _, needle := range []string{
 		`[mcp_servers.prism]`,
 		`command = "` + install.runScript + `"`,
+		`PRISM_AGENT_RUNTIME = "codex"`,
+		`PRISM_LLM_BACKEND = "codex"`,
 		`PRISM_REPO_PATH = "` + install.repoRoot + `"`,
 		`# PRISM_REPO_PATH is the source of truth for shared Prism skill, prompt, template, and MCP assets.`,
 		`PRISM_SHARED_SKILLS_ROOT = "` + filepath.Join(install.repoRoot, "skills") + `"`,
@@ -1481,6 +1485,8 @@ func TestInstalledCodexBrownfieldSkillIsPortableAcrossWorkingDirectories(t *test
 	config := readFile(t, install.configPath)
 	for _, needle := range []string{
 		`command = "` + install.runScript + `"`,
+		`PRISM_AGENT_RUNTIME = "codex"`,
+		`PRISM_LLM_BACKEND = "codex"`,
 		`PRISM_REPO_PATH = "` + install.repoRoot + `"`,
 	} {
 		if !strings.Contains(config, needle) {
@@ -1729,6 +1735,8 @@ func TestInstalledCodexPRDSkillIsPortableAcrossWorkingDirectories(t *testing.T) 
 	config := readFile(t, install.configPath)
 	for _, needle := range []string{
 		`command = "` + install.runScript + `"`,
+		`PRISM_AGENT_RUNTIME = "codex"`,
+		`PRISM_LLM_BACKEND = "codex"`,
 		`PRISM_REPO_PATH = "` + install.repoRoot + `"`,
 	} {
 		if !strings.Contains(config, needle) {

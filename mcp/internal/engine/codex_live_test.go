@@ -32,3 +32,30 @@ func TestLiveCodexScopedToolsAndSchemaCompletes(t *testing.T) {
 		t.Fatal("QueryLLMScopedWithToolsAndSchema() returned empty output")
 	}
 }
+
+func TestLiveCodexScopedSchemaCompletes(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping live Codex schema-only test in short mode")
+	}
+
+	t.Setenv("PRISM_AGENT_RUNTIME", "codex")
+	t.Setenv("PRISM_LLM_BACKEND", "codex")
+	t.Setenv("PRISM_CODEX_CLI_PATH", resolveCLIPath(ClaudeOptions{}))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+
+	result, err := QueryLLMScopedWithSchema(
+		ctx,
+		t.TempDir(),
+		"claude-sonnet-4-6",
+		`{"type":"object","properties":{"status":{"type":"string"}},"required":["status"],"additionalProperties":false}`,
+		"Return JSON with status='ok'. Do not use any tools.",
+	)
+	if err != nil {
+		t.Fatalf("QueryLLMScopedWithSchema() error = %v", err)
+	}
+	if result == "" {
+		t.Fatal("QueryLLMScopedWithSchema() returned empty output")
+	}
+}

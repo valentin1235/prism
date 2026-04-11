@@ -75,6 +75,8 @@ managed_block = f"""# Prism MCP hookup for Codex CLI.
 command = "{run_script}"
 
 [mcp_servers.prism.env]
+PRISM_AGENT_RUNTIME = "codex"
+PRISM_LLM_BACKEND = "codex"
 PRISM_REPO_PATH = "{repo_root}"
 PRISM_SHARED_SKILLS_ROOT = "{shared_skills_root}"
 PRISM_CODEX_SKILLS_ROOT = "{codex_skills_root}"

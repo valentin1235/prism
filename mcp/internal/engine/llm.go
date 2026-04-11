@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	prismconfig "github.com/heechul/prism-mcp/internal/config"
 )
 
 var analysisFilesystemTools = []string{"Glob", "Grep", "Read", "Bash"}
@@ -45,6 +47,7 @@ func FilterEnv(keys ...string) []string {
 // QueryLLM calls the claude CLI as a subprocess.
 func QueryLLM(ctx context.Context, prompt string) (string, error) {
 	return QuerySync(ctx, prompt, ClaudeOptions{
+		Env:          runtimeEnvOverrides(""),
 		AllowedTools: []string{},
 		MaxTurns:     1,
 	})
@@ -54,6 +57,7 @@ func QueryLLM(ctx context.Context, prompt string) (string, error) {
 func QueryLLMWithSystemPrompt(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
 	return QuerySync(ctx, userPrompt, ClaudeOptions{
 		SystemPrompt: systemPrompt,
+		Env:          runtimeEnvOverrides(""),
 		AllowedTools: []string{},
 		MaxTurns:     1,
 	})
@@ -64,6 +68,7 @@ func QueryLLMScoped(ctx context.Context, stateDir, model, prompt string) (string
 	return QuerySync(ctx, prompt, ClaudeOptions{
 		Model:        model,
 		Cwd:          stateDir,
+		Env:          runtimeEnvOverrides(""),
 		AllowedTools: []string{},
 		MaxTurns:     1,
 	})
@@ -72,10 +77,15 @@ func QueryLLMScoped(ctx context.Context, stateDir, model, prompt string) (string
 // QueryLLMScopedWithSystemPrompt calls the claude CLI with task-scoped isolation
 // and a separate system prompt.
 func QueryLLMScopedWithSystemPrompt(ctx context.Context, stateDir, model, systemPrompt, userPrompt string) (string, error) {
+	return QueryLLMScopedWithSystemPromptAdaptor(ctx, stateDir, model, "", systemPrompt, userPrompt)
+}
+
+func QueryLLMScopedWithSystemPromptAdaptor(ctx context.Context, stateDir, model, adaptor, systemPrompt, userPrompt string) (string, error) {
 	return QuerySync(ctx, userPrompt, ClaudeOptions{
 		Model:        model,
 		SystemPrompt: systemPrompt,
 		Cwd:          stateDir,
+		Env:          runtimeEnvOverrides(adaptor),
 		AllowedTools: []string{},
 		MaxTurns:     1,
 	})
@@ -84,10 +94,15 @@ func QueryLLMScopedWithSystemPrompt(ctx context.Context, stateDir, model, system
 // QueryLLMScopedWithSchema calls the claude CLI with --json-schema for structured
 // output. Single-turn, no tool access.
 func QueryLLMScopedWithSchema(ctx context.Context, stateDir, model, jsonSchema, prompt string) (string, error) {
+	return QueryLLMScopedWithSchemaAdaptor(ctx, stateDir, model, "", jsonSchema, prompt)
+}
+
+func QueryLLMScopedWithSchemaAdaptor(ctx context.Context, stateDir, model, adaptor, jsonSchema, prompt string) (string, error) {
 	return QuerySync(ctx, prompt, ClaudeOptions{
 		Model:        model,
 		JSONSchema:   jsonSchema,
 		Cwd:          stateDir,
+		Env:          runtimeEnvOverrides(adaptor),
 		AllowedTools: []string{},
 		MaxTurns:     1,
 	})
@@ -97,6 +112,10 @@ func QueryLLMScopedWithSchema(ctx context.Context, stateDir, model, jsonSchema, 
 // --json-schema for structured output. Multi-turn mode — timeout controls duration,
 // while maxTurns is still surfaced as an execution-budget hint in the prompt.
 func QueryLLMScopedWithToolsAndSchema(ctx context.Context, stateDir, model, jsonSchema, systemPrompt, userPrompt string, maxTurns int) (string, error) {
+	return QueryLLMScopedWithToolsAndSchemaAdaptor(ctx, stateDir, model, "", jsonSchema, systemPrompt, userPrompt, maxTurns)
+}
+
+func QueryLLMScopedWithToolsAndSchemaAdaptor(ctx context.Context, stateDir, model, adaptor, jsonSchema, systemPrompt, userPrompt string, maxTurns int) (string, error) {
 	if maxTurns <= 0 {
 		maxTurns = 8
 	}
@@ -106,11 +125,23 @@ func QueryLLMScopedWithToolsAndSchema(ctx context.Context, stateDir, model, json
 		SystemPrompt:    systemPrompt,
 		JSONSchema:      jsonSchema,
 		PermissionMode:  "bypassPermissions",
+		Env:             runtimeEnvOverrides(adaptor),
 		AllowedTools:    analysisFilesystemTools,
 		DisallowedTools: nonFilesystemToolRoutes,
 		Cwd:             stateDir,
 		MaxTurns:        maxTurns,
 	})
+}
+
+func runtimeEnvOverrides(adaptor string) map[string]string {
+	backend := strings.ToLower(strings.TrimSpace(adaptor))
+	if backend != "codex" && backend != "claude" {
+		backend = prismconfig.ResolveRuntimeBackend()
+	}
+	return map[string]string{
+		"PRISM_AGENT_RUNTIME": backend,
+		"PRISM_LLM_BACKEND":   backend,
+	}
 }
 
 // ExtractJSON extracts a valid JSON object from output that may contain

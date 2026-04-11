@@ -340,6 +340,7 @@ func TestBuildAllSpecialistCommands(t *testing.T) {
 	cfg := AnalysisConfig{
 		Topic:     "Test multi-specialist",
 		Model:     "claude-sonnet-4-6",
+		Adaptor:   "codex",
 		ContextID: "analyze-test123",
 		StateDir:  tmpDir,
 	}
@@ -389,18 +390,24 @@ func TestBuildAllSpecialistCommands(t *testing.T) {
 		}
 	}
 
-	// Verify each command has distinct perspective ID and work dir
+	// Verify each command has distinct perspective ID and writes to distinct outputs.
 	if commands[0].PerspectiveID == commands[1].PerspectiveID {
 		t.Error("commands must have distinct perspective IDs")
 	}
-	if commands[0].WorkDir == commands[1].WorkDir {
-		t.Error("commands must have distinct work directories")
+	if commands[0].OutputPath == commands[1].OutputPath {
+		t.Error("commands must have distinct output paths")
+	}
+	if commands[0].WorkDir != commands[1].WorkDir {
+		t.Error("commands should share the same analysis work directory")
 	}
 
 	// Verify seed summary is injected
 	for _, cmd := range commands {
 		if !strings.Contains(cmd.SystemPrompt, "Found 3 distinct areas for analysis.") {
 			t.Errorf("command for %s must contain seed summary in system prompt", cmd.PerspectiveID)
+		}
+		if cmd.Adaptor != "codex" {
+			t.Errorf("command for %s adaptor = %q, want %q", cmd.PerspectiveID, cmd.Adaptor, "codex")
 		}
 	}
 }

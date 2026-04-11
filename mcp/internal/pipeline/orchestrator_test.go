@@ -491,3 +491,26 @@ func TestReadAnalysisConfigOptionalFields(t *testing.T) {
 		t.Errorf("report_template: got %q", got.ReportTemplate)
 	}
 }
+
+func TestReadAnalysisConfigAdaptor(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfg := AnalysisConfig{
+		Topic:     "test",
+		Model:     "default",
+		Adaptor:   "codex",
+		ContextID: "analyze-test",
+		StateDir:  tmpDir,
+	}
+	data, _ := json.Marshal(cfg)
+	if err := os.WriteFile(filepath.Join(tmpDir, "config.json"), data, 0644); err != nil {
+		t.Fatalf("write config.json: %v", err)
+	}
+
+	got, err := ReadAnalysisConfig(tmpDir)
+	if err != nil {
+		t.Fatalf("ReadAnalysisConfig() error = %v", err)
+	}
+	if got.Adaptor != "codex" {
+		t.Fatalf("Adaptor = %q, want %q", got.Adaptor, "codex")
+	}
+}

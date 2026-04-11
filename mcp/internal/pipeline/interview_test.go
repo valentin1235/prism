@@ -412,6 +412,7 @@ func TestBuildAllInterviewCommands_SkipsFailedSpecialists(t *testing.T) {
 		Topic:     "test",
 		ContextID: "analyze-test",
 		Model:     "claude-sonnet-4-6",
+		Adaptor:   "codex",
 		StateDir:  stateDir,
 	}
 
@@ -438,6 +439,9 @@ func TestBuildAllInterviewCommands_SkipsFailedSpecialists(t *testing.T) {
 	}
 	if commands[0].PerspectiveID != "persp-1" {
 		t.Errorf("Expected persp-1, got %q", commands[0].PerspectiveID)
+	}
+	if commands[0].Adaptor != "codex" {
+		t.Fatalf("Adaptor = %q, want %q", commands[0].Adaptor, "codex")
 	}
 }
 

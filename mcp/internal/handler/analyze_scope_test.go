@@ -375,3 +375,42 @@ func TestHandleAnalyze_DefaultModelUsesRuntimeDefaultAlias(t *testing.T) {
 		t.Fatalf("config model = %q, want %q", got, "default")
 	}
 }
+
+func TestHandleAnalyze_ExplicitAdaptorPersistsToConfig(t *testing.T) {
+	dir := setupTestBrownfieldDB(t, []brownfield.Repo{
+		{Path: t.TempDir(), Name: "repo"},
+	}, []string{})
+
+	origBase := PrismBaseDir
+	PrismBaseDir = dir
+	defer func() { PrismBaseDir = origBase }()
+
+	TaskStore = taskpkg.NewTaskStore()
+
+	explicitScope := `{"sources":[{"id":1,"type":"doc","path":"` + t.TempDir() + `","domain":"explicit","summary":"Explicit scope","status":"available","access":{"tools":["Read"],"instructions":"Use Read"}}],"totals":{"doc":1}}`
+
+	result, err := HandleAnalyze(context.Background(), makeAnalyzeRequest(map[string]interface{}{
+		"topic":          "test explicit adaptor",
+		"ontology_scope": explicitScope,
+		"adaptor":        "codex",
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("unexpected error result: %s", result.Content[0].(mcp.TextContent).Text)
+	}
+
+	var snap taskpkg.TaskSnapshot
+	if err := json.Unmarshal([]byte(result.Content[0].(mcp.TextContent).Text), &snap); err != nil {
+		t.Fatalf("parse response: %v", err)
+	}
+
+	cfg, err := pipeline.ReadAnalysisConfig(filepath.Join(dir, "state", snap.ID))
+	if err != nil {
+		t.Fatalf("ReadAnalysisConfig() error = %v", err)
+	}
+	if cfg.Adaptor != "codex" {
+		t.Fatalf("config adaptor = %q, want %q", cfg.Adaptor, "codex")
+	}
+}

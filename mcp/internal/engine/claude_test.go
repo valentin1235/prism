@@ -66,6 +66,34 @@ func TestBuildCLIArgs_UsesCodexExecPattern(t *testing.T) {
 	}
 }
 
+func TestResolveAdaptor_UsesExplicitRequestRuntime(t *testing.T) {
+	t.Setenv("PRISM_AGENT_RUNTIME", "claude")
+
+	got := ResolveAdaptor(LLMRequest{
+		Env: map[string]string{
+			"PRISM_AGENT_RUNTIME": "codex",
+		},
+	})
+
+	if got.Name() != "codex" {
+		t.Fatalf("ResolveAdaptor() = %q, want codex", got.Name())
+	}
+}
+
+func TestResolveCLIPath_DelegatesThroughAdaptor(t *testing.T) {
+	t.Setenv("PRISM_AGENT_RUNTIME", "codex")
+
+	got := resolveCLIPath(ClaudeOptions{
+		Env: map[string]string{
+			"PRISM_CODEX_CLI_PATH": "/tmp/codex-cli",
+		},
+	})
+
+	if got != "/tmp/codex-cli" {
+		t.Fatalf("resolveCLIPath() = %q, want /tmp/codex-cli", got)
+	}
+}
+
 func TestBuildCLIArgs_OmitsLegacyClaudeModelAliases(t *testing.T) {
 	t.Setenv("PRISM_AGENT_RUNTIME", "codex")
 	args := buildCLIArgs(ClaudeOptions{

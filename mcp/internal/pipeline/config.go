@@ -18,6 +18,7 @@ import (
 type AnalysisConfig struct {
 	Topic                string `json:"topic"`
 	Model                string `json:"model"`
+	Adaptor              string `json:"adaptor,omitempty"`
 	TaskID               string `json:"task_id"`
 	ContextID            string `json:"context_id"`
 	StateDir             string `json:"state_dir"`

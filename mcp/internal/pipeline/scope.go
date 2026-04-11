@@ -485,10 +485,11 @@ func RunSeedAnalysis(task *taskpkg.AnalysisTask, cfg AnalysisConfig) error {
 	ctx, cancel := context.WithTimeout(task.Ctx, 10*time.Minute)
 	defer cancel()
 
-	rawOutput, err := engine.QueryLLMScopedWithToolsAndSchema(
+	rawOutput, err := engine.QueryLLMScopedWithToolsAndSchemaAdaptor(
 		ctx,
 		workDir,
 		cfg.Model,
+		cfg.Adaptor,
 		SeedAnalysisSchema(),
 		systemPrompt,
 		userPrompt,
@@ -567,7 +568,7 @@ func RunDAReviewLoop(task *taskpkg.AnalysisTask, cfg AnalysisConfig) error {
 
 		// Call LLM for DA review (30-minute timeout per round)
 		ctx, cancel := context.WithTimeout(task.Ctx, 30*time.Minute)
-		rawOutput, err := engine.QueryLLMScopedWithSystemPrompt(ctx, stateDir, cfg.Model, daPrompt, userPrompt)
+		rawOutput, err := engine.QueryLLMScopedWithSystemPromptAdaptor(ctx, stateDir, cfg.Model, cfg.Adaptor, daPrompt, userPrompt)
 		cancel()
 		if err != nil {
 			return fmt.Errorf("DA review LLM call round %d: %w", round, err)
@@ -663,10 +664,11 @@ func runSupplementaryResearch(task *taskpkg.AnalysisTask, cfg AnalysisConfig, ga
 	ctx, cancel := context.WithTimeout(task.Ctx, 5*time.Minute)
 	defer cancel()
 
-	rawOutput, err := engine.QueryLLMScopedWithToolsAndSchema(
+	rawOutput, err := engine.QueryLLMScopedWithToolsAndSchemaAdaptor(
 		ctx,
 		workDir,
 		cfg.Model,
+		cfg.Adaptor,
 		SeedAnalysisSchema(),
 		sb.String(),
 		"Investigate the DA critique gaps listed above and output additional findings as structured JSON.",
@@ -733,10 +735,11 @@ func RunPerspectiveGeneration(task *taskpkg.AnalysisTask, cfg AnalysisConfig) er
 	ctx, cancel := context.WithTimeout(task.Ctx, 5*time.Minute)
 	defer cancel()
 
-	rawOutput, err := engine.QueryLLMScopedWithSchema(
+	rawOutput, err := engine.QueryLLMScopedWithSchemaAdaptor(
 		ctx,
 		stateDir,
 		cfg.Model,
+		cfg.Adaptor,
 		PerspectivesSchema(),
 		prompt,
 	)

@@ -36,6 +36,9 @@ type InterviewCommand struct {
 	// Model is the fixed model identifier for this analysis run.
 	Model string
 
+	// Adaptor is the explicit LLM runtime backend for this interview session.
+	Adaptor string
+
 	// WorkDir is the perspective-specific working directory.
 	// e.g., ~/.prism/state/analyze-{id}/perspectives/{perspective-id}/
 	WorkDir string
@@ -177,6 +180,9 @@ type InterviewContext struct {
 	// Model is the fixed model for all interviews in this run.
 	Model string
 
+	// Adaptor is the explicit LLM runtime backend for this analysis run.
+	Adaptor string
+
 	// StateDir is the root state directory for this analysis.
 	StateDir string
 
@@ -200,6 +206,7 @@ func LoadInterviewContext(cfg AnalysisConfig) (InterviewContext, error) {
 		Topic:     cfg.Topic,
 		ContextID: cfg.ContextID,
 		Model:     cfg.Model,
+		Adaptor:   cfg.Adaptor,
 		StateDir:  cfg.StateDir,
 		WorkDir:   ResolveAnalysisWorkDir(cfg),
 	}
@@ -259,6 +266,7 @@ func BuildInterviewCommand(ictx InterviewContext, perspective Perspective, findi
 		SystemPrompt:  systemPrompt,
 		UserPrompt:    userPrompt,
 		Model:         ictx.Model,
+		Adaptor:       ictx.Adaptor,
 		WorkDir:       ictx.WorkDir,
 		OutputPath:    outputPath,
 		MaxTurns:      10,

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	prismconfig "github.com/heechul/prism-mcp/internal/config"
 	"github.com/heechul/prism-mcp/internal/brownfield"
 	"github.com/heechul/prism-mcp/internal/pipeline"
 	taskpkg "github.com/heechul/prism-mcp/internal/task"
@@ -54,6 +55,15 @@ func HandleAnalyze(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallT
 	}
 	if !isSupportedModelAlias(model) {
 		return mcp.NewToolResultError(fmt.Sprintf("invalid model %q", model)), nil
+	}
+
+	adaptor, _ := request.Params.Arguments["adaptor"].(string)
+	adaptor = strings.ToLower(strings.TrimSpace(adaptor))
+	if adaptor == "" {
+		adaptor = prismconfig.ResolveRuntimeBackend()
+	}
+	if adaptor != "codex" && adaptor != "claude" {
+		return mcp.NewToolResultError(fmt.Sprintf("invalid adaptor %q", adaptor)), nil
 	}
 
 	inputContext, _ := request.Params.Arguments["input_context"].(string)
@@ -143,6 +153,7 @@ func HandleAnalyze(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallT
 	config := map[string]interface{}{
 		"topic":      topic,
 		"model":      model,
+		"adaptor":    adaptor,
 		"task_id":    task.ID,
 		"context_id": contextID,
 		"state_dir":  stateDir,
