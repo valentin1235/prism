@@ -462,7 +462,11 @@ import re
 import sys
 
 text = Path(sys.argv[1]).read_text(encoding="utf-8")
-match = re.search(r"(?m)^version:\s*(.+?)\s*$", text)
+frontmatter = re.match(r"\A---\n(.*?)\n---\n", text, re.DOTALL)
+if not frontmatter:
+    raise SystemExit(0)
+
+match = re.search(r"(?m)^version:\s*(.+?)\s*$", frontmatter.group(1))
 if match:
     print(match.group(1).strip())
 PY

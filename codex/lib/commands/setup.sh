@@ -71,7 +71,6 @@ prism_psm_setup_command_contract() {
 prism_psm_define_command_config "setup" "shared_skill_relative_path" "skills/setup/SKILL.md"
 prism_psm_define_command_config "setup" "skill_title" "setup flow"
 prism_psm_define_command_config "setup" "skill_description" "Run Prism setup from Codex through the shared brownfield scan and default-selection workflow."
-prism_psm_define_command_config "setup" "skill_version" "2.0.0"
 prism_psm_define_command_config "setup" "command_description" "Run Prism setup workflow"
 prism_psm_define_command_config "setup" "usage_function" "prism_psm_setup_usage"
 prism_psm_define_command_config "setup" "skill_dispatch_function" "prism_psm_setup_skill_dispatch"

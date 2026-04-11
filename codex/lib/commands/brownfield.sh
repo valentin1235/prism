@@ -65,7 +65,6 @@ prism_psm_brownfield_command_contract() {
 prism_psm_define_command_config "brownfield" "shared_skill_relative_path" "skills/brownfield/SKILL.md"
 prism_psm_define_command_config "brownfield" "skill_title" "brownfield repository scan and default-management workflow"
 prism_psm_define_command_config "brownfield" "skill_description" "Scan and manage brownfield repository defaults for interviews through the shared Prism brownfield skill."
-prism_psm_define_command_config "brownfield" "skill_version" "2.0.0"
 prism_psm_define_command_config "brownfield" "command_description" "Run Prism brownfield repository setup"
 prism_psm_define_command_config "brownfield" "usage_function" "prism_psm_brownfield_usage"
 prism_psm_define_command_config "brownfield" "skill_dispatch_function" "prism_psm_brownfield_skill_dispatch"
