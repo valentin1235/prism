@@ -222,7 +222,7 @@ func TestResolveCLIPath_PrefersClaudeConfigWhenConfigured(t *testing.T) {
 	}
 }
 
-func TestComposePrompt_IncludesSystemToolsAndBudget(t *testing.T) {
+func TestComposePrompt_IncludesSystemAndToolingGuidance(t *testing.T) {
 	got := composePrompt("Investigate the failure.", ClaudeOptions{
 		SystemPrompt:    "Follow the shared protocol exactly.",
 		AllowedTools:    []string{"Read", "grep", "Bash"},
