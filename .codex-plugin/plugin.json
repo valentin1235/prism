@@ -1,6 +1,6 @@
 {
   "name": "prism",
-  "version": "2.16.0",
+  "version": "2.16.1",
   "description": "Multi-perspective agent team analysis for Codex using Prism skills and MCP workflows.",
   "author": {
     "name": "cohemm",
