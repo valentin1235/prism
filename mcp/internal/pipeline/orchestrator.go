@@ -25,6 +25,7 @@ import (
 func RunAnalysisPipeline(task *taskpkg.AnalysisTask) {
 	// Ensure cancel is called when pipeline exits to release resources.
 	defer func() {
+		task.CloseDone()
 		if task.Cancel != nil {
 			task.Cancel()
 		}

@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -1774,8 +1775,6 @@ func TestInstalledCodexPRDSkillMatchesRepresentativeClaudeScenario(t *testing.T)
 }
 
 func TestInstalledPSMWrapperDispatchesPRDFromOutsideRepoRootWithSharedArtifactContract(t *testing.T) {
-	t.Parallel()
-
 	install := installCodexArtifacts(t)
 	unrelatedDir := t.TempDir()
 
@@ -1812,15 +1811,17 @@ func TestInstalledPSMWrapperDispatchesPRDFromOutsideRepoRootWithSharedArtifactCo
 }
 
 func TestInstalledPSMSetupIsGloballyExecutableViaPATHFromUnrelatedDirectory(t *testing.T) {
-	t.Parallel()
-
 	install := installCodexArtifacts(t)
 	unrelatedDir := t.TempDir()
+	pathBinDir := t.TempDir()
+	if err := os.Symlink(filepath.Join(install.codexHome, "bin", "psm"), filepath.Join(pathBinDir, "psm")); err != nil {
+		t.Fatalf("symlink psm into PATH dir: %v", err)
+	}
 
 	argsOutput, stdinOutput := runInstalledPSMWithFakeCodexOptions(t, install, unrelatedDir, psmInvocationOptions{
 		invokeViaPath: true,
 		extraEnv: []string{
-			"PATH=" + filepath.Join(install.codexHome, "bin") + string(os.PathListSeparator) + os.Getenv("PATH"),
+			"PATH=" + pathBinDir + string(os.PathListSeparator) + "/usr/bin:/bin:/usr/sbin:/sbin",
 		},
 		args: []string{"setup", "defaults"},
 	})
@@ -2133,7 +2134,7 @@ func TestPSMEntrypointsAreRenderedFromSharedFrameworkConfigs(t *testing.T) {
 func readRepoFile(t *testing.T, relativePath string) string {
 	t.Helper()
 
-	path := filepath.Clean(relativePath)
+	path := filepath.Join(mustGetwd(t), relativePath)
 	return readFile(t, path)
 }
 
@@ -2221,7 +2222,7 @@ func installCodexArtifacts(t *testing.T) codexInstallPaths {
 
 	cmd := exec.Command("bash", installScript)
 	cmd.Dir = t.TempDir()
-	cmd.Env = append(
+	cmd.Env = buildTestEnv(
 		os.Environ(),
 		"HOME="+homeDir,
 		"CODEX_HOME="+codexHome,
@@ -2360,6 +2361,9 @@ func representativePSMInvocations() map[string]psmRepresentativeInvocation {
 }
 
 func TestGeneratedCodexSkillVersionMatchesSharedSkillFrontmatter(t *testing.T) {
+	t.Parallel()
+
+	install := installCodexArtifacts(t)
 	tests := []struct {
 		command string
 		version string
@@ -2374,7 +2378,7 @@ func TestGeneratedCodexSkillVersionMatchesSharedSkillFrontmatter(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.command, func(t *testing.T) {
-			content := renderGeneratedPSMSkill(t, tt.command)
+			content := readFile(t, filepath.Join(install.codexHome, "skills", "prism-"+tt.command, "SKILL.md"))
 			needle := "version: " + tt.version
 			if !strings.Contains(content, needle) {
 				t.Fatalf("expected %q in generated Codex skill for %s", needle, tt.command)
@@ -2445,16 +2449,47 @@ func runInstalledPSMWithFakeCodexOptions(t *testing.T, install codexInstallPaths
 
 	cmd := exec.Command(commandPath, commandArgs...)
 	cmd.Dir = workingDir
-	cmd.Env = append(
+	cmd.Env = buildTestEnv(
 		os.Environ(),
-		"HOME="+install.homeDir,
-		"CODEX_HOME="+install.codexHome,
-		"PSM_CODEX_CLI_PATH="+fakeCodexPath,
+		append([]string{
+			"HOME=" + install.homeDir,
+			"CODEX_HOME=" + install.codexHome,
+			"PSM_CODEX_CLI_PATH=" + fakeCodexPath,
+		}, opts.extraEnv...)...,
 	)
-	cmd.Env = append(cmd.Env, opts.extraEnv...)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("run psm wrapper: %v\n%s", err, output)
 	}
 
 	return readFile(t, argsPath), readFile(t, stdinPath)
+}
+
+func buildTestEnv(base []string, overrides ...string) []string {
+	envMap := make(map[string]string, len(base)+len(overrides))
+	order := make([]string, 0, len(base)+len(overrides))
+
+	record := func(entry string) {
+		key, value, ok := strings.Cut(entry, "=")
+		if !ok {
+			return
+		}
+		if _, exists := envMap[key]; !exists {
+			order = append(order, key)
+		}
+		envMap[key] = value
+	}
+
+	for _, entry := range base {
+		record(entry)
+	}
+	for _, entry := range overrides {
+		record(entry)
+	}
+
+	sort.Strings(order)
+	result := make([]string, 0, len(order))
+	for _, key := range order {
+		result = append(result, key+"="+envMap[key])
+	}
+	return result
 }

@@ -134,6 +134,9 @@ func HandleAnalyze(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallT
 			if snapshot := existing.Snapshot(); !snapshot.Status.IsTerminal() {
 				return mcp.NewToolResultError(fmt.Sprintf("task %s is already %s — deterministic rerun requires the previous in-memory run to finish or be cancelled first", taskID, snapshot.Status)), nil
 			}
+			if !existing.WaitForExit(5 * time.Second) {
+				return mcp.NewToolResultError(fmt.Sprintf("task %s reached %s but has not fully exited yet — retry after the previous run finishes cleaning up", taskID, existing.Snapshot().Status)), nil
+			}
 			TaskStore.Remove(taskID)
 		}
 	}
@@ -726,12 +729,25 @@ func cleanupFailedAnalysisTask(taskID, stateDir, reportDir string, backup analys
 }
 
 func loadPersistedTaskSnapshot(taskID string) (taskpkg.TaskSnapshot, int, bool, error) {
-	if snapshot, pollCount, ok, err := loadPersistenceFailureSnapshot(filepath.Join(PrismBaseDir, "state", taskID)); err != nil {
+	sidecarSnapshot, sidecarPollCount, sidecarOK, err := loadPersistenceFailureSnapshot(filepath.Join(PrismBaseDir, "state", taskID))
+	if err != nil {
 		return taskpkg.TaskSnapshot{}, 0, false, err
-	} else if ok {
-		return snapshot, pollCount, true, nil
 	}
-	return analysisstore.LoadTaskSnapshot(PrismBaseDir, taskID)
+	dbSnapshot, dbPollCount, dbOK, err := analysisstore.LoadTaskSnapshot(PrismBaseDir, taskID)
+	if err != nil {
+		return taskpkg.TaskSnapshot{}, 0, false, err
+	}
+	switch {
+	case sidecarOK && dbOK:
+		if shouldPreferPersistenceFailureSnapshot(sidecarSnapshot, dbSnapshot) {
+			return sidecarSnapshot, sidecarPollCount, true, nil
+		}
+		return dbSnapshot, dbPollCount, true, nil
+	case sidecarOK:
+		return sidecarSnapshot, sidecarPollCount, true, nil
+	default:
+		return dbSnapshot, dbPollCount, dbOK, nil
+	}
 }
 
 func pathExists(path string) (bool, error) {
@@ -790,6 +806,22 @@ func mergeStageDetail(existing, detail string) string {
 	default:
 		return existing + "; " + detail
 	}
+}
+
+func shouldPreferPersistenceFailureSnapshot(sidecar, db taskpkg.TaskSnapshot) bool {
+	if sidecar.UpdatedAt.After(db.UpdatedAt) {
+		return true
+	}
+	if db.UpdatedAt.After(sidecar.UpdatedAt) {
+		return false
+	}
+	if sidecar.CreatedAt.After(db.CreatedAt) {
+		return true
+	}
+	if db.CreatedAt.After(sidecar.CreatedAt) {
+		return false
+	}
+	return false
 }
 
 type persistenceFailureSnapshot struct {

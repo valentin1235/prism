@@ -665,3 +665,45 @@ func TestHandleAnalyzeRejectsDeterministicRerunWhileTaskIsRunning(t *testing.T) 
 		t.Fatalf("expected existing running task %s to remain registered", task.ID)
 	}
 }
+
+func TestHandleAnalyzeRejectsDeterministicRerunUntilTerminalTaskFullyExits(t *testing.T) {
+	dir := t.TempDir()
+
+	origBase := PrismBaseDir
+	PrismBaseDir = dir
+	defer func() { PrismBaseDir = origBase }()
+
+	TaskStore = taskpkg.NewTaskStore()
+
+	task := TaskStore.Create("", "default", "", "", "same-session-terminal")
+	task.SetError("already failed")
+
+	result, err := HandleAnalyze(context.Background(), makeAnalyzeRequest(map[string]interface{}{
+		"topic":          "rerun while cleanup pending",
+		"session_id":     "same-session-terminal",
+		"ontology_scope": `{"sources":[],"totals":{"doc":0}}`,
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.IsError {
+		t.Fatal("expected deterministic rerun to fail until previous terminal task exits")
+	}
+	errText := result.Content[0].(mcp.TextContent).Text
+	if !strings.Contains(errText, "has not fully exited yet") {
+		t.Fatalf("expected cleanup-pending rejection, got %q", errText)
+	}
+
+	task.CloseDone()
+	result, err = HandleAnalyze(context.Background(), makeAnalyzeRequest(map[string]interface{}{
+		"topic":          "rerun after cleanup",
+		"session_id":     "same-session-terminal",
+		"ontology_scope": `{"sources":[],"totals":{"doc":0}}`,
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error after close: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("expected rerun after done close to succeed, got %s", result.Content[0].(mcp.TextContent).Text)
+	}
+}

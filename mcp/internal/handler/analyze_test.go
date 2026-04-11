@@ -329,6 +329,67 @@ func TestHandleTaskStatusPrefersPersistenceFailureSnapshotOverStaleSQLite(t *tes
 	}
 }
 
+func TestHandleTaskStatusPrefersNewerSQLiteSnapshotOverStalePersistenceFailureSidecar(t *testing.T) {
+	prismDir := t.TempDir()
+	origBase := PrismBaseDir
+	PrismBaseDir = prismDir
+	defer func() { PrismBaseDir = origBase }()
+
+	TaskStore = taskpkg.NewTaskStore()
+	taskID := "analyze-sidecar-stale"
+	stateDir := filepath.Join(prismDir, "state", taskID)
+	reportDir := filepath.Join(prismDir, "reports", taskID)
+	if err := analysisstore.SaveAnalysisConfig(prismDir, analysisstore.AnalysisConfigRecord{
+		TaskID:    taskID,
+		Topic:     "sidecar stale",
+		Model:     "default",
+		Adaptor:   "codex",
+		CreatedAt: time.Now().UTC(),
+		ContextID: taskID,
+		StateDir:  stateDir,
+		ReportDir: reportDir,
+	}); err != nil {
+		t.Fatalf("persist config: %v", err)
+	}
+
+	sidecarTask := taskpkg.NewAnalysisTask(taskID, "default", stateDir, reportDir, "sidecar-stale")
+	sidecarTask.SetStatus(taskpkg.TaskStatusRunning)
+	sidecarTask.StartStage(taskpkg.StageScope, "old sidecar")
+	sidecarSnapshot := sidecarTask.Snapshot()
+	markSnapshotFailed(&sidecarSnapshot, "old persistence failure")
+	if err := savePersistenceFailureSnapshot(stateDir, sidecarSnapshot, 1); err != nil {
+		t.Fatalf("save stale sidecar: %v", err)
+	}
+
+	time.Sleep(20 * time.Millisecond)
+
+	dbTask := taskpkg.NewAnalysisTask(taskID, "default", stateDir, reportDir, "sidecar-stale")
+	dbTask.SetStatus(taskpkg.TaskStatusRunning)
+	dbTask.StartStage(taskpkg.StageScope, "new sqlite snapshot")
+	if err := analysisstore.SaveTaskSnapshot(prismDir, dbTask.Snapshot(), 2); err != nil {
+		t.Fatalf("persist newer sqlite snapshot: %v", err)
+	}
+
+	result, err := HandleTaskStatus(context.Background(), makeStatusRequest(taskID))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("unexpected error result: %s", result.Content[0].(mcp.TextContent).Text)
+	}
+
+	var snap taskpkg.TaskSnapshot
+	if err := json.Unmarshal([]byte(result.Content[0].(mcp.TextContent).Text), &snap); err != nil {
+		t.Fatalf("unmarshal snapshot: %v", err)
+	}
+	if snap.Status != taskpkg.TaskStatusRunning {
+		t.Fatalf("expected newer sqlite snapshot to win, got %s", snap.Status)
+	}
+	if len(snap.Stages) == 0 || snap.Stages[0].Detail != "new sqlite snapshot" {
+		t.Fatalf("expected sqlite stage detail to win, got %+v", snap.Stages)
+	}
+}
+
 func TestHandleTaskStatusQueued(t *testing.T) {
 	TaskStore = taskpkg.NewTaskStore()
 	task := TaskStore.Create("ctx-test", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")

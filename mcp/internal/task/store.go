@@ -109,6 +109,8 @@ type AnalysisTask struct {
 	persistHook      func(TaskSnapshot, int) error
 	persistErrHook   func(error)
 	persistErrRaised bool
+	done             chan struct{}
+	doneOnce         sync.Once
 }
 
 // NewAnalysisTask creates a new task with all stages initialized to pending.
@@ -132,6 +134,40 @@ func NewAnalysisTask(contextID, model, stateDir, reportDir, sessionID string) *A
 		StateDir:  stateDir,
 		ReportDir: reportDir,
 		Stages:    stages,
+		done:      make(chan struct{}),
+	}
+}
+
+func (t *AnalysisTask) CloseDone() {
+	t.doneOnce.Do(func() {
+		close(t.done)
+	})
+}
+
+func (t *AnalysisTask) WaitForExit(timeout time.Duration) bool {
+	t.mu.RLock()
+	done := t.done
+	t.mu.RUnlock()
+
+	if done == nil {
+		return true
+	}
+	if timeout <= 0 {
+		select {
+		case <-done:
+			return true
+		default:
+			return false
+		}
+	}
+
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case <-done:
+		return true
+	case <-timer.C:
+		return false
 	}
 }
 

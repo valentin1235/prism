@@ -163,6 +163,10 @@ func SaveTaskSnapshot(baseDir string, snapshot taskpkg.TaskSnapshot, pollCount i
 	if err != nil {
 		return fmt.Errorf("marshal stages: %w", err)
 	}
+	updatedAt := formatSQLiteTimestamp(snapshot.UpdatedAt)
+	if snapshot.UpdatedAt.IsZero() {
+		updatedAt = formatSQLiteTimestamp(time.Now().UTC())
+	}
 
 	result, err := db.Exec(`
 		UPDATE analysis_tasks
@@ -173,9 +177,9 @@ func SaveTaskSnapshot(baseDir string, snapshot taskpkg.TaskSnapshot, pollCount i
 			error = ?,
 			poll_count = ?,
 			stages_json = ?,
-			updated_at = CURRENT_TIMESTAMP
+			updated_at = ?
 		WHERE task_id = ?
-	`, string(snapshot.Status), snapshot.ContextID, snapshot.ReportPath, snapshot.Error, pollCount, string(stagesJSON), snapshot.ID)
+	`, string(snapshot.Status), snapshot.ContextID, snapshot.ReportPath, snapshot.Error, pollCount, string(stagesJSON), updatedAt, snapshot.ID)
 	if err != nil {
 		return err
 	}
