@@ -481,14 +481,7 @@ prism_psm_render_codex_skill() {
   local dispatch_function
   local normalization_function
 
-  if skill_id="$(prism_psm_command_skill_id "${command_name}" 2>/dev/null)"; then
-    :
-  else
-    # Rendering generated Codex skills should remain possible as long as the
-    # command config exists, even if the registry lookup is unavailable.
-    prism_psm_require_command_config "${command_name}" "shared_skill_relative_path" >/dev/null
-    skill_id="prism-${command_name}"
-  fi
+  skill_id="$(prism_psm_command_skill_id "${command_name}")" || prism_psm_die "unsupported command '${command_name}'."
   skill_description="$(prism_psm_require_command_config "${command_name}" "skill_description")"
   skill_version="$(prism_psm_resolve_skill_version "${command_name}")"
   usage_function="$(prism_psm_require_command_config "${command_name}" "usage_function")"
