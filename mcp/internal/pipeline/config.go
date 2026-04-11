@@ -10,6 +10,8 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/heechul/prism-mcp/internal/analysisstore"
+	prismconfig "github.com/heechul/prism-mcp/internal/config"
 	"github.com/heechul/prism-mcp/internal/parallel"
 )
 
@@ -17,6 +19,7 @@ import (
 type AnalysisConfig struct {
 	Topic                string `json:"topic"`
 	Model                string `json:"model"`
+	Adaptor              string `json:"adaptor,omitempty"`
 	TaskID               string `json:"task_id"`
 	ContextID            string `json:"context_id"`
 	StateDir             string `json:"state_dir"`
@@ -38,6 +41,15 @@ type ontologyScopeSource struct {
 // ReadAnalysisConfig reads config.json from the task's state directory.
 func ReadAnalysisConfig(stateDir string) (AnalysisConfig, error) {
 	var cfg AnalysisConfig
+	if persisted, ok, err := readPersistedAnalysisConfig(stateDir); err != nil {
+		return cfg, err
+	} else if ok {
+		if err := validateAnalysisAdaptor(persisted.Adaptor); err != nil {
+			return cfg, err
+		}
+		return persisted, nil
+	}
+
 	data, err := os.ReadFile(filepath.Join(stateDir, "config.json"))
 	if err != nil {
 		return cfg, fmt.Errorf("read config.json: %w", err)
@@ -45,7 +57,65 @@ func ReadAnalysisConfig(stateDir string) (AnalysisConfig, error) {
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return cfg, fmt.Errorf("parse config.json: %w", err)
 	}
+	cfg.Adaptor = normalizeLegacyAnalysisAdaptor(cfg.Adaptor)
+	if err := validateAnalysisAdaptor(cfg.Adaptor); err != nil {
+		return cfg, err
+	}
 	return cfg, nil
+}
+
+func readPersistedAnalysisConfig(stateDir string) (AnalysisConfig, bool, error) {
+	taskID := strings.TrimSpace(filepath.Base(filepath.Clean(stateDir)))
+	if taskID == "" || taskID == "." || taskID == string(filepath.Separator) {
+		return AnalysisConfig{}, false, nil
+	}
+
+	baseDir := filepath.Dir(filepath.Dir(filepath.Clean(stateDir)))
+	record, ok, err := analysisstore.LoadAnalysisConfig(baseDir, taskID)
+	if err != nil {
+		return AnalysisConfig{}, false, fmt.Errorf("load analysis config from sqlite: %w", err)
+	}
+	if !ok {
+		return AnalysisConfig{}, false, nil
+	}
+
+	return AnalysisConfig{
+		Topic:                record.Topic,
+		Model:                record.Model,
+		Adaptor:              record.Adaptor,
+		TaskID:               record.TaskID,
+		ContextID:            record.ContextID,
+		StateDir:             record.StateDir,
+		ReportDir:            record.ReportDir,
+		InputContext:         record.InputContext,
+		OntologyScope:        record.OntologyScope,
+		SeedHints:            record.SeedHints,
+		ReportTemplate:       record.ReportTemplate,
+		Language:             record.Language,
+		PerspectiveInjection: record.PerspectiveInjection,
+	}, true, nil
+}
+
+func validateAnalysisAdaptor(adaptor string) error {
+	adaptor = strings.ToLower(strings.TrimSpace(adaptor))
+	switch adaptor {
+	case "codex", "claude":
+		return nil
+	default:
+		return fmt.Errorf("analysis config has invalid adaptor %q", adaptor)
+	}
+}
+
+func normalizeLegacyAnalysisAdaptor(adaptor string) string {
+	adaptor = strings.ToLower(strings.TrimSpace(adaptor))
+	if adaptor == "codex" || adaptor == "claude" {
+		return adaptor
+	}
+	resolved := strings.ToLower(strings.TrimSpace(prismconfig.ResolveRuntimeBackend()))
+	if resolved == "codex" || resolved == "claude" {
+		return resolved
+	}
+	return "claude"
 }
 
 // ResolveAnalysisWorkDir picks a filesystem workspace root for tool-driven Codex
@@ -314,12 +384,15 @@ func LoadDASystemPrompt() (string, error) {
 
 // GetRepoRoot determines the repository root from the executable path or known markers.
 func GetRepoRoot() string {
-	marker := filepath.Join("agents", "devils-advocate.md")
+	markers := []string{
+		filepath.Join("skills", "setup", "SKILL.md"),
+		filepath.Join("agents", "devils-advocate.md"),
+	}
 	var tried []string
 
 	// First priority: Codex install path override.
 	if root := os.Getenv("PRISM_REPO_PATH"); root != "" {
-		if _, err := os.Stat(filepath.Join(root, marker)); err == nil {
+		if prismRepoRootMatches(root, markers...) {
 			return root
 		}
 		tried = append(tried, "PRISM_REPO_PATH="+root)
@@ -327,10 +400,25 @@ func GetRepoRoot() string {
 
 	// Second priority: legacy PRISM_ROOT environment variable.
 	if root := os.Getenv("PRISM_ROOT"); root != "" {
-		if _, err := os.Stat(filepath.Join(root, marker)); err == nil {
+		if prismRepoRootMatches(root, markers...) {
 			return root
 		}
 		tried = append(tried, "PRISM_ROOT="+root)
+	}
+
+	// Third priority: the repo-root pointer written into ~/.codex during setup.
+	if pointerPath := prismconfig.CodexRepoRootPointerPath(); pointerPath != "" {
+		if pointedRoot, err := os.ReadFile(pointerPath); err == nil {
+			root := strings.TrimSpace(string(pointedRoot))
+			if prismRepoRootMatches(root, markers...) {
+				return root
+			}
+			if root != "" {
+				tried = append(tried, pointerPath+"="+root)
+			}
+		} else {
+			tried = append(tried, pointerPath)
+		}
 	}
 
 	// Try from executable path (binary is in mcp/bin/ or mcp/)
@@ -343,7 +431,7 @@ func GetRepoRoot() string {
 			if absErr != nil {
 				continue
 			}
-			if _, err := os.Stat(filepath.Join(abs, marker)); err == nil {
+			if prismRepoRootMatches(abs, markers...) {
 				return abs
 			}
 			tried = append(tried, abs)
@@ -357,14 +445,33 @@ func GetRepoRoot() string {
 		if absErr != nil {
 			continue
 		}
-		if _, err := os.Stat(filepath.Join(abs, marker)); err == nil {
+		if prismRepoRootMatches(abs, markers...) {
 			return abs
 		}
 		tried = append(tried, abs)
 	}
 
-	log.Printf("WARNING: could not locate %s. Tried paths: %v. Set PRISM_REPO_PATH or PRISM_ROOT to override.", marker, tried)
+	log.Printf(
+		"WARNING: could not locate Prism repo markers %v. Tried paths: %v. Set PRISM_REPO_PATH or PRISM_ROOT to override.",
+		markers,
+		tried,
+	)
 	return cwd
+}
+
+func prismRepoRootMatches(root string, markers ...string) bool {
+	root = strings.TrimSpace(root)
+	if root == "" {
+		return false
+	}
+
+	for _, marker := range markers {
+		if _, err := os.Stat(filepath.Join(root, marker)); err != nil {
+			return false
+		}
+	}
+
+	return true
 }
 
 // ResolveRepoAssetPath resolves a repository-relative Prism asset path using the

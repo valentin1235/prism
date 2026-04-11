@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"sort"
 	"sync"
 	"time"
@@ -104,6 +105,12 @@ type AnalysisTask struct {
 	// Cancel terminates all in-flight subprocess work.
 	Ctx    context.Context    `json:"-"`
 	Cancel context.CancelFunc `json:"-"`
+
+	persistHook      func(TaskSnapshot, int) error
+	persistErrHook   func(error)
+	persistErrRaised bool
+	done             chan struct{}
+	doneOnce         sync.Once
 }
 
 // NewAnalysisTask creates a new task with all stages initialized to pending.
@@ -127,39 +134,75 @@ func NewAnalysisTask(contextID, model, stateDir, reportDir, sessionID string) *A
 		StateDir:  stateDir,
 		ReportDir: reportDir,
 		Stages:    stages,
+		done:      make(chan struct{}),
+	}
+}
+
+func (t *AnalysisTask) CloseDone() {
+	t.doneOnce.Do(func() {
+		close(t.done)
+	})
+}
+
+func (t *AnalysisTask) WaitForExit(timeout time.Duration) bool {
+	t.mu.RLock()
+	done := t.done
+	t.mu.RUnlock()
+
+	if done == nil {
+		return true
+	}
+	if timeout <= 0 {
+		select {
+		case <-done:
+			return true
+		default:
+			return false
+		}
+	}
+
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case <-done:
+		return true
+	case <-timer.C:
+		return false
 	}
 }
 
 // SetStatus transitions the task to a new status.
 func (t *AnalysisTask) SetStatus(status TaskStatus) {
 	t.mu.Lock()
-	defer t.mu.Unlock()
 	t.Status = status
 	t.UpdatedAt = time.Now().UTC()
+	t.mu.Unlock()
+	t.persistIfConfigured()
 }
 
 // SetError marks the task as failed with an error message.
 func (t *AnalysisTask) SetError(err string) {
 	t.mu.Lock()
-	defer t.mu.Unlock()
 	t.Status = TaskStatusFailed
 	t.Error = err
 	t.UpdatedAt = time.Now().UTC()
+	t.mu.Unlock()
+	t.persistIfConfigured()
 }
 
 // SetReportPath marks the task as completed with a report path.
 func (t *AnalysisTask) SetReportPath(path string) {
 	t.mu.Lock()
-	defer t.mu.Unlock()
 	t.Status = TaskStatusCompleted
 	t.ReportPath = path
 	t.UpdatedAt = time.Now().UTC()
+	t.mu.Unlock()
+	t.persistIfConfigured()
 }
 
 // StartStage transitions a stage to running.
 func (t *AnalysisTask) StartStage(name StageName, detail string) {
 	t.mu.Lock()
-	defer t.mu.Unlock()
 	if s, ok := t.Stages[name]; ok {
 		now := time.Now().UTC()
 		s.Status = StageStatusRunning
@@ -167,12 +210,13 @@ func (t *AnalysisTask) StartStage(name StageName, detail string) {
 		s.Detail = detail
 	}
 	t.UpdatedAt = time.Now().UTC()
+	t.mu.Unlock()
+	t.persistIfConfigured()
 }
 
 // CompleteStage transitions a stage to completed.
 func (t *AnalysisTask) CompleteStage(name StageName, detail string) {
 	t.mu.Lock()
-	defer t.mu.Unlock()
 	if s, ok := t.Stages[name]; ok {
 		now := time.Now().UTC()
 		s.Status = StageStatusCompleted
@@ -182,12 +226,13 @@ func (t *AnalysisTask) CompleteStage(name StageName, detail string) {
 		}
 	}
 	t.UpdatedAt = time.Now().UTC()
+	t.mu.Unlock()
+	t.persistIfConfigured()
 }
 
 // FailStage transitions a stage to failed.
 func (t *AnalysisTask) FailStage(name StageName, detail string) {
 	t.mu.Lock()
-	defer t.mu.Unlock()
 	if s, ok := t.Stages[name]; ok {
 		now := time.Now().UTC()
 		s.Status = StageStatusFailed
@@ -195,38 +240,43 @@ func (t *AnalysisTask) FailStage(name StageName, detail string) {
 		s.Detail = detail
 	}
 	t.UpdatedAt = time.Now().UTC()
+	t.mu.Unlock()
+	t.persistIfConfigured()
 }
 
 // SetStageParallel sets the total count for parallel sub-tasks in a stage.
 func (t *AnalysisTask) SetStageParallel(name StageName, total int) {
 	t.mu.Lock()
-	defer t.mu.Unlock()
 	if s, ok := t.Stages[name]; ok {
 		s.Total = total
 		s.Completed = 0
 		s.Failed = 0
 	}
 	t.UpdatedAt = time.Now().UTC()
+	t.mu.Unlock()
+	t.persistIfConfigured()
 }
 
 // IncrStageCompleted increments the completed count for a parallel stage.
 func (t *AnalysisTask) IncrStageCompleted(name StageName) {
 	t.mu.Lock()
-	defer t.mu.Unlock()
 	if s, ok := t.Stages[name]; ok {
 		s.Completed++
 	}
 	t.UpdatedAt = time.Now().UTC()
+	t.mu.Unlock()
+	t.persistIfConfigured()
 }
 
 // IncrStageFailed increments the failed count for a parallel stage.
 func (t *AnalysisTask) IncrStageFailed(name StageName) {
 	t.mu.Lock()
-	defer t.mu.Unlock()
 	if s, ok := t.Stages[name]; ok {
 		s.Failed++
 	}
 	t.UpdatedAt = time.Now().UTC()
+	t.mu.Unlock()
+	t.persistIfConfigured()
 }
 
 // UpdateStageDetail updates only the detail text of a running stage
@@ -234,31 +284,35 @@ func (t *AnalysisTask) IncrStageFailed(name StageName) {
 // within a single stage (e.g., "running seed analysis" → "running DA review").
 func (t *AnalysisTask) UpdateStageDetail(name StageName, detail string) {
 	t.mu.Lock()
-	defer t.mu.Unlock()
 	if s, ok := t.Stages[name]; ok {
 		s.Detail = detail
 	}
 	t.UpdatedAt = time.Now().UTC()
+	t.mu.Unlock()
+	t.persistIfConfigured()
 }
 
 // IncrPollCount atomically increments the poll counter and returns the new count.
 // Used by handleTaskStatus to enforce MaxPollIterations.
 func (t *AnalysisTask) IncrPollCount() int {
 	t.mu.Lock()
-	defer t.mu.Unlock()
 	t.PollCount++
-	return t.PollCount
+	pollCount := t.PollCount
+	t.mu.Unlock()
+	t.persistIfConfigured()
+	return pollCount
 }
 
 // UpdateDirs sets the context ID, state directory, and report directory.
 // Used after task creation when directories are derived from the generated task ID.
 func (t *AnalysisTask) UpdateDirs(contextID, stateDir, reportDir string) {
 	t.mu.Lock()
-	defer t.mu.Unlock()
 	t.ContextID = contextID
 	t.StateDir = stateDir
 	t.ReportDir = reportDir
 	t.UpdatedAt = time.Now().UTC()
+	t.mu.Unlock()
+	t.persistIfConfigured()
 }
 
 // GetID returns the task ID under a read lock.
@@ -287,7 +341,16 @@ func (t *AnalysisTask) GetReportDir() string {
 func (t *AnalysisTask) Snapshot() TaskSnapshot {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
+	return t.snapshotLocked()
+}
 
+func (t *AnalysisTask) SnapshotWithPollCount() (TaskSnapshot, int) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.snapshotLocked(), t.PollCount
+}
+
+func (t *AnalysisTask) snapshotLocked() TaskSnapshot {
 	stages := make([]StageProgress, 0, len(t.Stages))
 	for _, name := range AllStages() {
 		if s, ok := t.Stages[name]; ok {
@@ -317,6 +380,61 @@ func (t *AnalysisTask) Snapshot() TaskSnapshot {
 	}
 }
 
+func (t *AnalysisTask) SetPersistenceHook(fn func(TaskSnapshot, int) error) error {
+	t.mu.Lock()
+	t.persistHook = fn
+	t.persistErrRaised = false
+	t.mu.Unlock()
+	return t.persistIfConfigured()
+}
+
+func (t *AnalysisTask) SetPersistenceErrorHook(fn func(error)) {
+	t.mu.Lock()
+	t.persistErrHook = fn
+	t.mu.Unlock()
+}
+
+func (t *AnalysisTask) DisablePersistence() {
+	t.mu.Lock()
+	t.persistHook = nil
+	t.persistErrHook = nil
+	t.persistErrRaised = true
+	t.mu.Unlock()
+}
+
+func (t *AnalysisTask) persistIfConfigured() error {
+	t.mu.RLock()
+	fn := t.persistHook
+	if fn == nil {
+		t.mu.RUnlock()
+		return nil
+	}
+	snapshot := t.snapshotLocked()
+	pollCount := t.PollCount
+	t.mu.RUnlock()
+	if err := fn(snapshot, pollCount); err != nil {
+		log.Printf("[%s] task snapshot persistence failed: %v", snapshot.ID, err)
+		t.notifyPersistError(err)
+		return err
+	}
+	return nil
+}
+
+func (t *AnalysisTask) notifyPersistError(err error) {
+	t.mu.Lock()
+	if t.persistErrRaised {
+		t.mu.Unlock()
+		return
+	}
+	t.persistErrRaised = true
+	hook := t.persistErrHook
+	t.mu.Unlock()
+
+	if hook != nil {
+		hook(err)
+	}
+}
+
 // TaskSnapshot is an immutable point-in-time view of a task for API responses.
 type TaskSnapshot struct {
 	ID         string          `json:"id"`
@@ -329,8 +447,8 @@ type TaskSnapshot struct {
 	Error      string          `json:"error,omitempty"`
 }
 
-// TaskStore is a thread-safe in-memory store for analysis tasks.
-// Tasks are lost on MCP server restart (by design - no checkpoint/recovery).
+// TaskStore is a thread-safe in-memory store for active analysis tasks.
+// Long-lived task snapshots may also be persisted elsewhere for restart-safe reads.
 type TaskStore struct {
 	mu    sync.RWMutex
 	tasks map[string]*AnalysisTask

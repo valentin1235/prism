@@ -327,27 +327,21 @@ type Stage1Config struct {
 // LoadStage1Config reads config.json from the task's state directory
 // and resolves ontology doc paths for the seed analyst.
 func LoadStage1Config(task *taskpkg.AnalysisTask) (Stage1Config, error) {
-	configPath := filepath.Join(task.StateDir, "config.json")
-	data, err := os.ReadFile(configPath)
+	cfg, err := ReadAnalysisConfig(task.StateDir)
 	if err != nil {
-		return Stage1Config{}, fmt.Errorf("read config.json: %w", err)
-	}
-
-	var config map[string]interface{}
-	if err := json.Unmarshal(data, &config); err != nil {
-		return Stage1Config{}, fmt.Errorf("parse config.json: %w", err)
+		return Stage1Config{}, err
 	}
 
 	sc := Stage1Config{
-		Topic:     stringFromMap(config, "topic"),
-		ContextID: stringFromMap(config, "context_id"),
-		Model:     stringFromMap(config, "model"),
-		StateDir:  stringFromMap(config, "state_dir"),
-		SeedHints: stringFromMap(config, "seed_hints"),
+		Topic:     cfg.Topic,
+		ContextID: cfg.ContextID,
+		Model:     cfg.Model,
+		StateDir:  cfg.StateDir,
+		SeedHints: cfg.SeedHints,
 	}
 
 	// Load ontology scope if present
-	sc.OntologyScope = stringFromMap(config, "ontology_scope")
+	sc.OntologyScope = cfg.OntologyScope
 
 	return sc, nil
 }
@@ -485,10 +479,11 @@ func RunSeedAnalysis(task *taskpkg.AnalysisTask, cfg AnalysisConfig) error {
 	ctx, cancel := context.WithTimeout(task.Ctx, 10*time.Minute)
 	defer cancel()
 
-	rawOutput, err := engine.QueryLLMScopedWithToolsAndSchema(
+	rawOutput, err := engine.QueryLLMScopedWithToolsAndSchemaAdaptor(
 		ctx,
 		workDir,
 		cfg.Model,
+		cfg.Adaptor,
 		SeedAnalysisSchema(),
 		systemPrompt,
 		userPrompt,
@@ -567,7 +562,7 @@ func RunDAReviewLoop(task *taskpkg.AnalysisTask, cfg AnalysisConfig) error {
 
 		// Call LLM for DA review (30-minute timeout per round)
 		ctx, cancel := context.WithTimeout(task.Ctx, 30*time.Minute)
-		rawOutput, err := engine.QueryLLMScopedWithSystemPrompt(ctx, stateDir, cfg.Model, daPrompt, userPrompt)
+		rawOutput, err := engine.QueryLLMScopedWithSystemPromptAdaptor(ctx, stateDir, cfg.Model, cfg.Adaptor, daPrompt, userPrompt)
 		cancel()
 		if err != nil {
 			return fmt.Errorf("DA review LLM call round %d: %w", round, err)
@@ -663,10 +658,11 @@ func runSupplementaryResearch(task *taskpkg.AnalysisTask, cfg AnalysisConfig, ga
 	ctx, cancel := context.WithTimeout(task.Ctx, 5*time.Minute)
 	defer cancel()
 
-	rawOutput, err := engine.QueryLLMScopedWithToolsAndSchema(
+	rawOutput, err := engine.QueryLLMScopedWithToolsAndSchemaAdaptor(
 		ctx,
 		workDir,
 		cfg.Model,
+		cfg.Adaptor,
 		SeedAnalysisSchema(),
 		sb.String(),
 		"Investigate the DA critique gaps listed above and output additional findings as structured JSON.",
@@ -733,10 +729,11 @@ func RunPerspectiveGeneration(task *taskpkg.AnalysisTask, cfg AnalysisConfig) er
 	ctx, cancel := context.WithTimeout(task.Ctx, 5*time.Minute)
 	defer cancel()
 
-	rawOutput, err := engine.QueryLLMScopedWithSchema(
+	rawOutput, err := engine.QueryLLMScopedWithSchemaAdaptor(
 		ctx,
 		stateDir,
 		cfg.Model,
+		cfg.Adaptor,
 		PerspectivesSchema(),
 		prompt,
 	)

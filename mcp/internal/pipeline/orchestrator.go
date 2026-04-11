@@ -25,6 +25,7 @@ import (
 func RunAnalysisPipeline(task *taskpkg.AnalysisTask) {
 	// Ensure cancel is called when pipeline exits to release resources.
 	defer func() {
+		task.CloseDone()
 		if task.Cancel != nil {
 			task.Cancel()
 		}
@@ -357,10 +358,11 @@ func runInterviewSession(ctx context.Context, task *taskpkg.AnalysisTask, cmd In
 
 	// Run claude CLI with tool access and structured output.
 	// The ctx already carries a per-job timeout from the ParallelExecutor.
-	rawOutput, err := engine.QueryLLMScopedWithToolsAndSchema(
+	rawOutput, err := engine.QueryLLMScopedWithToolsAndSchemaAdaptor(
 		ctx,
 		cmd.WorkDir,
 		cmd.Model,
+		cmd.Adaptor,
 		cmd.JSONSchema,
 		cmd.SystemPrompt,
 		cmd.UserPrompt,

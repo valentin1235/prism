@@ -34,7 +34,12 @@ Prism keeps its active runtime in `~/.prism/config.yaml`, similar to Ouroboros. 
 bash scripts/setup.sh --runtime <claude|codex>
 ```
 
-Use `--runtime codex` if you want global `psm` commands in Codex. Use `--runtime claude` if you want Claude Code as the active backend.
+Prism follows the same split-source model as Ouroboros for skills:
+- The checked-in repo `skills/` directory is the single authored source of truth.
+- Claude Code reads the repo `commands/` and `skills/` trees directly.
+- Codex setup installs managed mirror copies into `~/.codex/skills` and matching rules into `~/.codex/rules`.
+
+Use `--runtime codex` if you want global `psm` commands plus managed Codex installs under `~/.codex`. Use `--runtime claude` if you want Claude Code as the active backend while keeping Claude on the checked-in repo assets.
 
 ### Codex Installation
 
@@ -43,6 +48,12 @@ From the Prism repo:
 ```bash
 bash scripts/setup.sh --runtime codex
 ```
+
+This refreshes:
+- `~/.codex/skills/prism-*` from the canonical repo `skills/` source
+- `~/.codex/rules/prism.md`
+- `~/.codex/bin/psm`
+- Prism's Codex MCP configuration and `~/.prism/config.yaml`
 
 Then make sure `~/.codex/bin` is on your `PATH`:
 
@@ -68,6 +79,7 @@ cat ~/.prism/config.yaml
 Expected result:
 - `which psm` points to `~/.codex/bin/psm`
 - `~/.prism/config.yaml` contains `runtime.backend: codex`
+- `~/.codex/skills/prism-setup/SKILL.md` exists as a setup-managed mirror of `./skills/setup/SKILL.md`
 
 ### Claude Code Installation
 
@@ -152,7 +164,8 @@ Then open Claude Code and run:
 /prism:setup
 ```
 
-This keeps `~/.prism/config.yaml` aligned with Claude Code and configures the MCP tools (`prism_interview`) used by the analyze skill's Socratic verification.
+This keeps `~/.prism/config.yaml` aligned with Claude Code and configures the MCP tools (`prism_interview`) used by the analyze skill's Socratic verification. Claude uses the checked-in repo `commands/` and `skills/` directories directly, so this step does not install or sync duplicate slash-command copies.
+The repo `skills/` tree remains the canonical shared source for both runtimes: Claude reads it directly from the repo, while Codex gets setup-managed mirror copies under `~/.codex/skills`.
 
 #### Step 5: Verify installation
 
@@ -168,10 +181,15 @@ Quick verification from the terminal:
 
 ```bash
 cat ~/.prism/config.yaml
+test ! -e ~/.prism/commands && test ! -e ~/.prism/skills
+rg -n '/prism:(analyze|incident|prd|setup)|skills/.*/SKILL.md' CLAUDE.md
 ```
 
 Expected result:
 - `~/.prism/config.yaml` contains `runtime.backend: claude`
+- `~/.prism/commands` and `~/.prism/skills` do not exist after setup
+- `CLAUDE.md` maps `/prism:*` slash commands to the checked-in repo `skills/*/SKILL.md` entries
+- Codex-managed mirrors, when installed separately, live under `~/.codex/skills` and do not replace the repo `skills/` source
 
 ## Full settings.json Example
 

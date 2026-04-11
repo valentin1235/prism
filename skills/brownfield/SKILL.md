@@ -1,13 +1,16 @@
 ---
 name: brownfield
 description: "Scan and manage brownfield repository defaults for interviews"
+version: 2.0.0
 user-invocable: true
-allowed-tools: ToolSearch, AskUserQuestion, mcp__prism__prism_brownfield, mcp__plugin_prism_prism-mcp__prism_brownfield
+allowed-tools: ToolSearch, AskUserQuestion, mcp__prism__prism_brownfield, mcp__plugin_prism_prism__prism_brownfield
 ---
 
 # /prism:brownfield
 
 Scan your home directory for existing git repositories and manage default repos used as context in interviews.
+
+In Codex, this same shared workflow is invoked through `psm brownfield`. The repo `skills/brownfield/SKILL.md` file remains the canonical source; any installed `~/.codex/skills/prism-brownfield` copy is just a managed mirror refreshed by setup.
 
 ## Usage
 

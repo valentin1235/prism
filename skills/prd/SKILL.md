@@ -10,6 +10,14 @@ allowed-tools: Skill, Task, Read, Write, Bash, Glob, Grep, AskUserQuestion, Tool
 
 Takes a PRD file as input, cross-references it against codebase policy documents (ontology) to find policy conflicts and ambiguities. Internally delegates the full multi-perspective analysis to `prism:analyze`, then post-processes the results into a PM-readable format.
 
+All PRD skill assets must remain self-contained under this directory:
+- `skills/prd/SKILL.md`
+- `skills/prd/prompts/post-processor.md`
+- `skills/prd/templates/report.md`
+- `skills/prd/evals/`
+
+Do not require `~/.codex` copies or repo-external prompt/template paths when invoking this skill from Claude against the repo source.
+
 ## Phase 0: Input
 
 ### Step 0.1: Get PRD File Path
@@ -70,7 +78,7 @@ Write the following JSON to `~/.prism/state/prd-{short-id}/analyze-config.json`:
 }
 ```
 
-> Determine the absolute path of the directory containing this SKILL.md via `Bash`. Store it as `{SKILL_DIR}` for use in Step 2.1.
+> Determine the absolute path of the directory containing this SKILL.md via `Glob("**/skills/prd/SKILL.md")`. Extract the parent directory and store it as `{SKILL_DIR}` for use in Step 2.1. Do not hardcode `~/prism` or any `~/.codex` path.
 
 ### Step 1.3: Invoke Analyze
 

@@ -363,10 +363,11 @@ func RunSynthesisSession(ctx context.Context, task *taskpkg.AnalysisTask, cfg An
 	// Run single claude CLI subprocess for synthesis
 	// Uses --print mode with system prompt, single turn, no tool access needed
 	// (all data is provided inline in the system prompt)
-	rawReport, err := engine.QueryLLMScopedWithSystemPrompt(
+	rawReport, err := engine.QueryLLMScopedWithSystemPromptAdaptor(
 		ctx,
 		stateDir,
 		cfg.Model,
+		cfg.Adaptor,
 		systemPrompt,
 		userPrompt,
 	)

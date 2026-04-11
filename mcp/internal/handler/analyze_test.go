@@ -3,9 +3,12 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/heechul/prism-mcp/internal/analysisstore"
 	taskpkg "github.com/heechul/prism-mcp/internal/task"
 	"github.com/mark3labs/mcp-go/mcp"
 )
@@ -152,26 +155,238 @@ func TestHandleTaskStatusRemovedTask(t *testing.T) {
 }
 
 func TestHandleTaskStatusServerRestart(t *testing.T) {
-	// Simulate server restart: old task_id from previous session
-	// is polled against a fresh (empty) TaskStore
+	prismDir := t.TempDir()
+	origBase := PrismBaseDir
+	PrismBaseDir = prismDir
+	defer func() { PrismBaseDir = origBase }()
+
 	TaskStore = taskpkg.NewTaskStore()
-	oldTask := TaskStore.Create("ctx-old", "claude-sonnet-4-6", "/tmp/state", "/tmp/reports", "")
+	oldTask := TaskStore.Create("ctx-old", "claude-sonnet-4-6", filepath.Join(prismDir, "state", "analyze-old"), filepath.Join(prismDir, "reports", "analyze-old"), "")
+	if err := analysisstore.SaveAnalysisConfig(prismDir, analysisstore.AnalysisConfigRecord{
+		TaskID:    oldTask.ID,
+		Topic:     "restart test",
+		Model:     "default",
+		Adaptor:   "codex",
+		ContextID: oldTask.ContextID,
+		StateDir:  oldTask.StateDir,
+		ReportDir: oldTask.ReportDir,
+	}); err != nil {
+		t.Fatalf("persist config: %v", err)
+	}
+	if err := oldTask.SetPersistenceHook(func(snapshot taskpkg.TaskSnapshot, pollCount int) error {
+		return analysisstore.SaveTaskSnapshot(prismDir, snapshot, pollCount)
+	}); err != nil {
+		t.Fatalf("set persistence hook: %v", err)
+	}
+	oldTask.SetStatus(taskpkg.TaskStatusRunning)
+	oldTask.StartStage(taskpkg.StageScope, "running after restart")
 	oldTaskID := oldTask.ID
 
 	// "Restart" — replace the store with a fresh one
 	TaskStore = taskpkg.NewTaskStore()
 
-	// Polling the old task_id should return "not found"
+	// Polling the old task_id should fall back to persisted sqlite snapshot
 	result, err := HandleTaskStatus(context.Background(), makeStatusRequest(oldTaskID))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !result.IsError {
-		t.Fatal("expected error result for task from previous server session")
+	if result.IsError {
+		t.Fatalf("unexpected error result: %s", result.Content[0].(mcp.TextContent).Text)
 	}
-	errText := result.Content[0].(mcp.TextContent).Text
-	if !strings.Contains(errText, "not found") {
-		t.Errorf("error should contain 'not found', got %q", errText)
+	var snap taskpkg.TaskSnapshot
+	if err := json.Unmarshal([]byte(result.Content[0].(mcp.TextContent).Text), &snap); err != nil {
+		t.Fatalf("unmarshal snapshot: %v", err)
+	}
+	if snap.Status != taskpkg.TaskStatusRunning {
+		t.Fatalf("expected running status from persisted snapshot, got %s", snap.Status)
+	}
+	if snap.Stages[0].Detail != "running after restart" {
+		t.Fatalf("expected persisted stage detail, got %q", snap.Stages[0].Detail)
+	}
+}
+
+func TestHandleTaskStatusServerRestartConsumesPersistedPollBudget(t *testing.T) {
+	prismDir := t.TempDir()
+	origBase := PrismBaseDir
+	PrismBaseDir = prismDir
+	defer func() { PrismBaseDir = origBase }()
+
+	TaskStore = taskpkg.NewTaskStore()
+	taskID := "analyze-restart-poll"
+	if err := analysisstore.SaveAnalysisConfig(prismDir, analysisstore.AnalysisConfigRecord{
+		TaskID:    taskID,
+		Topic:     "restart poll",
+		Model:     "default",
+		Adaptor:   "codex",
+		CreatedAt: time.Now().UTC(),
+		ContextID: taskID,
+		StateDir:  filepath.Join(prismDir, "state", taskID),
+		ReportDir: filepath.Join(prismDir, "reports", taskID),
+	}); err != nil {
+		t.Fatalf("persist config: %v", err)
+	}
+
+	task := taskpkg.NewAnalysisTask(taskID, "default", filepath.Join(prismDir, "state", taskID), filepath.Join(prismDir, "reports", taskID), "restart-poll")
+	task.SetStatus(taskpkg.TaskStatusRunning)
+	task.StartStage(taskpkg.StageScope, "still running")
+	if err := analysisstore.SaveTaskSnapshot(prismDir, task.Snapshot(), taskpkg.MaxPollIterations); err != nil {
+		t.Fatalf("persist running snapshot: %v", err)
+	}
+
+	result, err := HandleTaskStatus(context.Background(), makeStatusRequest(taskID))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("unexpected error result: %s", result.Content[0].(mcp.TextContent).Text)
+	}
+
+	var snap taskpkg.TaskSnapshot
+	if err := json.Unmarshal([]byte(result.Content[0].(mcp.TextContent).Text), &snap); err != nil {
+		t.Fatalf("unmarshal snapshot: %v", err)
+	}
+	if snap.Status != taskpkg.TaskStatusFailed {
+		t.Fatalf("expected failed status after persisted poll timeout, got %s", snap.Status)
+	}
+	if !strings.Contains(snap.Error, "poll limit exceeded") {
+		t.Fatalf("expected poll timeout error, got %q", snap.Error)
+	}
+
+	persisted, pollCount, ok, err := analysisstore.LoadTaskSnapshot(prismDir, taskID)
+	if err != nil || !ok {
+		t.Fatalf("load persisted snapshot: ok=%v err=%v", ok, err)
+	}
+	if persisted.Status != taskpkg.TaskStatusFailed {
+		t.Fatalf("expected persisted failed status, got %s", persisted.Status)
+	}
+	if pollCount != taskpkg.MaxPollIterations+1 {
+		t.Fatalf("expected poll count %d, got %d", taskpkg.MaxPollIterations+1, pollCount)
+	}
+	if len(persisted.Stages) == 0 || persisted.Stages[0].Status != taskpkg.StageStatusFailed {
+		t.Fatalf("expected running stage to be marked failed, got %+v", persisted.Stages)
+	}
+	if !strings.Contains(persisted.Stages[0].Detail, "poll limit exceeded") {
+		t.Fatalf("expected timed-out stage detail to mention poll limit, got %q", persisted.Stages[0].Detail)
+	}
+}
+
+func TestHandleTaskStatusPrefersPersistenceFailureSnapshotOverStaleSQLite(t *testing.T) {
+	prismDir := t.TempDir()
+	origBase := PrismBaseDir
+	PrismBaseDir = prismDir
+	defer func() { PrismBaseDir = origBase }()
+
+	TaskStore = taskpkg.NewTaskStore()
+	taskID := "analyze-persist-failure"
+	stateDir := filepath.Join(prismDir, "state", taskID)
+	reportDir := filepath.Join(prismDir, "reports", taskID)
+	if err := analysisstore.SaveAnalysisConfig(prismDir, analysisstore.AnalysisConfigRecord{
+		TaskID:    taskID,
+		Topic:     "persist failure",
+		Model:     "default",
+		Adaptor:   "codex",
+		CreatedAt: time.Now().UTC(),
+		ContextID: taskID,
+		StateDir:  stateDir,
+		ReportDir: reportDir,
+	}); err != nil {
+		t.Fatalf("persist config: %v", err)
+	}
+
+	runningTask := taskpkg.NewAnalysisTask(taskID, "default", stateDir, reportDir, "persist-failure")
+	runningTask.SetStatus(taskpkg.TaskStatusRunning)
+	runningTask.StartStage(taskpkg.StageScope, "stale running row")
+	if err := analysisstore.SaveTaskSnapshot(prismDir, runningTask.Snapshot(), 3); err != nil {
+		t.Fatalf("persist stale running snapshot: %v", err)
+	}
+
+	failedSnapshot := runningTask.Snapshot()
+	markSnapshotFailed(&failedSnapshot, "failed to persist task snapshot: disk full")
+	if err := savePersistenceFailureSnapshot(stateDir, failedSnapshot, 3); err != nil {
+		t.Fatalf("save persistence failure snapshot: %v", err)
+	}
+
+	result, err := HandleTaskStatus(context.Background(), makeStatusRequest(taskID))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("unexpected error result: %s", result.Content[0].(mcp.TextContent).Text)
+	}
+
+	var snap taskpkg.TaskSnapshot
+	if err := json.Unmarshal([]byte(result.Content[0].(mcp.TextContent).Text), &snap); err != nil {
+		t.Fatalf("unmarshal snapshot: %v", err)
+	}
+	if snap.Status != taskpkg.TaskStatusFailed {
+		t.Fatalf("expected failed status from persistence failure snapshot, got %s", snap.Status)
+	}
+	if !strings.Contains(snap.Error, "failed to persist task snapshot") {
+		t.Fatalf("expected persistence failure error, got %q", snap.Error)
+	}
+	if len(snap.Stages) == 0 || snap.Stages[0].Status != taskpkg.StageStatusFailed {
+		t.Fatalf("expected stage failed from sidecar snapshot, got %+v", snap.Stages)
+	}
+}
+
+func TestHandleTaskStatusPrefersNewerSQLiteSnapshotOverStalePersistenceFailureSidecar(t *testing.T) {
+	prismDir := t.TempDir()
+	origBase := PrismBaseDir
+	PrismBaseDir = prismDir
+	defer func() { PrismBaseDir = origBase }()
+
+	TaskStore = taskpkg.NewTaskStore()
+	taskID := "analyze-sidecar-stale"
+	stateDir := filepath.Join(prismDir, "state", taskID)
+	reportDir := filepath.Join(prismDir, "reports", taskID)
+	if err := analysisstore.SaveAnalysisConfig(prismDir, analysisstore.AnalysisConfigRecord{
+		TaskID:    taskID,
+		Topic:     "sidecar stale",
+		Model:     "default",
+		Adaptor:   "codex",
+		CreatedAt: time.Now().UTC(),
+		ContextID: taskID,
+		StateDir:  stateDir,
+		ReportDir: reportDir,
+	}); err != nil {
+		t.Fatalf("persist config: %v", err)
+	}
+
+	sidecarTask := taskpkg.NewAnalysisTask(taskID, "default", stateDir, reportDir, "sidecar-stale")
+	sidecarTask.SetStatus(taskpkg.TaskStatusRunning)
+	sidecarTask.StartStage(taskpkg.StageScope, "old sidecar")
+	sidecarSnapshot := sidecarTask.Snapshot()
+	markSnapshotFailed(&sidecarSnapshot, "old persistence failure")
+	if err := savePersistenceFailureSnapshot(stateDir, sidecarSnapshot, 1); err != nil {
+		t.Fatalf("save stale sidecar: %v", err)
+	}
+
+	time.Sleep(20 * time.Millisecond)
+
+	dbTask := taskpkg.NewAnalysisTask(taskID, "default", stateDir, reportDir, "sidecar-stale")
+	dbTask.SetStatus(taskpkg.TaskStatusRunning)
+	dbTask.StartStage(taskpkg.StageScope, "new sqlite snapshot")
+	if err := analysisstore.SaveTaskSnapshot(prismDir, dbTask.Snapshot(), 2); err != nil {
+		t.Fatalf("persist newer sqlite snapshot: %v", err)
+	}
+
+	result, err := HandleTaskStatus(context.Background(), makeStatusRequest(taskID))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("unexpected error result: %s", result.Content[0].(mcp.TextContent).Text)
+	}
+
+	var snap taskpkg.TaskSnapshot
+	if err := json.Unmarshal([]byte(result.Content[0].(mcp.TextContent).Text), &snap); err != nil {
+		t.Fatalf("unmarshal snapshot: %v", err)
+	}
+	if snap.Status != taskpkg.TaskStatusRunning {
+		t.Fatalf("expected newer sqlite snapshot to win, got %s", snap.Status)
+	}
+	if len(snap.Stages) == 0 || snap.Stages[0].Detail != "new sqlite snapshot" {
+		t.Fatalf("expected sqlite stage detail to win, got %+v", snap.Stages)
 	}
 }
 

@@ -78,13 +78,12 @@ assert_eq "$(prism_psm_command_skill_id brownfield)" "prism-brownfield" "brownfi
 assert_eq "$(prism_psm_command_skill_id incident)" "prism-incident" "incident should resolve to the shared skill id"
 assert_eq "$(prism_psm_command_skill_id prd)" "prism-prd" "prd should resolve to the shared skill id"
 assert_eq "$(prism_psm_command_skill_id setup)" "prism-setup" "setup should resolve to the shared skill id"
-
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "${tmpdir}"' EXIT
 test_tmpdir="${tmpdir}/tmp"
 mkdir -p "${test_tmpdir}"
 
-CODEX_HOME="${tmpdir}/codex-home" bash "${REPO_ROOT}/scripts/install-codex.sh" >/dev/null
+HOME="${tmpdir}" CODEX_HOME="${tmpdir}/codex-home" bash "${REPO_ROOT}/scripts/install-codex.sh" >/dev/null
 
 assert_dir_exists "${tmpdir}/codex-home/bin"
 assert_dir_exists "${tmpdir}/codex-home/lib/prism"
@@ -107,6 +106,132 @@ assert_dir_exists "${tmpdir}/codex-home/skills/prism-prd"
 assert_dir_exists "${tmpdir}/codex-home/skills/prism-setup"
 assert_not_exists "${tmpdir}/codex-home/skills/prism-test-analyze"
 assert_not_exists "${tmpdir}/codex-home/skills/prism-analyze-workspace"
+assert_eq "$(<"${tmpdir}/codex-home/skills/prism-analyze/SKILL.md")" "$(<"${REPO_ROOT}/skills/analyze/SKILL.md")" "installed analyze skill should come from the shared repo skill"
+assert_eq "$(<"${tmpdir}/codex-home/skills/prism-brownfield/SKILL.md")" "$(<"${REPO_ROOT}/skills/brownfield/SKILL.md")" "installed brownfield skill should come from the shared repo skill"
+assert_eq "$(<"${tmpdir}/codex-home/skills/prism-incident/SKILL.md")" "$(<"${REPO_ROOT}/skills/incident/SKILL.md")" "installed incident skill should come from the shared repo skill"
+assert_eq "$(<"${tmpdir}/codex-home/skills/prism-prd/SKILL.md")" "$(<"${REPO_ROOT}/skills/prd/SKILL.md")" "installed prd skill should come from the shared repo skill"
+assert_eq "$(<"${tmpdir}/codex-home/skills/prism-setup/SKILL.md")" "$(<"${REPO_ROOT}/skills/setup/SKILL.md")" "installed setup skill should come from the shared repo skill"
+shared_analyze_skill_before="$(<"${REPO_ROOT}/skills/analyze/SKILL.md")"
+if [ -L "${tmpdir}/codex-home/skills/prism-analyze" ]; then
+  printf 'ASSERTION FAILED: expected installed prism-analyze skill to be a managed copy, not a symlink\n' >&2
+  exit 1
+fi
+printf 'mutated installed copy\n' > "${tmpdir}/codex-home/skills/prism-analyze/SKILL.md"
+assert_eq "$(<"${REPO_ROOT}/skills/analyze/SKILL.md")" "${shared_analyze_skill_before}" "shared repo analyze skill should remain the authored source"
+if [ "$(<"${tmpdir}/codex-home/skills/prism-analyze/SKILL.md")" = "$(<"${REPO_ROOT}/skills/analyze/SKILL.md")" ]; then
+  printf 'ASSERTION FAILED: expected installed prism-analyze skill mutation to stay isolated from the repo source\n' >&2
+  exit 1
+fi
+HOME="${tmpdir}" CODEX_HOME="${tmpdir}/codex-home" bash "${REPO_ROOT}/scripts/install-codex.sh" >/dev/null
+assert_eq "$(<"${tmpdir}/codex-home/skills/prism-analyze/SKILL.md")" "${shared_analyze_skill_before}" "reinstall should refresh the managed analyze skill copy from the repo source"
+resolved_codex_home="$(python3 -c 'from pathlib import Path; import sys; print(Path(sys.argv[1]).resolve())' "${tmpdir}/codex-home")"
+assert_file_contains "${tmpdir}/codex-home/config.toml" "# PRISM_SHARED_SKILLS_ROOT points at the canonical shared repo skills/ tree."
+assert_file_contains "${tmpdir}/codex-home/config.toml" "# The managed ~/.codex/skills/prism-* entries are setup-refreshed mirrors of PRISM_SHARED_SKILLS_ROOT."
+assert_file_contains "${tmpdir}/codex-home/config.toml" "PRISM_SHARED_SKILLS_ROOT = \"${REPO_ROOT}/skills\""
+assert_file_contains "${tmpdir}/codex-home/config.toml" "PRISM_CODEX_SKILLS_ROOT = \"${resolved_codex_home}/skills\""
+assert_file_contains "${tmpdir}/codex-home/config.toml" "PRISM_CODEX_RULES_ROOT = \"${resolved_codex_home}/rules\""
+
+mkdir -p "${tmpdir}/codex-home/skills/prism-stale-skill"
+printf 'stale\n' > "${tmpdir}/codex-home/skills/prism-stale-skill/SKILL.md"
+HOME="${tmpdir}" CODEX_HOME="${tmpdir}/codex-home" bash "${REPO_ROOT}/scripts/install-codex.sh" >/dev/null
+assert_not_exists "${tmpdir}/codex-home/skills/prism-stale-skill"
+
+sync_target="${tmpdir}/direct-sync-target"
+python3 "${REPO_ROOT}/scripts/sync-codex-skills.py" \
+  --repo-root "${REPO_ROOT}" \
+  --registry-path "${REPO_ROOT}/codex/lib/command-registry.tsv" \
+  --shared-skills-root "${REPO_ROOT}/skills" \
+  --target-root "${sync_target}" >/dev/null
+assert_eq "$(<"${sync_target}/prism-setup/SKILL.md")" "$(<"${REPO_ROOT}/skills/setup/SKILL.md")" "direct skill sync should treat repo skills as the canonical source"
+
+invalid_registry="${tmpdir}/invalid-command-registry.tsv"
+cat > "${invalid_registry}" <<'EOF'
+# command	skill_dir	installed_skill_id
+analyze	prism-analyze	prism-analyze
+EOF
+
+invalid_sync_stdout="${tmpdir}/invalid-sync-stdout.txt"
+invalid_sync_stderr="${tmpdir}/invalid-sync-stderr.txt"
+set +e
+python3 "${REPO_ROOT}/scripts/sync-codex-skills.py" \
+  --repo-root "${REPO_ROOT}" \
+  --registry-path "${invalid_registry}" \
+  --shared-skills-root "${REPO_ROOT}/skills" \
+  --target-root "${tmpdir}/invalid-sync-target" \
+  >"${invalid_sync_stdout}" 2>"${invalid_sync_stderr}"
+invalid_sync_status=$?
+set -e
+assert_eq "${invalid_sync_status}" "1" "direct skill sync should reject non-canonical repo skill registry rows"
+assert_file_contains "${invalid_sync_stderr}" "must use repo source 'skills/analyze/'"
+
+repo_sync_stdout="${tmpdir}/repo-sync-stdout.txt"
+repo_sync_stderr="${tmpdir}/repo-sync-stderr.txt"
+set +e
+python3 "${REPO_ROOT}/scripts/sync-codex-skills.py" \
+  --repo-root "${REPO_ROOT}" \
+  --registry-path "${REPO_ROOT}/codex/lib/command-registry.tsv" \
+  --shared-skills-root "${REPO_ROOT}/skills" \
+  --target-root "${REPO_ROOT}/codex/skills" \
+  >"${repo_sync_stdout}" 2>"${repo_sync_stderr}"
+repo_sync_status=$?
+set -e
+assert_eq "${repo_sync_status}" "1" "direct skill sync should refuse repo-local managed install targets"
+assert_file_contains "${repo_sync_stderr}" "Refusing to sync managed Prism skills inside the Prism repo."
+
+claude_home="${tmpdir}/claude-home"
+claude_setup_output="${tmpdir}/claude-setup-output.txt"
+HOME="${claude_home}" bash "${REPO_ROOT}/scripts/setup.sh" --runtime claude >"${claude_setup_output}"
+assert_file_contains "${claude_home}/.prism/config.yaml" "backend: claude"
+assert_file_contains "${claude_setup_output}" "Claude uses the checked-in Prism commands/ and skills/ directories directly."
+assert_file_contains "${claude_setup_output}" "No duplicate Claude slash-command artifacts were installed or synced."
+assert_file_contains "${claude_setup_output}" "Canonical shared skill source remains ${REPO_ROOT}/skills."
+assert_file_contains "${claude_setup_output}" "Canonical Claude command source remains ${REPO_ROOT}/commands."
+assert_not_exists "${claude_home}/.codex"
+assert_not_exists "${REPO_ROOT}/codex/skills/analyze/SKILL.md"
+assert_not_exists "${REPO_ROOT}/codex/skills/brownfield/SKILL.md"
+assert_not_exists "${REPO_ROOT}/codex/skills/incident/SKILL.md"
+assert_not_exists "${REPO_ROOT}/codex/skills/prd/SKILL.md"
+assert_not_exists "${REPO_ROOT}/codex/skills/setup/SKILL.md"
+
+codex_setup_home="${tmpdir}/codex-setup-home"
+codex_setup_output="${tmpdir}/codex-setup-output.txt"
+HOME="${codex_setup_home}" bash "${REPO_ROOT}/scripts/setup.sh" --runtime codex >"${codex_setup_output}"
+assert_file_contains "${codex_setup_home}/.prism/config.yaml" "backend: codex"
+assert_file_contains "${codex_setup_output}" "Prism Codex setup refreshed the managed ~/.codex Prism skill mirror from the repo skills/ source and updated MCP integration."
+assert_file_contains "${codex_setup_output}" "Managed Prism skills in ${codex_setup_home}/.codex/skills were refreshed from the canonical repo source ${REPO_ROOT}/skills"
+assert_dir_exists "${codex_setup_home}/.codex/bin"
+assert_dir_exists "${codex_setup_home}/.codex/skills/prism-analyze"
+assert_dir_exists "${codex_setup_home}/.codex/skills/prism-brownfield"
+assert_dir_exists "${codex_setup_home}/.codex/skills/prism-incident"
+assert_dir_exists "${codex_setup_home}/.codex/skills/prism-prd"
+assert_dir_exists "${codex_setup_home}/.codex/skills/prism-setup"
+assert_eq "$(<"${codex_setup_home}/.codex/skills/prism-setup/SKILL.md")" "$(<"${REPO_ROOT}/skills/setup/SKILL.md")" "setup.sh codex flow should install the shared setup skill into ~/.codex"
+assert_eq "$(<"${codex_setup_home}/.codex/lib/prism/repo-root")" "${REPO_ROOT}" "setup.sh codex flow should preserve the shared repo-root pointer for installed psm"
+
+render_stdout="${tmpdir}/render-stdout.txt"
+render_stderr="${tmpdir}/render-stderr.txt"
+set +e
+bash "${REPO_ROOT}/scripts/render-codex-entrypoints.sh" "${REPO_ROOT}/codex/skills" \
+  >"${render_stdout}" 2>"${render_stderr}"
+render_status=$?
+set -e
+assert_eq "${render_status}" "1" "render script should refuse to recreate duplicate Codex skill sources inside the repo"
+assert_file_contains "${render_stderr}" "Refusing to generate Codex skill copies inside the Prism repo."
+
+invalid_render_stdout="${tmpdir}/invalid-render-stdout.txt"
+invalid_render_stderr="${tmpdir}/invalid-render-stderr.txt"
+registry_backup="${REPO_ROOT}/codex/lib/command-registry.tsv.bak-test"
+cp "${REPO_ROOT}/codex/lib/command-registry.tsv" "${registry_backup}"
+trap 'rm -rf "${tmpdir}"; if [ -f "${registry_backup}" ]; then mv "${registry_backup}" "${REPO_ROOT}/codex/lib/command-registry.tsv"; fi' EXIT
+cp "${invalid_registry}" "${REPO_ROOT}/codex/lib/command-registry.tsv"
+set +e
+bash "${REPO_ROOT}/scripts/render-codex-entrypoints.sh" "${tmpdir}/generated-skills" \
+  >"${invalid_render_stdout}" 2>"${invalid_render_stderr}"
+invalid_render_status=$?
+set -e
+mv "${registry_backup}" "${REPO_ROOT}/codex/lib/command-registry.tsv"
+assert_eq "${invalid_render_status}" "1" "render script should reject non-canonical repo skill registry rows"
+assert_file_contains "${invalid_render_stderr}" "Expected repo source skills/analyze/SKILL.md"
 
 assert_eq "$(prism_psm_require_command_config analyze shared_skill_relative_path)" "skills/analyze/SKILL.md" "analyze should expose its shared skill path through the command config contract"
 assert_eq "$(prism_psm_require_command_config analyze asset_paths_function)" "prism_psm_analyze_asset_paths" "analyze should expose its asset path resolver through the command config contract"
@@ -116,18 +241,17 @@ assert_eq "$(prism_psm_require_command_config analyze prompt_function)" "prism_p
 assert_eq "$(prism_psm_require_command_config brownfield shared_skill_relative_path)" "skills/brownfield/SKILL.md" "brownfield should expose its shared skill path through the command config contract"
 assert_eq "$(prism_psm_require_command_config brownfield contract_function)" "prism_psm_brownfield_command_contract" "brownfield should expose its command contract through the command config contract"
 
-for command_name in analyze brownfield incident prd setup; do
-  skill_dir="$(prism_psm_command_skill_dir "${command_name}")"
-  rendered_skill="$(prism_psm_render_codex_skill "${command_name}")"
-  actual_skill="$(<"${REPO_ROOT}/codex/skills/${skill_dir}/SKILL.md")"
-  assert_eq "${actual_skill}" "${rendered_skill}" "codex skill entrypoint for ${command_name} should be rendered from the shared framework config"
-
-  rendered_command_doc="$(prism_psm_render_command_markdown "${command_name}")"
-  actual_command_doc="$(<"${REPO_ROOT}/commands/${command_name}.md")"
-  assert_eq "${actual_command_doc}" "${rendered_command_doc}" "command entrypoint for ${command_name} should be rendered from the shared framework config"
-done
-
-assert_file_contains "${REPO_ROOT}/commands/brownfield.md" 'Treat `psm brownfield`, `psm brownfield scan`, `psm brownfield defaults`, and `psm brownfield set <indices>` as exact command forms routed through that shared skill.'
+assert_file_contains "${REPO_ROOT}/commands/brownfield.md" 'Read the file at `skills/brownfield/SKILL.md` using the Read tool and follow its instructions exactly.'
+assert_file_contains "${REPO_ROOT}/commands/setup.md" 'Read the file at `skills/setup/SKILL.md` using the Read tool and follow its instructions exactly.'
+assert_file_contains "${REPO_ROOT}/skills/setup/SKILL.md" "Do not create or sync duplicate Claude slash-command artifacts during this step."
+assert_file_contains "${REPO_ROOT}/skills/setup/SKILL.md" 'Validate that the checked-in `commands/` and `skills/` directories still exist in the Prism repo before continuing.'
+assert_file_contains "${REPO_ROOT}/skills/brownfield/SKILL.md" 'In Codex, this same shared workflow is invoked through `psm brownfield`.'
+assert_file_contains "${REPO_ROOT}/skills/brownfield/SKILL.md" 'any installed `~/.codex/skills/prism-brownfield` copy is just a managed mirror refreshed by setup.'
+assert_file_contains "${REPO_ROOT}/skills/brownfield/SKILL.md" "No default repos set. Run '/prism:brownfield' to configure."
+assert_file_contains "${REPO_ROOT}/skills/brownfield/SKILL.md" "No default repos set. Interviews will run in greenfield mode."
+assert_file_contains "${REPO_ROOT}/skills/brownfield/SKILL.md" "Brownfield defaults updated!"
+assert_file_contains "${REPO_ROOT}/CLAUDE.md" "Do not require generated skill copies for slash-command discovery."
+assert_file_contains "${REPO_ROOT}/README.md" 'The repo `skills/` tree remains the canonical shared source for both runtimes:'
 
 config_project="${tmpdir}/config-project"
 mkdir -p "${config_project}/configs" "${config_project}/inputs"
@@ -222,18 +346,11 @@ fi
 
 assert_file_contains "${captured_prompt}" "psm analyze"
 assert_file_contains "${captured_prompt}" "Prism Analyze Compatibility Bridge"
-assert_file_contains "${captured_prompt}" "Preserve the full shared-skill decision flow and exit gates, not just the MCP payload shape."
 assert_file_contains "${captured_prompt}" "adapter-generated temporary config path"
-assert_file_contains "${captured_prompt}" "Preserve the shared analyze config schema and MCP payload contract exactly."
+assert_file_contains "${captured_prompt}" "The shared skill is the only workflow definition."
 assert_file_contains "${captured_prompt}" "Path-valued analyze config fields have already been normalized for Codex execution context. Pass them through unchanged once read."
-assert_file_contains "${captured_prompt}" "if \`--config <path>\` is present, read that config and use \`config.topic\` as the description when present, otherwise fall back to remaining arguments;"
-assert_file_contains "${captured_prompt}" "if no config is present, use the remaining command arguments as the description;"
-assert_file_contains "${captured_prompt}" "if the description is still empty, ask the user directly for what to analyze."
-assert_file_contains "${captured_prompt}" "Honor the shared Phase 1 exit gate before starting analysis: do not call \`prism_analyze\` until the description has been collected."
-assert_file_contains "${captured_prompt}" "Honor the shared Phase 2 exit gate: do not proceed to polling until \`prism_analyze\` returns a \`task_id\`."
-assert_file_contains "${captured_prompt}" "During Phase 3, poll \`prism_task_status\` every 30 seconds until the task reaches \`completed\` or \`failed\`"
-assert_file_contains "${captured_prompt}" "if the task status is \`failed\`, report the error and stop without calling \`prism_analyze_result\`;"
-assert_file_contains "${captured_prompt}" "Honor the shared Phase 4 exit gate: after completion, call \`prism_analyze_result(task_id)\`, present the returned \`summary\`, and communicate the returned \`report_path\`."
+assert_file_contains "${captured_prompt}" 'When the shared skill asks `SELECT who you are: codex | claude`, choose `codex`'
+assert_file_contains "${captured_prompt}" "Preserve the shared analyze config schema and MCP payload contract exactly."
 assert_file_contains "${captured_prompt}" "The user's original working directory is:"
 assert_file_contains "${captured_prompt}" "${invoke_dir}"
 assert_file_contains "${captured_prompt}" "${REPO_ROOT}/skills/analyze/SKILL.md"
@@ -255,9 +372,21 @@ assert_file_contains "${captured_prompt}" "${REPO_ROOT}/skills/brownfield/SKILL.
 assert_file_contains "${captured_prompt}" "psm setup"
 assert_file_contains "${captured_prompt}" "The canonical shared Prism skill for this command is:"
 assert_file_contains "${captured_prompt}" "${REPO_ROOT}/skills/setup/SKILL.md"
+assert_file_contains "${captured_prompt}" "managed mirror copies under ~/.codex/skills"
+assert_file_contains "${captured_prompt}" "Treat any installed ~/.codex skill copy as a managed mirror, not as the authored source."
 assert_file_contains "${captured_prompt}" "Resolve the shared Prism setup skill deterministically from"
-assert_file_contains "${captured_prompt}" "Preserve the shared setup flow exactly, including the brownfield scan, default-selection prompt, MCP tool usage, and final confirmation messaging."
-assert_file_contains "${captured_prompt}" "Read and follow that shared Prism skill from the resolved Prism asset root, not from the user's working directory."
+assert_file_contains "${captured_prompt}" "Treat that shared skill as the only workflow definition; do not duplicate its phase logic, brownfield flow, status text, or stop conditions in the Codex command layer."
+assert_file_contains "${captured_prompt}" "Read and follow that shared Prism skill from the resolved Prism asset root."
+
+(
+  cd "${invoke_dir}"
+  HOME="${codex_setup_home}" PSM_CODEX_CLI_PATH="${fake_codex}" bash "${codex_setup_home}/.codex/bin/psm" setup
+)
+
+assert_file_contains "${captured_prompt}" "psm setup"
+assert_file_contains "${captured_prompt}" "${REPO_ROOT}/skills/setup/SKILL.md"
+assert_file_contains "${captured_prompt}" "Treat any installed ~/.codex skill copy as a managed mirror, not as the authored source."
+assert_file_contains "${captured_prompt}" "Read and follow that shared Prism skill from the resolved Prism asset root."
 
 (
   cd "${invoke_dir}"
@@ -265,7 +394,7 @@ assert_file_contains "${captured_prompt}" "Read and follow that shared Prism ski
 )
 
 assert_file_contains "${captured_prompt}" "psm setup defaults"
-assert_file_contains "${captured_prompt}" "Preserve the shared-skill subcommand behavior exactly: \`scan\` means scan only, \`defaults\` means show current defaults, and \`set <indices>\` means update defaults directly with the provided comma-separated indices."
+assert_file_contains "${captured_prompt}" "Treat that shared skill as the only workflow definition; do not duplicate its phase logic, brownfield flow, status text, or stop conditions in the Codex command layer."
 
 (
   cd "${invoke_dir}"
@@ -273,7 +402,7 @@ assert_file_contains "${captured_prompt}" "Preserve the shared-skill subcommand 
 )
 
 assert_file_contains "${captured_prompt}" "psm setup set 6\\,18\\,19"
-assert_file_contains "${captured_prompt}" "successful default updates should confirm the selected repository names."
+assert_file_contains "${captured_prompt}" "Invalid brownfield selections or MCP failures must fail the Codex run instead of being converted into a success summary."
 
 (
   cd "${invoke_dir}"
@@ -281,8 +410,9 @@ assert_file_contains "${captured_prompt}" "successful default updates should con
 )
 
 assert_file_contains "${captured_prompt}" "psm brownfield"
-assert_file_contains "${captured_prompt}" "Preserve the default no-argument flow exactly: scan first, render the scan result, then prompt for default selection."
-assert_file_contains "${captured_prompt}" "clearing defaults should surface the shared greenfield-mode confirmation"
+assert_file_contains "${captured_prompt}" "Resolve the shared Prism brownfield skill deterministically from"
+assert_file_contains "${captured_prompt}" "Treat installed \`~/.codex/skills/prism-brownfield\` entries as setup-refreshed mirrors of the shared repo skill"
+assert_file_contains "${captured_prompt}" "Treat that shared skill as the only workflow definition; do not duplicate its phase logic, status text, or stop conditions in the Codex command layer."
 
 (
   cd "${invoke_dir}"
@@ -290,7 +420,7 @@ assert_file_contains "${captured_prompt}" "clearing defaults should surface the 
 )
 
 assert_file_contains "${captured_prompt}" "psm brownfield scan"
-assert_file_contains "${captured_prompt}" "Preserve the shared-skill subcommand behavior exactly: \`scan\` means scan only, \`defaults\` means show current defaults, and \`set <indices>\` means update defaults directly with the provided comma-separated indices."
+assert_file_contains "${captured_prompt}" "Treat that shared skill as the only workflow definition; do not duplicate its phase logic, status text, or stop conditions in the Codex command layer."
 
 (
   cd "${invoke_dir}"
@@ -298,7 +428,7 @@ assert_file_contains "${captured_prompt}" "Preserve the shared-skill subcommand 
 )
 
 assert_file_contains "${captured_prompt}" "psm brownfield set 6\\,18\\,19"
-assert_file_contains "${captured_prompt}" "successful default updates should confirm the selected repository names."
+assert_file_contains "${captured_prompt}" "Invalid brownfield selections or MCP failures must fail the Codex run instead of being converted into a success summary."
 
 (
   cd "${invoke_dir}"
@@ -307,10 +437,11 @@ assert_file_contains "${captured_prompt}" "successful default updates should con
 
 assert_file_contains "${captured_prompt}" "psm incident checkout outage"
 assert_file_contains "${captured_prompt}" "${REPO_ROOT}/skills/incident/SKILL.md"
-assert_file_contains "${captured_prompt}" "For psm incident, dispatch to the shared Prism incident workflow entrypoint and preserve its full RCA flow:"
+assert_file_contains "${captured_prompt}" "For psm incident, dispatch to the shared Prism incident workflow entrypoint:"
 assert_file_contains "${captured_prompt}" "Prism Incident Compatibility Bridge"
 assert_file_contains "${captured_prompt}" 'Treat `psm incident ...` as the exact Codex equivalent of Claude Code `/prism:incident ...`.'
 assert_file_contains "${captured_prompt}" 'Resolve the shared incident workflow entrypoint from `PRISM_REPO_PATH` first: `${PRISM_REPO_PATH}/skills/incident/SKILL.md`.'
+assert_file_contains "${captured_prompt}" 'The shared skill is the only workflow definition.'
 assert_file_contains "${captured_prompt}" 'When the shared incident skill dispatches analysis, preserve its asset contract exactly by passing through the shared incident report template and UX perspective injection assets unchanged.'
 
 (
@@ -323,16 +454,9 @@ assert_file_contains "${captured_prompt}" "${REPO_ROOT}/skills/prd/SKILL.md"
 assert_file_contains "${captured_prompt}" "${REPO_ROOT}/skills/prd/prompts/post-processor.md"
 assert_file_contains "${captured_prompt}" "${REPO_ROOT}/skills/prd/templates/report.md"
 assert_file_contains "${captured_prompt}" "${REPO_ROOT}/skills/analyze/SKILL.md"
-assert_file_contains "${captured_prompt}" 'When the shared PRD skill refers to files relative to its own `SKILL.md`, resolve them from `'
 assert_file_contains "${captured_prompt}" 'The wrapper has already exported `PRISM_REPO_PATH='
 assert_file_contains "${captured_prompt}" "Prism PRD Compatibility Bridge"
 assert_file_contains "${captured_prompt}" 'Treat `psm prd ...` as the exact Codex equivalent of Claude Code `/prism:prd ...`.'
-assert_file_contains "${captured_prompt}" 'Preserve the full shared PRD decision flow and exit gates, not just the eventual analyze handoff or report artifact.'
-assert_file_contains "${captured_prompt}" 'write `~/.prism/state/prd-{short-id}/analyze-config.json` with the shared `topic`, `input_context`, `seed_hints`, and `session_id` contract;'
-assert_file_contains "${captured_prompt}" 'keep `~/.prism/state/prd-{short-id}/analyze-config.json` as the concrete handoff artifact and do not substitute a different filename or directory.'
-assert_file_contains "${captured_prompt}" 'require `analyst-findings.md` before post-processing;'
-assert_file_contains "${captured_prompt}" 'require the post-processor handoff result to be that exact report path.'
-assert_file_contains "${captured_prompt}" 'verify the generated report contains `PM Decision Checklist` before presenting success.'
-assert_file_contains "${captured_prompt}" 'preserve that three-line handoff format because existing Prism workflows expect those locations and filenames.'
+assert_file_contains "${captured_prompt}" 'The shared skill is the only workflow definition.'
 
 printf 'psm registry test passed\n'

@@ -1,3 +1,10 @@
+# Prism - Development Environment
+
+> This CLAUDE.md is for local Prism development. In this repo, treat the checked-in
+> `commands/` and `skills/` directories as the command source of truth.
+> Do not require generated skill copies for slash-command discovery.
+> Codex setup may refresh managed mirrors under `~/.codex/skills/prism-*`, but those are install artifacts, not the authored workflow source.
+
 ## Prism Commands
 
 When the user types `psm analyze` or `psm analyze ...`, read `skills/analyze/SKILL.md` and follow its instructions exactly.
@@ -10,12 +17,39 @@ When the user types `psm prd` or `psm prd ...`, read `skills/prd/SKILL.md` and f
 
 When the user types `psm setup`, read `skills/setup/SKILL.md` and follow its instructions exactly.
 
-Important:
+When the user types any of these commands, read the corresponding repo skill file
+from `skills/` and follow it exactly:
+
+| Input | Action |
+|-------|--------|
+| `psm analyze ...` | Read `skills/analyze/SKILL.md` and follow it |
+| `psm brownfield ...` | Read `skills/brownfield/SKILL.md` and follow it |
+| `psm incident ...` | Read `skills/incident/SKILL.md` and follow it |
+| `psm prd ...` | Read `skills/prd/SKILL.md` and follow it |
+| `psm setup ...` | Read `skills/setup/SKILL.md` and follow it |
+
+## /prism Commands (Dev Mode)
+
+When the user types any of these commands, read the corresponding repo skill file
+from `skills/` and follow it exactly:
+
+| Input | Action |
+|-------|--------|
+| `/prism:analyze ...` | Read `skills/analyze/SKILL.md` and follow it |
+| `/prism:brownfield ...` | Read `skills/brownfield/SKILL.md` and follow it |
+| `/prism:incident ...` | Read `skills/incident/SKILL.md` and follow it |
+| `/prism:prd ...` | Read `skills/prd/SKILL.md` and follow it |
+| `/prism:setup ...` | Read `skills/setup/SKILL.md` and follow it |
+
+**Important**:
 - Treat `psm analyze` as a command, not as natural language.
 - Treat `psm brownfield` as a command, not as natural language.
 - Treat `psm incident` as a command, not as natural language.
 - Treat `psm prd` as a command, not as natural language.
 - Treat `psm setup` as a command, not as natural language.
+- Treat `/prism:*` and `psm *` inputs as commands, not as natural language.
+- For local Prism development, resolve slash commands from the checked-in `commands/`
+  directory and resolve the workflows from the checked-in `skills/` directory.
 - Reuse Prism's bundled MCP tools and skill assets; do not reimplement the workflow ad hoc.
 - Do NOT use the Skill tool. Read the file directly and execute it.
 

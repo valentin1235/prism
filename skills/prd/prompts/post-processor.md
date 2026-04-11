@@ -48,7 +48,8 @@ PMs are not developers. Code-level details, file paths, and function names are n
 
 Read the report template at `{REPORT_TEMPLATE_PATH}`.
 
-If the path is empty or file not found, search via `Glob` for `**/prd/templates/report.md`.
+If the path is empty or file not found, search via `Glob` for `**/skills/prd/templates/report.md`.
+Do not fall back to `~/.codex`, `~/prism`, or any path outside the repo-local `skills/prd/` subtree.
 
 ### Step 3: Transform — Analyze Report → PM Report
 

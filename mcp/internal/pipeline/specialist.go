@@ -36,6 +36,9 @@ type SpecialistCommand struct {
 	// Model is the fixed model identifier for this analysis run.
 	Model string
 
+	// Adaptor is the explicit LLM runtime backend for this specialist session.
+	Adaptor string
+
 	// WorkDir is the perspective-specific working directory under the task's state dir.
 	// e.g., ~/.prism/state/analyze-{id}/perspectives/{perspective-id}/
 	WorkDir string
@@ -62,6 +65,9 @@ type SpecialistContext struct {
 
 	// Model is the fixed model for all specialists in this run.
 	Model string
+
+	// Adaptor is the explicit LLM runtime backend for this analysis run.
+	Adaptor string
 
 	// StateDir is the root state directory for this analysis.
 	StateDir string
@@ -183,6 +189,7 @@ func LoadSpecialistContext(cfg AnalysisConfig) (SpecialistContext, error) {
 		Topic:     cfg.Topic,
 		ContextID: cfg.ContextID,
 		Model:     cfg.Model,
+		Adaptor:   cfg.Adaptor,
 		StateDir:  cfg.StateDir,
 		WorkDir:   ResolveAnalysisWorkDir(cfg),
 	}
@@ -358,6 +365,7 @@ func BuildSpecialistCommand(sctx SpecialistContext, perspective Perspective) Spe
 		SystemPrompt:  systemPrompt,
 		UserPrompt:    userPrompt,
 		Model:         sctx.Model,
+		Adaptor:       sctx.Adaptor,
 		WorkDir:       sctx.WorkDir,
 		OutputPath:    findingsPath,
 		MaxTurns:      10,
@@ -511,10 +519,11 @@ func RunSpecialistSession(ctx context.Context, task *taskpkg.AnalysisTask, cmd S
 
 	// Run claude CLI with tool access and structured output.
 	// The ctx already carries a per-job timeout from the ParallelExecutor.
-	rawOutput, err := engine.QueryLLMScopedWithToolsAndSchema(
+	rawOutput, err := engine.QueryLLMScopedWithToolsAndSchemaAdaptor(
 		ctx,
 		cmd.WorkDir,
 		cmd.Model,
+		cmd.Adaptor,
 		cmd.JSONSchema,
 		cmd.SystemPrompt,
 		cmd.UserPrompt,

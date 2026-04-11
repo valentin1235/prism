@@ -10,7 +10,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/heechul/prism-mcp/internal/analysisstore"
 	"github.com/heechul/prism-mcp/internal/brownfield"
 	"github.com/heechul/prism-mcp/internal/pipeline"
 	taskpkg "github.com/heechul/prism-mcp/internal/task"
@@ -77,6 +79,18 @@ func makeAnalyzeRequest(args map[string]interface{}) mcp.CallToolRequest {
 	}
 }
 
+func cancelTaskIfPresent(taskID string) {
+	if TaskStore == nil {
+		return
+	}
+	task := TaskStore.Get(taskID)
+	if task == nil || task.Cancel == nil {
+		return
+	}
+	task.Cancel()
+	time.Sleep(10 * time.Millisecond)
+}
+
 // TestMultipleDefaultReposMerge verifies that multiple is_default=1 repos
 // are merged into a single ontology scope with all paths as sources.
 func TestMultipleDefaultReposMerge(t *testing.T) {
@@ -115,6 +129,7 @@ func TestMultipleDefaultReposMerge(t *testing.T) {
 	if err := json.Unmarshal([]byte(text), &snap); err != nil {
 		t.Fatalf("parse response: %v", err)
 	}
+	defer cancelTaskIfPresent(snap.ID)
 
 	// Read the ontology-scope.json written by the handler
 	stateDir := filepath.Join(dir, "state", snap.ID)
@@ -200,6 +215,7 @@ func TestExplicitOntologyScopeTakesPriority(t *testing.T) {
 	if err := json.Unmarshal([]byte(text), &snap); err != nil {
 		t.Fatalf("parse response: %v", err)
 	}
+	defer cancelTaskIfPresent(snap.ID)
 
 	// Read the ontology-scope.json
 	stateDir := filepath.Join(dir, "state", snap.ID)
@@ -359,6 +375,7 @@ func TestHandleAnalyze_DefaultModelUsesRuntimeDefaultAlias(t *testing.T) {
 	if err := json.Unmarshal([]byte(result.Content[0].(mcp.TextContent).Text), &snap); err != nil {
 		t.Fatalf("parse response: %v", err)
 	}
+	defer cancelTaskIfPresent(snap.ID)
 
 	stateDir := filepath.Join(dir, "state", snap.ID)
 	configData, err := os.ReadFile(filepath.Join(stateDir, "config.json"))
@@ -373,5 +390,377 @@ func TestHandleAnalyze_DefaultModelUsesRuntimeDefaultAlias(t *testing.T) {
 
 	if got, _ := cfg["model"].(string); got != "default" {
 		t.Fatalf("config model = %q, want %q", got, "default")
+	}
+}
+
+func TestHandleAnalyze_ExplicitAdaptorPersistsToConfig(t *testing.T) {
+	dir := setupTestBrownfieldDB(t, []brownfield.Repo{
+		{Path: t.TempDir(), Name: "repo"},
+	}, []string{})
+
+	origBase := PrismBaseDir
+	PrismBaseDir = dir
+	defer func() { PrismBaseDir = origBase }()
+
+	TaskStore = taskpkg.NewTaskStore()
+
+	explicitScope := `{"sources":[{"id":1,"type":"doc","path":"` + t.TempDir() + `","domain":"explicit","summary":"Explicit scope","status":"available","access":{"tools":["Read"],"instructions":"Use Read"}}],"totals":{"doc":1}}`
+
+	result, err := HandleAnalyze(context.Background(), makeAnalyzeRequest(map[string]interface{}{
+		"topic":          "test explicit adaptor",
+		"ontology_scope": explicitScope,
+		"adaptor":        "codex",
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("unexpected error result: %s", result.Content[0].(mcp.TextContent).Text)
+	}
+
+	var snap taskpkg.TaskSnapshot
+	if err := json.Unmarshal([]byte(result.Content[0].(mcp.TextContent).Text), &snap); err != nil {
+		t.Fatalf("parse response: %v", err)
+	}
+	defer cancelTaskIfPresent(snap.ID)
+
+	cfg, err := pipeline.ReadAnalysisConfig(filepath.Join(dir, "state", snap.ID))
+	if err != nil {
+		t.Fatalf("ReadAnalysisConfig() error = %v", err)
+	}
+	if cfg.Adaptor != "codex" {
+		t.Fatalf("config adaptor = %q, want %q", cfg.Adaptor, "codex")
+	}
+}
+
+func TestResolveRequestedAdaptorFallbackOrder(t *testing.T) {
+	t.Setenv("PRISM_AGENT_RUNTIME", "")
+	t.Setenv("PRISM_LLM_BACKEND", "")
+	t.Setenv("CODEX_HOME", "")
+	t.Setenv("CLAUDECODE", "")
+	t.Setenv("CLAUDE_CODE_ENTRYPOINT", "")
+	t.Setenv("PATH", "")
+	t.Setenv("HOME", t.TempDir())
+
+	if got := resolveRequestedAdaptor("codex"); got != "codex" {
+		t.Fatalf("resolveRequestedAdaptor(explicit codex) = %q, want codex", got)
+	}
+
+	t.Setenv("PRISM_AGENT_RUNTIME", "codex")
+	if got := resolveRequestedAdaptor(""); got != "codex" {
+		t.Fatalf("resolveRequestedAdaptor(empty) with runtime codex = %q, want codex", got)
+	}
+
+	t.Setenv("PRISM_AGENT_RUNTIME", "")
+	t.Setenv("PRISM_LLM_BACKEND", "")
+	if got := resolveRequestedAdaptor(""); got != "claude" {
+		t.Fatalf("resolveRequestedAdaptor(empty) final fallback = %q, want claude", got)
+	}
+}
+
+func TestHandleAnalyzeInvalidOntologyScopeCleansUpArtifacts(t *testing.T) {
+	repoPath := t.TempDir()
+	dir := setupTestBrownfieldDB(t, []brownfield.Repo{
+		{Path: repoPath, Name: "repo"},
+	}, nil)
+
+	origBase := PrismBaseDir
+	PrismBaseDir = dir
+	defer func() { PrismBaseDir = origBase }()
+
+	TaskStore = taskpkg.NewTaskStore()
+
+	sessionID := "cleanup-invalid-ontology"
+	result, err := HandleAnalyze(context.Background(), makeAnalyzeRequest(map[string]interface{}{
+		"topic":          "cleanup invalid ontology",
+		"session_id":     sessionID,
+		"ontology_scope": `{"sources":[`,
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.IsError {
+		t.Fatal("expected invalid ontology scope to fail")
+	}
+
+	taskID := "analyze-" + sessionID
+	if TaskStore.Get(taskID) != nil {
+		t.Fatalf("expected task %s to be removed from memory", taskID)
+	}
+
+	stateDir := filepath.Join(dir, "state", taskID)
+	if _, err := os.Stat(stateDir); !os.IsNotExist(err) {
+		t.Fatalf("expected state dir to be removed, stat err=%v", err)
+	}
+
+	reportDir := filepath.Join(dir, "reports", taskID)
+	if _, err := os.Stat(reportDir); !os.IsNotExist(err) {
+		t.Fatalf("expected report dir to be removed, stat err=%v", err)
+	}
+
+	if _, ok, err := analysisstore.LoadAnalysisConfig(dir, taskID); err != nil {
+		t.Fatalf("load analysis config: %v", err)
+	} else if ok {
+		t.Fatalf("expected sqlite row for %s to be removed", taskID)
+	}
+}
+
+func TestHandleAnalyzeInvalidOntologyScopePreservesExistingDeterministicRun(t *testing.T) {
+	repoPath := t.TempDir()
+	dir := setupTestBrownfieldDB(t, []brownfield.Repo{
+		{Path: repoPath, Name: "repo"},
+	}, nil)
+
+	origBase := PrismBaseDir
+	PrismBaseDir = dir
+	defer func() { PrismBaseDir = origBase }()
+
+	TaskStore = taskpkg.NewTaskStore()
+
+	taskID := "analyze-existing-session"
+	stateDir := filepath.Join(dir, "state", taskID)
+	reportDir := filepath.Join(dir, "reports", taskID)
+	if err := os.MkdirAll(stateDir, 0o755); err != nil {
+		t.Fatalf("mkdir state dir: %v", err)
+	}
+	if err := os.MkdirAll(reportDir, 0o755); err != nil {
+		t.Fatalf("mkdir report dir: %v", err)
+	}
+	configContent := []byte(`{"task_id":"` + taskID + `","adaptor":"codex"}`)
+	if err := os.WriteFile(filepath.Join(stateDir, "config.json"), configContent, 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	scopeContent := []byte(`{"sources":[{"path":"/old"}]}`)
+	if err := os.WriteFile(filepath.Join(stateDir, "ontology-scope.json"), scopeContent, 0o644); err != nil {
+		t.Fatalf("write ontology: %v", err)
+	}
+
+	if err := analysisstore.SaveAnalysisConfig(dir, analysisstore.AnalysisConfigRecord{
+		TaskID:    taskID,
+		Topic:     "old topic",
+		Model:     "default",
+		Adaptor:   "codex",
+		ContextID: taskID,
+		StateDir:  stateDir,
+		ReportDir: reportDir,
+	}); err != nil {
+		t.Fatalf("persist config: %v", err)
+	}
+	oldTask := taskpkg.NewAnalysisTask(taskID, "default", stateDir, reportDir, "existing-session")
+	oldTask.SetReportPath(filepath.Join(reportDir, "report.md"))
+	if err := analysisstore.SaveTaskSnapshot(dir, oldTask.Snapshot(), 4); err != nil {
+		t.Fatalf("persist snapshot: %v", err)
+	}
+
+	result, err := HandleAnalyze(context.Background(), makeAnalyzeRequest(map[string]interface{}{
+		"topic":          "bad rerun",
+		"session_id":     "existing-session",
+		"ontology_scope": `{"sources":[`,
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.IsError {
+		t.Fatal("expected invalid ontology scope to fail")
+	}
+
+	if got, err := os.ReadFile(filepath.Join(stateDir, "config.json")); err != nil {
+		t.Fatalf("read config after failure: %v", err)
+	} else if string(got) != string(configContent) {
+		t.Fatalf("expected existing config to be preserved, got %q", string(got))
+	}
+	if got, err := os.ReadFile(filepath.Join(stateDir, "ontology-scope.json")); err != nil {
+		t.Fatalf("read ontology after failure: %v", err)
+	} else if string(got) != string(scopeContent) {
+		t.Fatalf("expected existing ontology to be preserved, got %q", string(got))
+	}
+
+	snapshot, pollCount, ok, err := analysisstore.LoadTaskSnapshot(dir, taskID)
+	if err != nil {
+		t.Fatalf("load persisted snapshot: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected persisted snapshot to remain")
+	}
+	if snapshot.Status != taskpkg.TaskStatusCompleted {
+		t.Fatalf("expected completed snapshot to remain, got %s", snapshot.Status)
+	}
+	if pollCount != 4 {
+		t.Fatalf("expected poll count 4 to remain, got %d", pollCount)
+	}
+}
+
+func TestHandleAnalyzeFailsFastOnExistingBackupReadError(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "prism.db"), []byte("not-a-sqlite-db"), 0o644); err != nil {
+		t.Fatalf("write corrupt prism db: %v", err)
+	}
+
+	origBase := PrismBaseDir
+	PrismBaseDir = dir
+	defer func() { PrismBaseDir = origBase }()
+
+	TaskStore = taskpkg.NewTaskStore()
+
+	sessionID := "backup-read-error"
+	result, err := HandleAnalyze(context.Background(), makeAnalyzeRequest(map[string]interface{}{
+		"topic":          "backup read error",
+		"session_id":     sessionID,
+		"ontology_scope": `{"sources":[],"totals":{"doc":0}}`,
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.IsError {
+		t.Fatal("expected corrupt sqlite backup read to fail")
+	}
+
+	errText := result.Content[0].(mcp.TextContent).Text
+	if !strings.Contains(errText, "failed to load existing analysis backup") {
+		t.Fatalf("expected backup read failure, got %q", errText)
+	}
+
+	taskID := "analyze-" + sessionID
+	if TaskStore.Get(taskID) != nil {
+		t.Fatalf("expected task %s to be removed from memory", taskID)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "state", taskID)); !os.IsNotExist(err) {
+		t.Fatalf("expected state dir to remain absent, stat err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "reports", taskID)); !os.IsNotExist(err) {
+		t.Fatalf("expected report dir to remain absent, stat err=%v", err)
+	}
+}
+
+func TestHandleAnalyzeRejectsDeterministicRerunWhileTaskIsRunning(t *testing.T) {
+	dir := t.TempDir()
+
+	origBase := PrismBaseDir
+	PrismBaseDir = dir
+	defer func() { PrismBaseDir = origBase }()
+
+	TaskStore = taskpkg.NewTaskStore()
+
+	task := TaskStore.Create("", "default", "", "", "same-session")
+	task.SetStatus(taskpkg.TaskStatusRunning)
+	task.StartStage(taskpkg.StageScope, "already running")
+
+	result, err := HandleAnalyze(context.Background(), makeAnalyzeRequest(map[string]interface{}{
+		"topic":          "rerun while running",
+		"session_id":     "same-session",
+		"ontology_scope": `{"sources":[],"totals":{"doc":0}}`,
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.IsError {
+		t.Fatal("expected deterministic rerun to fail while previous task is running")
+	}
+
+	errText := result.Content[0].(mcp.TextContent).Text
+	if !strings.Contains(errText, "already running") {
+		t.Fatalf("expected running task rejection, got %q", errText)
+	}
+	if TaskStore.Get(task.ID) == nil {
+		t.Fatalf("expected existing running task %s to remain registered", task.ID)
+	}
+}
+
+func TestHandleAnalyzeRejectsDeterministicRerunUntilTerminalTaskFullyExits(t *testing.T) {
+	dir := t.TempDir()
+
+	origBase := PrismBaseDir
+	PrismBaseDir = dir
+	defer func() { PrismBaseDir = origBase }()
+
+	TaskStore = taskpkg.NewTaskStore()
+
+	task := TaskStore.Create("", "default", "", "", "same-session-terminal")
+	task.SetError("already failed")
+
+	result, err := HandleAnalyze(context.Background(), makeAnalyzeRequest(map[string]interface{}{
+		"topic":          "rerun while cleanup pending",
+		"session_id":     "same-session-terminal",
+		"ontology_scope": `{"sources":[],"totals":{"doc":0}}`,
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.IsError {
+		t.Fatal("expected deterministic rerun to fail until previous terminal task exits")
+	}
+	errText := result.Content[0].(mcp.TextContent).Text
+	if !strings.Contains(errText, "has not fully exited yet") {
+		t.Fatalf("expected cleanup-pending rejection, got %q", errText)
+	}
+
+	task.CloseDone()
+	result, err = HandleAnalyze(context.Background(), makeAnalyzeRequest(map[string]interface{}{
+		"topic":          "rerun after cleanup",
+		"session_id":     "same-session-terminal",
+		"ontology_scope": `{"sources":[],"totals":{"doc":0}}`,
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error after close: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("expected rerun after done close to succeed, got %s", result.Content[0].(mcp.TextContent).Text)
+	}
+	if rerunTask := TaskStore.Get("analyze-same-session-terminal"); rerunTask != nil {
+		if rerunTask.Cancel != nil {
+			rerunTask.Cancel()
+		}
+		rerunTask.CloseDone()
+		TaskStore.Remove(rerunTask.ID)
+	}
+}
+
+func TestHandleAnalyzeRejectsDeterministicRerunWhilePersistedTaskIsRunning(t *testing.T) {
+	dir := t.TempDir()
+
+	origBase := PrismBaseDir
+	PrismBaseDir = dir
+	defer func() { PrismBaseDir = origBase }()
+
+	TaskStore = taskpkg.NewTaskStore()
+
+	taskID := "analyze-persisted-running"
+	if err := analysisstore.SaveAnalysisConfig(dir, analysisstore.AnalysisConfigRecord{
+		TaskID:        taskID,
+		Topic:         "existing persisted run",
+		Model:         "default",
+		Adaptor:       "claude",
+		ContextID:     taskID,
+		StateDir:      filepath.Join(dir, "state", taskID),
+		ReportDir:     filepath.Join(dir, "reports", taskID),
+		OntologyScope: `{"sources":[],"totals":{"doc":0}}`,
+	}); err != nil {
+		t.Fatalf("SaveAnalysisConfig() error = %v", err)
+	}
+
+	runningTask := taskpkg.NewAnalysisTask(taskID, "default", filepath.Join(dir, "state", taskID), filepath.Join(dir, "reports", taskID), "persisted-running")
+	runningTask.Status = taskpkg.TaskStatusRunning
+	runningTask.ContextID = taskID
+	runningTask.StartStage(taskpkg.StageScope, "persisted running row")
+	snapshot, pollCount := runningTask.SnapshotWithPollCount()
+	if err := analysisstore.SaveTaskSnapshot(dir, snapshot, pollCount); err != nil {
+		t.Fatalf("SaveTaskSnapshot() error = %v", err)
+	}
+
+	result, err := HandleAnalyze(context.Background(), makeAnalyzeRequest(map[string]interface{}{
+		"topic":          "rerun while persisted run is running",
+		"session_id":     "persisted-running",
+		"ontology_scope": `{"sources":[],"totals":{"doc":0}}`,
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.IsError {
+		t.Fatal("expected deterministic rerun to fail while persisted task is still running")
+	}
+
+	errText := result.Content[0].(mcp.TextContent).Text
+	if !strings.Contains(errText, "persisted state") {
+		t.Fatalf("expected persisted-state rejection, got %q", errText)
 	}
 }

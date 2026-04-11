@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/heechul/prism-mcp/internal/analysisstore"
 	taskpkg "github.com/heechul/prism-mcp/internal/task"
 	"github.com/mark3labs/mcp-go/mcp"
 )
@@ -208,6 +209,62 @@ Raw data available in state directory.
 	}
 	if !strings.Contains(resp.Summary, "duplicate charges") {
 		t.Errorf("expected summary to contain 'duplicate charges', got %q", resp.Summary)
+	}
+}
+
+func TestHandleAnalyzeResultCompletedFallsBackToSQLite(t *testing.T) {
+	prismDir := t.TempDir()
+	origBase := PrismBaseDir
+	PrismBaseDir = prismDir
+	defer func() { PrismBaseDir = origBase }()
+	TaskStore = taskpkg.NewTaskStore()
+
+	reportPath := filepath.Join(prismDir, "reports", "analyze-restart", "report.md")
+	if err := os.MkdirAll(filepath.Dir(reportPath), 0o755); err != nil {
+		t.Fatalf("mkdir report dir: %v", err)
+	}
+	if err := os.WriteFile(reportPath, []byte("# Executive Summary\n\npersisted summary"), 0o644); err != nil {
+		t.Fatalf("write report: %v", err)
+	}
+
+	task := TaskStore.Create("ctx-restart", "default", filepath.Join(prismDir, "state", "analyze-restart"), filepath.Dir(reportPath), "restart")
+	if err := analysisstore.SaveAnalysisConfig(prismDir, analysisstore.AnalysisConfigRecord{
+		TaskID:    task.ID,
+		Topic:     "persisted result",
+		Model:     "default",
+		Adaptor:   "codex",
+		ContextID: task.ContextID,
+		StateDir:  task.StateDir,
+		ReportDir: task.ReportDir,
+	}); err != nil {
+		t.Fatalf("persist config: %v", err)
+	}
+	if err := task.SetPersistenceHook(func(snapshot taskpkg.TaskSnapshot, pollCount int) error {
+		return analysisstore.SaveTaskSnapshot(prismDir, snapshot, pollCount)
+	}); err != nil {
+		t.Fatalf("set persistence hook: %v", err)
+	}
+	task.SetReportPath(reportPath)
+
+	TaskStore = taskpkg.NewTaskStore()
+
+	result, err := HandleAnalyzeResult(context.Background(), makeResultRequest(task.ID))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("unexpected error result: %s", getResultText(t, result))
+	}
+
+	var resp AnalyzeResultResponse
+	if err := json.Unmarshal([]byte(getResultText(t, result)), &resp); err != nil {
+		t.Fatalf("parse response: %v", err)
+	}
+	if resp.ReportPath != reportPath {
+		t.Fatalf("expected report path %s, got %s", reportPath, resp.ReportPath)
+	}
+	if !strings.Contains(resp.Summary, "persisted summary") {
+		t.Fatalf("expected persisted summary, got %q", resp.Summary)
 	}
 }
 
