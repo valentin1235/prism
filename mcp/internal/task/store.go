@@ -308,6 +308,12 @@ func (t *AnalysisTask) Snapshot() TaskSnapshot {
 	return t.snapshotLocked()
 }
 
+func (t *AnalysisTask) SnapshotWithPollCount() (TaskSnapshot, int) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.snapshotLocked(), t.PollCount
+}
+
 func (t *AnalysisTask) snapshotLocked() TaskSnapshot {
 	stages := make([]StageProgress, 0, len(t.Stages))
 	for _, name := range AllStages() {

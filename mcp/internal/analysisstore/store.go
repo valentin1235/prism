@@ -18,6 +18,7 @@ type AnalysisConfigRecord struct {
 	Topic                string
 	Model                string
 	Adaptor              string
+	CreatedAt            time.Time
 	ContextID            string
 	StateDir             string
 	ReportDir            string
@@ -45,12 +46,17 @@ func SaveAnalysisConfig(baseDir string, rec AnalysisConfigRecord) error {
 		return fmt.Errorf("marshal default stages: %w", err)
 	}
 
+	if rec.CreatedAt.IsZero() {
+		rec.CreatedAt = time.Now().UTC()
+	}
+	createdAt := formatSQLiteTimestamp(rec.CreatedAt)
+
 	result, err := db.Exec(`
 		INSERT INTO analysis_tasks (
 			task_id, topic, model, adaptor, context_id, state_dir, report_dir,
 			input_context, ontology_scope, seed_hints, report_template, language, perspective_injection,
-			status, report_path, error, poll_count, stages_json
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			status, report_path, error, poll_count, stages_json, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 		ON CONFLICT(task_id) DO UPDATE SET
 			topic = excluded.topic,
 			model = excluded.model,
@@ -68,11 +74,12 @@ func SaveAnalysisConfig(baseDir string, rec AnalysisConfigRecord) error {
 			error = excluded.error,
 			poll_count = excluded.poll_count,
 			stages_json = excluded.stages_json,
+			created_at = excluded.created_at,
 			updated_at = CURRENT_TIMESTAMP
 		WHERE analysis_tasks.adaptor = excluded.adaptor
 	`, rec.TaskID, rec.Topic, rec.Model, rec.Adaptor, rec.ContextID, rec.StateDir, rec.ReportDir,
 		rec.InputContext, rec.OntologyScope, rec.SeedHints, rec.ReportTemplate, rec.Language, rec.PerspectiveInjection,
-		string(taskpkg.TaskStatusQueued), "", "", 0, string(stagesJSON))
+		string(taskpkg.TaskStatusQueued), "", "", 0, string(stagesJSON), createdAt)
 	if err != nil {
 		return err
 	}
@@ -101,6 +108,7 @@ func SaveAnalysisConfig(baseDir string, rec AnalysisConfigRecord) error {
 
 func LoadAnalysisConfig(baseDir, taskID string) (AnalysisConfigRecord, bool, error) {
 	var rec AnalysisConfigRecord
+	var rawCreatedAt string
 	db, err := openReadOnly(baseDir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -112,7 +120,9 @@ func LoadAnalysisConfig(baseDir, taskID string) (AnalysisConfigRecord, bool, err
 
 	err = db.QueryRow(`
 		SELECT
-			task_id, topic, model, adaptor, context_id, state_dir, report_dir,
+			task_id, topic, model, adaptor,
+			strftime('%Y-%m-%dT%H:%M:%fZ', created_at),
+			context_id, state_dir, report_dir,
 			COALESCE(input_context, ''),
 			COALESCE(ontology_scope, ''),
 			COALESCE(seed_hints, ''),
@@ -122,7 +132,7 @@ func LoadAnalysisConfig(baseDir, taskID string) (AnalysisConfigRecord, bool, err
 		FROM analysis_tasks
 		WHERE task_id = ?
 	`, taskID).Scan(
-		&rec.TaskID, &rec.Topic, &rec.Model, &rec.Adaptor, &rec.ContextID, &rec.StateDir, &rec.ReportDir,
+		&rec.TaskID, &rec.Topic, &rec.Model, &rec.Adaptor, &rawCreatedAt, &rec.ContextID, &rec.StateDir, &rec.ReportDir,
 		&rec.InputContext, &rec.OntologyScope, &rec.SeedHints, &rec.ReportTemplate, &rec.Language, &rec.PerspectiveInjection,
 	)
 	if err == sql.ErrNoRows {
@@ -134,6 +144,7 @@ func LoadAnalysisConfig(baseDir, taskID string) (AnalysisConfigRecord, bool, err
 		}
 		return rec, false, err
 	}
+	rec.CreatedAt = parseSQLiteTimestamp(rawCreatedAt)
 	return rec, true, nil
 }
 
@@ -240,6 +251,42 @@ func LoadTaskSnapshot(baseDir, taskID string) (taskpkg.TaskSnapshot, int, bool, 
 	}
 
 	return snapshot, pollCount, true, nil
+}
+
+func IncrementTaskPollCount(baseDir, taskID string) (int, error) {
+	db, err := open(baseDir)
+	if err != nil {
+		return 0, err
+	}
+	defer db.Close()
+
+	if err := initialize(db); err != nil {
+		return 0, err
+	}
+
+	result, err := db.Exec(`
+		UPDATE analysis_tasks
+		SET
+			poll_count = poll_count + 1,
+			updated_at = CURRENT_TIMESTAMP
+		WHERE task_id = ?
+	`, taskID)
+	if err != nil {
+		return 0, err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	if rows == 0 {
+		return 0, fmt.Errorf("analysis task not found: %s", taskID)
+	}
+
+	var pollCount int
+	if err := db.QueryRow(`SELECT poll_count FROM analysis_tasks WHERE task_id = ?`, taskID).Scan(&pollCount); err != nil {
+		return 0, err
+	}
+	return pollCount, nil
 }
 
 func DeleteAnalysisTask(baseDir, taskID string) error {
@@ -398,4 +445,11 @@ func parseSQLiteTimestamp(raw string) time.Time {
 		}
 	}
 	return time.Time{}
+}
+
+func formatSQLiteTimestamp(ts time.Time) string {
+	if ts.IsZero() {
+		return ""
+	}
+	return ts.UTC().Format(time.RFC3339Nano)
 }

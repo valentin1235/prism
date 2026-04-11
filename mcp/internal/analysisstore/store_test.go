@@ -2,6 +2,7 @@ package analysisstore
 
 import (
 	"testing"
+	"time"
 
 	taskpkg "github.com/heechul/prism-mcp/internal/task"
 )
@@ -93,6 +94,10 @@ func TestSaveAnalysisConfigResetsLifecycleForDeterministicRerun(t *testing.T) {
 	if err := SaveAnalysisConfig(baseDir, record); err != nil {
 		t.Fatalf("initial save: %v", err)
 	}
+	initialSnapshot, _, ok, err := LoadTaskSnapshot(baseDir, record.TaskID)
+	if err != nil || !ok {
+		t.Fatalf("load initial snapshot: ok=%v err=%v", ok, err)
+	}
 
 	task := taskpkg.NewAnalysisTask("analyze-rerun", "default", "/tmp/state", "/tmp/report", "rerun")
 	task.SetStatus(taskpkg.TaskStatusRunning)
@@ -103,6 +108,7 @@ func TestSaveAnalysisConfigResetsLifecycleForDeterministicRerun(t *testing.T) {
 	}
 
 	record.Topic = "rerun topic"
+	time.Sleep(10 * time.Millisecond)
 	if err := SaveAnalysisConfig(baseDir, record); err != nil {
 		t.Fatalf("rerun save: %v", err)
 	}
@@ -125,5 +131,8 @@ func TestSaveAnalysisConfigResetsLifecycleForDeterministicRerun(t *testing.T) {
 	}
 	if len(snapshot.Stages) != 4 || snapshot.Stages[0].Status != taskpkg.StageStatusPending {
 		t.Fatalf("expected stages reset to pending, got %+v", snapshot.Stages)
+	}
+	if !snapshot.CreatedAt.After(initialSnapshot.CreatedAt) {
+		t.Fatalf("expected rerun created_at to advance, before=%s after=%s", initialSnapshot.CreatedAt, snapshot.CreatedAt)
 	}
 }

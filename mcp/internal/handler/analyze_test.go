@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/heechul/prism-mcp/internal/analysisstore"
 	taskpkg "github.com/heechul/prism-mcp/internal/task"
@@ -201,6 +202,65 @@ func TestHandleTaskStatusServerRestart(t *testing.T) {
 	}
 	if snap.Stages[0].Detail != "running after restart" {
 		t.Fatalf("expected persisted stage detail, got %q", snap.Stages[0].Detail)
+	}
+}
+
+func TestHandleTaskStatusServerRestartConsumesPersistedPollBudget(t *testing.T) {
+	prismDir := t.TempDir()
+	origBase := PrismBaseDir
+	PrismBaseDir = prismDir
+	defer func() { PrismBaseDir = origBase }()
+
+	TaskStore = taskpkg.NewTaskStore()
+	taskID := "analyze-restart-poll"
+	if err := analysisstore.SaveAnalysisConfig(prismDir, analysisstore.AnalysisConfigRecord{
+		TaskID:    taskID,
+		Topic:     "restart poll",
+		Model:     "default",
+		Adaptor:   "codex",
+		CreatedAt: time.Now().UTC(),
+		ContextID: taskID,
+		StateDir:  filepath.Join(prismDir, "state", taskID),
+		ReportDir: filepath.Join(prismDir, "reports", taskID),
+	}); err != nil {
+		t.Fatalf("persist config: %v", err)
+	}
+
+	task := taskpkg.NewAnalysisTask(taskID, "default", filepath.Join(prismDir, "state", taskID), filepath.Join(prismDir, "reports", taskID), "restart-poll")
+	task.SetStatus(taskpkg.TaskStatusRunning)
+	task.StartStage(taskpkg.StageScope, "still running")
+	if err := analysisstore.SaveTaskSnapshot(prismDir, task.Snapshot(), taskpkg.MaxPollIterations); err != nil {
+		t.Fatalf("persist running snapshot: %v", err)
+	}
+
+	result, err := HandleTaskStatus(context.Background(), makeStatusRequest(taskID))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("unexpected error result: %s", result.Content[0].(mcp.TextContent).Text)
+	}
+
+	var snap taskpkg.TaskSnapshot
+	if err := json.Unmarshal([]byte(result.Content[0].(mcp.TextContent).Text), &snap); err != nil {
+		t.Fatalf("unmarshal snapshot: %v", err)
+	}
+	if snap.Status != taskpkg.TaskStatusFailed {
+		t.Fatalf("expected failed status after persisted poll timeout, got %s", snap.Status)
+	}
+	if !strings.Contains(snap.Error, "poll limit exceeded") {
+		t.Fatalf("expected poll timeout error, got %q", snap.Error)
+	}
+
+	persisted, pollCount, ok, err := analysisstore.LoadTaskSnapshot(prismDir, taskID)
+	if err != nil || !ok {
+		t.Fatalf("load persisted snapshot: ok=%v err=%v", ok, err)
+	}
+	if persisted.Status != taskpkg.TaskStatusFailed {
+		t.Fatalf("expected persisted failed status, got %s", persisted.Status)
+	}
+	if pollCount != taskpkg.MaxPollIterations+1 {
+		t.Fatalf("expected poll count %d, got %d", taskpkg.MaxPollIterations+1, pollCount)
 	}
 }
 
