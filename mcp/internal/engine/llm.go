@@ -116,10 +116,6 @@ func QueryLLMScopedWithToolsAndSchema(ctx context.Context, stateDir, model, json
 }
 
 func QueryLLMScopedWithToolsAndSchemaAdaptor(ctx context.Context, stateDir, model, adaptor, jsonSchema, systemPrompt, userPrompt string, maxTurns int) (string, error) {
-	if maxTurns <= 0 {
-		maxTurns = 8
-	}
-
 	return QuerySync(ctx, userPrompt, ClaudeOptions{
 		Model:           model,
 		SystemPrompt:    systemPrompt,

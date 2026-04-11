@@ -487,7 +487,7 @@ func RunSeedAnalysis(task *taskpkg.AnalysisTask, cfg AnalysisConfig) error {
 		SeedAnalysisSchema(),
 		systemPrompt,
 		userPrompt,
-		8,
+		0, // no turn limit — timeout controls duration
 	)
 	if err != nil {
 		return fmt.Errorf("seed analysis subprocess: %w", err)
