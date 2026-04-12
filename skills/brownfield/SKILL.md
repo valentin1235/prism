@@ -71,11 +71,14 @@ The scan response `text` already contains a pre-formatted numbered list with `[d
 ```
 Scan complete. 5 repositories, 3 MCP servers registered.
 
- 1. (repo) repo1 *               5. (repo) repo5
- 2. (repo) repo2 *               6. (mcp) mcp1
- 3. (repo) repo3                 7. (mcp) mcp2
- 4. (repo) repo4                 8. (mcp) mcp3
+ 1. (repo) repo1 *               4. (repo) repo4
+ 2. (repo) repo2 *               5. (repo) repo5
+ 3. (repo) repo3                  - (mcp) mcp1
+                                   - (mcp) mcp2
+                                   - (mcp) mcp3
 ```
+
+Repo numbers match their `rowid` and can be used with `set_defaults`. MCP servers are listed without numbers (not selectable as defaults).
 
 Include `*` markers for defaults exactly as they appear in the scan response.
 

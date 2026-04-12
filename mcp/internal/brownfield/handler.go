@@ -147,40 +147,28 @@ func handleScan(ctx context.Context, args map[string]interface{}) (*mcp.CallTool
 		return mcp.NewToolResultError(fmt.Sprintf("list after scan failed: %v", listErr)), nil
 	}
 
-	// Build combined numbered list: repos first, then MCPs
+	// Build list: repos with rowid (selectable for set_defaults), MCPs separately
 	var lines []string
 	lines = append(lines, fmt.Sprintf("Scan complete. %d repositories, %d MCP servers registered.", len(allRepos), len(storedMCPs)), "")
 
-	idx := 1
 	for _, r := range allRepos {
 		marker := ""
 		if r.IsDefault {
 			marker = " *"
 		}
-		lines = append(lines, fmt.Sprintf("%2d. (repo) %s%s", idx, r.Name, marker))
-		idx++
+		lines = append(lines, fmt.Sprintf("%2d. (repo) %s%s", r.RowID, r.Name, marker))
 	}
 	for _, m := range storedMCPs {
-		marker := ""
-		if m.IsDefault {
-			marker = " *"
-		}
-		lines = append(lines, fmt.Sprintf("%2d. (mcp) %s%s", idx, m.Name, marker))
-		idx++
+		lines = append(lines, fmt.Sprintf("  - (mcp) %s", m.Name))
 	}
 
 	lines = append(lines, "")
 
-	// Collect defaults from both repos and MCPs
+	// Collect defaults (repos only — MCPs don't support set_defaults)
 	var defaultNames []string
 	for _, r := range allRepos {
 		if r.IsDefault {
 			defaultNames = append(defaultNames, r.Name)
-		}
-	}
-	for _, m := range storedMCPs {
-		if m.IsDefault {
-			defaultNames = append(defaultNames, m.Name)
 		}
 	}
 	if len(defaultNames) > 0 {
@@ -258,17 +246,11 @@ func handleQuery(args map[string]interface{}) (*mcp.CallToolResult, error) {
 		return mcp.NewToolResultError(fmt.Sprintf("query failed: %v", err)), nil
 	}
 
-	// Collect defaults
 	var defaults []Repo
-	for _, r := range repos {
-		if r.IsDefault {
-			defaults = append(defaults, r)
-		}
-	}
-	// If querying all, also get full default list
-	if !defaultOnly {
-		allDefaults, _, _ := store.List(0, 0, true)
-		defaults = allDefaults
+	if defaultOnly {
+		defaults = repos
+	} else {
+		defaults, _, _ = store.List(0, 0, true)
 	}
 
 	result := map[string]interface{}{

@@ -75,6 +75,10 @@ func normalizeVisibleMCPServersForSnapshot(servers []MCPServer) []MCPServer {
 	return normalized
 }
 
+// mcpServerVisibleAtScan determines snapshot inclusion. When VisibilityOK is
+// false (visibility could not be determined, e.g. zero-value struct), the
+// server is included by default so discovery sources that don't set
+// VisibilityOK don't silently exclude servers.
 func mcpServerVisibleAtScan(server MCPServer) bool {
 	if !server.VisibilityOK {
 		return true
