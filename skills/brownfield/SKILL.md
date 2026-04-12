@@ -71,10 +71,10 @@ The scan response `text` already contains a pre-formatted numbered list with `[d
 ```
 Scan complete. 5 repositories, 3 MCP servers registered.
 
- 1. (repo) repo-alpha *          5. (repo) repo-epsilon
- 2. (repo) repo-bravo *          6. (mcp) plugin:ouroboros
- 3. (repo) repo-charlie          7. (mcp) mcp-clickhouse
- 4. (repo) repo-delta            8. (mcp) sentry
+ 1. (repo) prism *               5. (repo) grape
+ 2. (repo) podo-backend *        6. (mcp) plugin:ouroboros
+ 3. (repo) podo-app *            7. (mcp) mcp-clickhouse
+ 4. (repo) ouroboros              8. (mcp) sentry
 ```
 
 Include `*` markers for defaults exactly as they appear in the scan response.
