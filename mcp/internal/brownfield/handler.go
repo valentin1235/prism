@@ -123,19 +123,22 @@ func handleScan(ctx context.Context, args map[string]interface{}) (*mcp.CallTool
 	// mutex acquisitions. This is safe because the MCP server is single-process
 	// and scan requests are serialized. If concurrent scans are added later,
 	// these should be combined into a single transaction.
+	var (
+		storedMCPs []MCPServerSnapshot
+		mcpErr     error
+	)
 	if err := store.EnsureMCPSnapshotTableSchema(); err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("mcp snapshot migration failed: %v", err)), nil
+		mcpErr = fmt.Errorf("mcp snapshot migration: %w", err)
 	}
-	servers, err := discoverMCPServers(ctx)
-	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("mcp scan failed: %v", err)), nil
-	}
-	if _, err := store.ReplaceMCPsSnapshot(servers); err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("mcp snapshot sync failed: %v", err)), nil
-	}
-	storedMCPs, err := store.ListMCPs()
-	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("mcp snapshot list failed: %v", err)), nil
+	if mcpErr == nil {
+		servers, err := discoverMCPServers(ctx)
+		if err != nil {
+			mcpErr = fmt.Errorf("mcp discovery: %w", err)
+		} else if _, err := store.ReplaceMCPsSnapshot(servers); err != nil {
+			mcpErr = fmt.Errorf("mcp snapshot sync: %w", err)
+		} else {
+			storedMCPs, _ = store.ListMCPs()
+		}
 	}
 
 	// Fetch all repos and MCP snapshots for combined listing
@@ -189,6 +192,9 @@ func handleScan(ctx context.Context, args map[string]interface{}) (*mcp.CallTool
 
 	if bulkErr != nil {
 		summary += fmt.Sprintf("\n\nWarning: %s", bulkErr.Error())
+	}
+	if mcpErr != nil {
+		summary += fmt.Sprintf("\n\nWarning (MCP): %s", mcpErr.Error())
 	}
 
 	return mcp.NewToolResultText(summary), nil
