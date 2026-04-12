@@ -191,7 +191,7 @@ func (s *Store) migrateFromLegacyTables() error {
 	} else if mcpExists {
 		if _, err := tx.Exec(`
 			INSERT OR IGNORE INTO brownfield_entries (type, key, name, desc, path, is_default, registered_at)
-			SELECT 'mcp', name, name, desc, path, is_default, registered_at
+			SELECT 'mcp', name, name, desc, path, 0, registered_at
 			FROM mcp_server_snapshot
 		`); err != nil {
 			return fmt.Errorf("migrate mcps: %w", err)
@@ -471,12 +471,19 @@ func (s *Store) SyncMCPEntries(servers []MCPServer) (int, error) {
 	sort.Strings(sortedNames)
 
 	for _, name := range sortedNames {
-		if existingKeys[name] {
-			continue
-		}
 		server := scanServers[name]
 		desc := normalizeMCPDescription(name, server.Desc)
 		pathVal := normalizeOptionalPath(approvedSnapshotPath(server))
+		if existingKeys[name] {
+			// Update desc/path for existing entries (preserves rowid and is_default)
+			if _, err := tx.Exec(`
+				UPDATE brownfield_entries SET desc = ?, path = ?, registered_at = ?
+				WHERE type = 'mcp' AND key = ?
+			`, desc, pathVal, registeredAt, name); err != nil {
+				return 0, fmt.Errorf("update mcp %s: %w", name, err)
+			}
+			continue
+		}
 		if _, err := tx.Exec(`
 			INSERT INTO brownfield_entries (type, key, name, desc, path, is_default, registered_at)
 			VALUES ('mcp', ?, ?, ?, ?, 0, ?)
@@ -601,7 +608,10 @@ func (s *Store) SetDefaultsByRowIDs(ids []int64) error {
 	for _, id := range ids {
 		var exists int
 		if err := tx.QueryRow("SELECT 1 FROM brownfield_entries WHERE rowid = ?", id).Scan(&exists); err != nil {
-			return fmt.Errorf("rowid %d does not exist", id)
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("rowid %d does not exist", id)
+			}
+			return fmt.Errorf("validate rowid %d: %w", id, err)
 		}
 	}
 
