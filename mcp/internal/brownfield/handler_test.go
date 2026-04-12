@@ -116,8 +116,11 @@ func TestHandlerScanNoReposFound(t *testing.T) {
 	}
 
 	text := extractText(result)
-	if text != "No GitHub repositories found in your home directory." {
-		t.Fatalf("expected no-repos message, got: %q", text)
+	if !strings.Contains(text, "0 repositories") {
+		t.Fatalf("expected 0 repositories in message, got: %q", text)
+	}
+	if !strings.Contains(text, "MCP servers registered") {
+		t.Fatalf("expected MCP servers in message, got: %q", text)
 	}
 
 	total, err := s.CountMCPs()

@@ -142,37 +142,52 @@ func handleScan(ctx context.Context, args map[string]interface{}) (*mcp.CallTool
 		}
 	}
 
-	if len(repos) == 0 {
-		return mcp.NewToolResultText("No GitHub repositories found in your home directory."), nil
-	}
-
 	_, bulkErr := store.BulkRegister(repos)
 
-	// Fetch all repos with defaults to build formatted list (matches ouroboros format)
-	allRepos, total, listErr := store.List(0, 0, false)
+	// Fetch all repos and MCP snapshots for combined listing
+	allRepos, _, listErr := store.List(0, 0, false)
 	if listErr != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("list after scan failed: %v", listErr)), nil
 	}
-	defaults, _, _ := store.List(0, 0, true)
 
-	// Build compact numbered list: "{rowid}. {name} *"
+	// Build combined numbered list: repos first, then MCPs
 	var lines []string
-	lines = append(lines, fmt.Sprintf("Scan complete. %d repositories registered.", total), "")
+	lines = append(lines, fmt.Sprintf("Scan complete. %d repositories, %d MCP servers registered.", len(allRepos), len(storedMCPs)), "")
+
+	idx := 1
 	for _, r := range allRepos {
 		marker := ""
 		if r.IsDefault {
 			marker = " *"
 		}
-		lines = append(lines, fmt.Sprintf("%2d. %s%s", r.RowID, r.Name, marker))
+		lines = append(lines, fmt.Sprintf("%2d. (repo) %s%s", idx, r.Name, marker))
+		idx++
 	}
-	lines = append(lines, "")
-	if len(defaults) > 0 {
-		var ids, names []string
-		for _, d := range defaults {
-			ids = append(ids, fmt.Sprintf("%d", d.RowID))
-			names = append(names, d.Name)
+	for _, m := range storedMCPs {
+		marker := ""
+		if m.IsDefault {
+			marker = " *"
 		}
-		lines = append(lines, fmt.Sprintf("Defaults (* marked): %s (%s)", strings.Join(ids, ", "), strings.Join(names, ", ")))
+		lines = append(lines, fmt.Sprintf("%2d. (mcp) %s%s", idx, m.Name, marker))
+		idx++
+	}
+
+	lines = append(lines, "")
+
+	// Collect defaults from both repos and MCPs
+	var defaultNames []string
+	for _, r := range allRepos {
+		if r.IsDefault {
+			defaultNames = append(defaultNames, r.Name)
+		}
+	}
+	for _, m := range storedMCPs {
+		if m.IsDefault {
+			defaultNames = append(defaultNames, m.Name)
+		}
+	}
+	if len(defaultNames) > 0 {
+		lines = append(lines, fmt.Sprintf("Defaults (* marked): %s", strings.Join(defaultNames, ", ")))
 	} else {
 		lines = append(lines, "No defaults set.")
 	}
