@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -24,16 +22,7 @@ import (
 var TaskStore *taskpkg.TaskStore
 
 // PrismBaseDir is the resolved ~/.prism directory.
-var PrismBaseDir string
-
-func init() {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		log.Printf("Warning: cannot resolve home dir: %v", err)
-		return
-	}
-	PrismBaseDir = filepath.Join(home, ".prism")
-}
+var PrismBaseDir = prismconfig.PrismBaseDir()
 
 // HandleAnalyze validates input parameters, creates a task entry,
 // launches the analysis pipeline in a background goroutine, and

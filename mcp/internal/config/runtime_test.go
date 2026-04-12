@@ -63,3 +63,18 @@ func TestCodexPathHelpersHonorEnvironment(t *testing.T) {
 		t.Fatalf("CodexRepoRootPointerPath() = %q, want /tmp/custom-codex/lib/prism/repo-root", got)
 	}
 }
+
+func TestPrismRuntimePathsUseHomeDirectory(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	if got := PrismBaseDir(); got != filepath.Join(home, ".prism") {
+		t.Fatalf("PrismBaseDir() = %q, want %q", got, filepath.Join(home, ".prism"))
+	}
+	if got := ConfigPath(); got != filepath.Join(home, ".prism", "config.yaml") {
+		t.Fatalf("ConfigPath() = %q, want %q", got, filepath.Join(home, ".prism", "config.yaml"))
+	}
+	if got := RuntimeSQLitePath(); got != filepath.Join(home, ".prism", "prism.db") {
+		t.Fatalf("RuntimeSQLitePath() = %q, want %q", got, filepath.Join(home, ".prism", "prism.db"))
+	}
+}

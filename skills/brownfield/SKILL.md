@@ -27,6 +27,18 @@ In Codex, this same shared workflow is invoked through `psm brownfield`. The rep
 
 ## How It Works
 
+### MCP Snapshot Ontology
+
+When a brownfield scan refreshes the MCP snapshot, duplicate visible `/mcp` entries with the same server name must be resolved before SQLite insertion using this documented policy:
+
+```yaml
+name_collision_policy:
+  id: prefer_approved_path_then_resolved_description_then_lexicographically_smallest_normalized_snapshot_fingerprint
+  rule: prefer approved path, then resolved description, then lexicographically smallest normalized snapshot fingerprint
+```
+
+This survivor rule is authoritative for the scan workflow. It must not depend on SQLite primary-key conflict side effects or discovery insertion order.
+
 ### Default flow (no args)
 
 **Step 1: Scan**

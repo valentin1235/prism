@@ -18,12 +18,16 @@ var (
 	store     *Store
 	storeOnce sync.Once
 	storeErr  error
+
+	scanHomeForRepos   = ScanHomeForRepos
+	discoverMCPServers = DiscoverMCPServers
 )
 
-// InitStore opens the brownfield database. Safe to call multiple times (sync.Once).
-func InitStore() error {
+// InitStore opens the brownfield database at dbPath. Safe to call multiple
+// times (sync.Once).
+func InitStore(dbPath string) error {
 	storeOnce.Do(func() {
-		s, err := NewStore()
+		s, err := NewStoreAt(dbPath)
 		if err != nil {
 			storeErr = err
 			return
@@ -101,9 +105,41 @@ func handleScan(ctx context.Context, args map[string]interface{}) (*mcp.CallTool
 		}
 		scanRoot = abs
 	}
-	repos, err := ScanHomeForRepos(scanRoot)
+	repos, err := scanHomeForRepos(scanRoot)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
+	}
+	if err := store.EnsureMCPSnapshotTableSchema(); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("mcp snapshot migration failed: %v", err)), nil
+	}
+
+	servers, err := discoverMCPServers(ctx)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("mcp scan failed: %v", err)), nil
+	}
+	expectedSnapshotNames := snapshotNamesForMCPServers(servers)
+	storedSnapshotCount, err := store.ReplaceMCPsSnapshot(servers)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("mcp snapshot sync failed: %v", err)), nil
+	}
+	mcpCount, err := store.CountMCPs()
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("mcp snapshot count failed: %v", err)), nil
+	}
+	if mcpCount != storedSnapshotCount {
+		return mcp.NewToolResultError(fmt.Sprintf("mcp snapshot count mismatch: discovered %d unique rows, stored %d", storedSnapshotCount, mcpCount)), nil
+	}
+	storedMCPs, err := store.ListMCPs()
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("mcp snapshot verification failed: %v", err)), nil
+	}
+	if len(storedMCPs) != len(expectedSnapshotNames) {
+		return mcp.NewToolResultError(fmt.Sprintf("mcp snapshot verification mismatch: expected %d rows, stored %d", len(expectedSnapshotNames), len(storedMCPs))), nil
+	}
+	for i, expectedName := range expectedSnapshotNames {
+		if storedMCPs[i].Name != expectedName {
+			return mcp.NewToolResultError(fmt.Sprintf("mcp snapshot verification mismatch at row %d: expected %q, stored %q", i, expectedName, storedMCPs[i].Name)), nil
+		}
 	}
 
 	if len(repos) == 0 {
