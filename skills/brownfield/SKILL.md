@@ -69,11 +69,11 @@ The scan response `text` already contains a pre-formatted numbered list with `[d
 **Display the results in a plain-text 2-column grid** (NOT a markdown table). Use a code block so columns align. Repos always appear first, MCP servers after. Example:
 
 ```
-Scan complete. 4 repositories, 4 MCP servers registered.
+Scan complete. 5 repositories, 3 MCP servers registered.
 
- 1. (repo) repo-alpha *          5. (mcp) plugin:ouroboros
- 2. (repo) repo-bravo *          6. (mcp) mcp-clickhouse
- 3. (repo) repo-charlie          7. (mcp) notion
+ 1. (repo) repo-alpha *          5. (repo) repo-epsilon
+ 2. (repo) repo-bravo *          6. (mcp) plugin:ouroboros
+ 3. (repo) repo-charlie          7. (mcp) mcp-clickhouse
  4. (repo) repo-delta            8. (mcp) sentry
 ```
 
