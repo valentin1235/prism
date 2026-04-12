@@ -18,12 +18,16 @@ var (
 	store     *Store
 	storeOnce sync.Once
 	storeErr  error
+
+	scanHomeForRepos   = ScanHomeForRepos
+	discoverMCPServers = DiscoverMCPServers
 )
 
-// InitStore opens the brownfield database. Safe to call multiple times (sync.Once).
-func InitStore() error {
+// InitStore opens the brownfield database at dbPath. Safe to call multiple
+// times (sync.Once).
+func InitStore(dbPath string) error {
 	storeOnce.Do(func() {
-		s, err := NewStore()
+		s, err := NewStoreAt(dbPath)
 		if err != nil {
 			storeErr = err
 			return
@@ -36,6 +40,12 @@ func InitStore() error {
 // SetStoreForTest replaces the package-level store (testing only).
 func SetStoreForTest(s *Store) {
 	store = s
+}
+
+// ResetInitStoreForTest resets the sync.Once guard so InitStore can be called
+// again in tests. Must only be used from test code.
+func ResetInitStoreForTest() {
+	storeOnce = sync.Once{}
 }
 
 // HandleBrownfield is the MCP tool handler for prism_brownfield.
@@ -101,42 +111,72 @@ func handleScan(ctx context.Context, args map[string]interface{}) (*mcp.CallTool
 		}
 		scanRoot = abs
 	}
-	repos, err := ScanHomeForRepos(scanRoot)
+	repos, err := scanHomeForRepos(scanRoot)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("scan failed: %v", err)), nil
 	}
 
-	if len(repos) == 0 {
-		return mcp.NewToolResultText("No GitHub repositories found in your home directory."), nil
-	}
-
+	// Register repos first so MCP failures don't block repo registration.
 	_, bulkErr := store.BulkRegister(repos)
 
-	// Fetch all repos with defaults to build formatted list (matches ouroboros format)
-	allRepos, total, listErr := store.List(0, 0, false)
+	// NOTE: EnsureMCPSnapshotTableSchema and ReplaceMCPsSnapshot use separate
+	// mutex acquisitions. This is safe because the MCP server is single-process
+	// and scan requests are serialized. If concurrent scans are added later,
+	// these should be combined into a single transaction.
+	var (
+		storedMCPs []MCPServerSnapshot
+		mcpErr     error
+	)
+	if err := store.EnsureMCPSnapshotTableSchema(); err != nil {
+		mcpErr = fmt.Errorf("mcp snapshot migration: %w", err)
+	}
+	if mcpErr == nil {
+		servers, discoverErr := discoverMCPServers(ctx)
+		if discoverErr != nil {
+			mcpErr = fmt.Errorf("mcp discovery: %w", discoverErr)
+		}
+		// On complete failure (error + no servers), preserve existing snapshot.
+		// On partial success or full success, replace snapshot with current results.
+		if discoverErr == nil || len(servers) > 0 {
+			if _, err := store.ReplaceMCPsSnapshot(servers); err != nil {
+				mcpErr = fmt.Errorf("mcp snapshot sync: %w", err)
+			}
+		}
+		storedMCPs, _ = store.ListMCPs()
+	}
+
+	// Fetch all repos and MCP snapshots for combined listing
+	allRepos, _, listErr := store.List(0, 0, false)
 	if listErr != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("list after scan failed: %v", listErr)), nil
 	}
-	defaults, _, _ := store.List(0, 0, true)
 
-	// Build compact numbered list: "{rowid}. {name} *"
+	// Build list: repos with rowid (selectable for set_defaults), MCPs separately
 	var lines []string
-	lines = append(lines, fmt.Sprintf("Scan complete. %d repositories registered.", total), "")
+	lines = append(lines, fmt.Sprintf("Scan complete. %d repositories, %d MCP servers registered.", len(allRepos), len(storedMCPs)), "")
+
 	for _, r := range allRepos {
 		marker := ""
 		if r.IsDefault {
 			marker = " *"
 		}
-		lines = append(lines, fmt.Sprintf("%2d. %s%s", r.RowID, r.Name, marker))
+		lines = append(lines, fmt.Sprintf("%2d. (repo) %s%s", r.RowID, r.Name, marker))
 	}
+	for _, m := range storedMCPs {
+		lines = append(lines, fmt.Sprintf("  - (mcp) %s", m.Name))
+	}
+
 	lines = append(lines, "")
-	if len(defaults) > 0 {
-		var ids, names []string
-		for _, d := range defaults {
-			ids = append(ids, fmt.Sprintf("%d", d.RowID))
-			names = append(names, d.Name)
+
+	// Collect defaults (repos only — MCPs don't support set_defaults)
+	var defaultNames []string
+	for _, r := range allRepos {
+		if r.IsDefault {
+			defaultNames = append(defaultNames, r.Name)
 		}
-		lines = append(lines, fmt.Sprintf("Defaults (* marked): %s (%s)", strings.Join(ids, ", "), strings.Join(names, ", ")))
+	}
+	if len(defaultNames) > 0 {
+		lines = append(lines, fmt.Sprintf("Defaults (* marked): %s", strings.Join(defaultNames, ", ")))
 	} else {
 		lines = append(lines, "No defaults set.")
 	}
@@ -144,6 +184,9 @@ func handleScan(ctx context.Context, args map[string]interface{}) (*mcp.CallTool
 
 	if bulkErr != nil {
 		summary += fmt.Sprintf("\n\nWarning: %s", bulkErr.Error())
+	}
+	if mcpErr != nil {
+		summary += fmt.Sprintf("\n\nWarning (MCP): %s", mcpErr.Error())
 	}
 
 	return mcp.NewToolResultText(summary), nil
@@ -207,17 +250,11 @@ func handleQuery(args map[string]interface{}) (*mcp.CallToolResult, error) {
 		return mcp.NewToolResultError(fmt.Sprintf("query failed: %v", err)), nil
 	}
 
-	// Collect defaults
 	var defaults []Repo
-	for _, r := range repos {
-		if r.IsDefault {
-			defaults = append(defaults, r)
-		}
-	}
-	// If querying all, also get full default list
-	if !defaultOnly {
-		allDefaults, _, _ := store.List(0, 0, true)
-		defaults = allDefaults
+	if defaultOnly {
+		defaults = repos
+	} else {
+		defaults, _, _ = store.List(0, 0, true)
 	}
 
 	result := map[string]interface{}{

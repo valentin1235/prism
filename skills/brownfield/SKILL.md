@@ -27,6 +27,18 @@ In Codex, this same shared workflow is invoked through `psm brownfield`. The rep
 
 ## How It Works
 
+### MCP Snapshot Ontology
+
+When a brownfield scan refreshes the MCP snapshot, duplicate visible `/mcp` entries with the same server name must be resolved before SQLite insertion using this documented policy:
+
+```yaml
+name_collision_policy:
+  id: prefer_approved_path_then_resolved_description_then_lexicographically_smallest_normalized_snapshot_fingerprint
+  rule: prefer approved path, then resolved description, then lexicographically smallest normalized snapshot fingerprint
+```
+
+This survivor rule is authoritative for the scan workflow. It must not depend on SQLite primary-key conflict side effects or discovery insertion order.
+
 ### Default flow (no args)
 
 **Step 1: Scan**
@@ -54,22 +66,25 @@ This may take a moment...
 
 The scan response `text` already contains a pre-formatted numbered list with `[default]` markers. **Do NOT make any additional MCP calls to list or query repos.**
 
-**Display the repos in a plain-text 2-column grid** (NOT a markdown table). Use a code block so columns align. Example:
+**Display the results in a plain-text 2-column grid** (NOT a markdown table). Use a code block so columns align. Repos always appear first, MCP servers after. Example:
 
 ```
-Scan complete. 8 repositories registered.
+Scan complete. 5 repositories, 3 MCP servers registered.
 
- 1. repo-alpha                   5. repo-epsilon
- 2. repo-bravo *                 6. repo-foxtrot
- 3. repo-charlie                 7. repo-golf *
- 4. repo-delta                   8. repo-hotel
+ 1. (repo) repo1 *               4. (repo) repo4
+ 2. (repo) repo2 *               5. (repo) repo5
+ 3. (repo) repo3                  - (mcp) mcp1
+                                   - (mcp) mcp2
+                                   - (mcp) mcp3
 ```
+
+Repo numbers match their `rowid` and can be used with `set_defaults`. MCP servers are listed without numbers (not selectable as defaults).
 
 Include `*` markers for defaults exactly as they appear in the scan response.
 
-**If no repos found**, show:
+**If no repos and no MCP servers found**, show:
 ```
-No GitHub repositories found in your home directory.
+No GitHub repositories or MCP servers found.
 ```
 Then stop.
 

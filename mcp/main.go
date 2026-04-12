@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/heechul/prism-mcp/internal/brownfield"
+	prismconfig "github.com/heechul/prism-mcp/internal/config"
 	"github.com/heechul/prism-mcp/internal/handler"
 	taskpkg "github.com/heechul/prism-mcp/internal/task"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -92,7 +93,7 @@ func main() {
 	)
 
 	// Brownfield repository registry
-	if err := brownfield.InitStore(); err != nil {
+	if err := brownfield.InitStore(prismconfig.RuntimeSQLitePath()); err != nil {
 		log.Printf("Warning: brownfield store init failed: %v", err)
 	} else {
 		s.AddTool(

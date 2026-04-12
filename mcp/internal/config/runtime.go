@@ -42,11 +42,19 @@ func DefaultRuntimeConfig() RuntimeConfig {
 }
 
 func ConfigPath() string {
+	return filepath.Join(PrismBaseDir(), "config.yaml")
+}
+
+func PrismBaseDir() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return ".prism/config.yaml"
+		return ".prism"
 	}
-	return filepath.Join(home, ".prism", "config.yaml")
+	return filepath.Join(home, ".prism")
+}
+
+func RuntimeSQLitePath() string {
+	return filepath.Join(PrismBaseDir(), "prism.db")
 }
 
 func CodexHomePath() string {
