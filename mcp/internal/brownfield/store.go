@@ -447,11 +447,10 @@ func (s *Store) SyncMCPEntries(servers []MCPServer) (int, error) {
 		return 0, err
 	}
 
-	// Build scan key set from normalized servers
+	// Build scan key set from normalized servers (names already trimmed by normalizeVisibleMCPServersForSnapshot)
 	scanServers := make(map[string]MCPServer, len(normalized))
 	for _, server := range normalized {
-		name := strings.TrimSpace(server.Name)
-		scanServers[name] = server
+		scanServers[server.Name] = server
 	}
 
 	// Delete stale entries (in DB but not in scan)

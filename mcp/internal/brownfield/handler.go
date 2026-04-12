@@ -240,7 +240,7 @@ func handleQuery(args map[string]interface{}) (*mcp.CallToolResult, error) {
 	limit := intArg(args, "limit", 0)
 	defaultOnly, _ := args["default_only"].(bool)
 
-	repos, total, err := store.List(offset, limit, defaultOnly)
+	entries, total, err := store.ListEntries(offset, limit, defaultOnly)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("query failed: %v", err)), nil
 	}
@@ -249,11 +249,11 @@ func handleQuery(args map[string]interface{}) (*mcp.CallToolResult, error) {
 
 	result := map[string]interface{}{
 		"action":   "query",
-		"repos":    repos,
+		"entries":  entries,
 		"total":    total,
 		"offset":   offset,
 		"defaults": defaultEntries,
-		"count":    len(repos),
+		"count":    len(entries),
 	}
 	return jsonResult(result)
 }

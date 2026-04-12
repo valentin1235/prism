@@ -724,6 +724,52 @@ func TestSyncMCPEntriesPreservesRowID(t *testing.T) {
 	}
 }
 
+func TestSyncMCPEntriesUpdatePreservesIsDefaultAndRefreshesDescPath(t *testing.T) {
+	s := newTestStore(t)
+
+	// Initial sync
+	s.SyncMCPEntries([]MCPServer{{Name: "alpha", Desc: "v1"}})
+
+	// Set alpha as default
+	entries, _, _ := s.ListEntries(0, 0, false)
+	var alphaID int64
+	for _, e := range entries {
+		if e.Type == "mcp" {
+			alphaID = e.RowID
+		}
+	}
+	s.SetDefaultsByRowIDs([]int64{alphaID})
+
+	// Rescan: alpha goes through UPDATE branch with new desc/path
+	s.SyncMCPEntries([]MCPServer{{Name: "alpha", Desc: "v2", Path: "/new/path"}})
+
+	// Verify is_default preserved, desc/path updated
+	mcps, err := s.ListMCPs()
+	if err != nil {
+		t.Fatalf("list mcps: %v", err)
+	}
+	if len(mcps) != 1 {
+		t.Fatalf("len(mcps) = %d, want 1", len(mcps))
+	}
+	if !mcps[0].IsDefault {
+		t.Fatal("is_default should be preserved across rescan")
+	}
+	if mcps[0].Desc != "v2" {
+		t.Fatalf("desc not updated: got %q, want v2", mcps[0].Desc)
+	}
+	if mcps[0].Path == nil || *mcps[0].Path != "/new/path" {
+		t.Fatalf("path not updated: got %v, want /new/path", mcps[0].Path)
+	}
+
+	// Verify rowid preserved
+	entries, _, _ = s.ListEntries(0, 0, false)
+	for _, e := range entries {
+		if e.Type == "mcp" && e.RowID != alphaID {
+			t.Fatalf("rowid changed from %d to %d", alphaID, e.RowID)
+		}
+	}
+}
+
 func TestSyncMCPEntriesDeduplicatesVisibleNames(t *testing.T) {
 	s := newTestStore(t)
 
