@@ -168,17 +168,18 @@ func TestHandlerScanNoDefaults(t *testing.T) {
 }
 
 func TestHandlerScanStoresOneRowPerDiscoveredMCP(t *testing.T) {
-	s := newTestHandlerStore(t)
-	scanHomeForRepos = func(string) ([]Repo, error) {
-		return []Repo{{Path: "/tmp/repo1", Name: "repo1"}}, nil
-	}
-	discoverMCPServers = func(context.Context) ([]MCPServer, error) {
-		return []MCPServer{
-			{Name: "alpha", Desc: ""},
-			{Name: "beta", Desc: ""},
-			{Name: "gamma", Desc: ""},
-		}, nil
-	}
+	s := newTestHandlerStore(t, testHandlerOpts{
+		repoScan: func(string) ([]Repo, error) {
+			return []Repo{{Path: "/tmp/repo1", Name: "repo1"}}, nil
+		},
+		mcpServers: func(context.Context) ([]MCPServer, error) {
+			return []MCPServer{
+				{Name: "alpha", Desc: ""},
+				{Name: "beta", Desc: ""},
+				{Name: "gamma", Desc: ""},
+			}, nil
+		},
+	})
 
 	req := makeRequest(map[string]any{
 		"action": "scan",
@@ -276,18 +277,19 @@ func TestHandlerScanAppliesDeterministicNameCollisionPolicy(t *testing.T) {
 }
 
 func TestHandlerScanStoresOnlyVisibleDeduplicatedMCPServers(t *testing.T) {
-	s := newTestHandlerStore(t)
-	scanHomeForRepos = func(string) ([]Repo, error) {
-		return []Repo{{Path: "/tmp/repo1", Name: "repo1"}}, nil
-	}
-	discoverMCPServers = func(context.Context) ([]MCPServer, error) {
-		return []MCPServer{
-			{Name: "alpha", Path: "/tmp/alpha-a", Desc: "first desc", Visible: true, VisibilityOK: true},
-			{Name: "beta", Path: "/tmp/beta-hidden", Desc: "hidden desc", Visible: false, VisibilityOK: true},
-			{Name: " alpha ", Path: "/tmp/alpha-b", Desc: "second desc", Visible: true, VisibilityOK: true},
-			{Name: "gamma", Path: "/tmp/gamma", Desc: "gamma desc"},
-		}, nil
-	}
+	s := newTestHandlerStore(t, testHandlerOpts{
+		repoScan: func(string) ([]Repo, error) {
+			return []Repo{{Path: "/tmp/repo1", Name: "repo1"}}, nil
+		},
+		mcpServers: func(context.Context) ([]MCPServer, error) {
+			return []MCPServer{
+				{Name: "alpha", Path: "/tmp/alpha-a", Desc: "first desc", Visible: true, VisibilityOK: true},
+				{Name: "beta", Path: "/tmp/beta-hidden", Desc: "hidden desc", Visible: false, VisibilityOK: true},
+				{Name: " alpha ", Path: "/tmp/alpha-b", Desc: "second desc", Visible: true, VisibilityOK: true},
+				{Name: "gamma", Path: "/tmp/gamma", Desc: "gamma desc"},
+			}, nil
+		},
+	})
 
 	req := makeRequest(map[string]any{
 		"action": "scan",
@@ -315,17 +317,18 @@ func TestHandlerScanStoresOnlyVisibleDeduplicatedMCPServers(t *testing.T) {
 }
 
 func TestHandlerScanUsesSharedRegisteredAtAcrossSnapshotRows(t *testing.T) {
-	s := newTestHandlerStore(t)
-	scanHomeForRepos = func(string) ([]Repo, error) {
-		return []Repo{{Path: "/tmp/repo1", Name: "repo1"}}, nil
-	}
-	discoverMCPServers = func(context.Context) ([]MCPServer, error) {
-		return []MCPServer{
-			{Name: "alpha", Desc: ""},
-			{Name: "beta", Desc: ""},
-			{Name: "gamma", Desc: ""},
-		}, nil
-	}
+	s := newTestHandlerStore(t, testHandlerOpts{
+		repoScan: func(string) ([]Repo, error) {
+			return []Repo{{Path: "/tmp/repo1", Name: "repo1"}}, nil
+		},
+		mcpServers: func(context.Context) ([]MCPServer, error) {
+			return []MCPServer{
+				{Name: "alpha", Desc: ""},
+				{Name: "beta", Desc: ""},
+				{Name: "gamma", Desc: ""},
+			}, nil
+		},
+	})
 
 	req := makeRequest(map[string]any{
 		"action": "scan",
@@ -355,17 +358,18 @@ func TestHandlerScanUsesSharedRegisteredAtAcrossSnapshotRows(t *testing.T) {
 }
 
 func TestHandlerScanRecomputesMCPDefaultsAsFalseWithoutDefaultSource(t *testing.T) {
-	s := newTestHandlerStore(t)
-	scanHomeForRepos = func(string) ([]Repo, error) {
-		return []Repo{{Path: "/tmp/repo1", Name: "repo1"}}, nil
-	}
-	discoverMCPServers = func(context.Context) ([]MCPServer, error) {
-		return []MCPServer{
-			{Name: "alpha", Desc: "Alpha tools", IsDefault: true},
-			{Name: "beta", Desc: "Beta tools"},
-			{Name: "gamma", Desc: "Gamma tools", IsDefault: true},
-		}, nil
-	}
+	s := newTestHandlerStore(t, testHandlerOpts{
+		repoScan: func(string) ([]Repo, error) {
+			return []Repo{{Path: "/tmp/repo1", Name: "repo1"}}, nil
+		},
+		mcpServers: func(context.Context) ([]MCPServer, error) {
+			return []MCPServer{
+				{Name: "alpha", Desc: "Alpha tools", IsDefault: true},
+				{Name: "beta", Desc: "Beta tools"},
+				{Name: "gamma", Desc: "Gamma tools", IsDefault: true},
+			}, nil
+		},
+	})
 
 	req := makeRequest(map[string]any{
 		"action": "scan",
@@ -392,15 +396,16 @@ func TestHandlerScanRecomputesMCPDefaultsAsFalseWithoutDefaultSource(t *testing.
 }
 
 func TestHandlerScanStoresUnknownMCPPathAsNull(t *testing.T) {
-	s := newTestHandlerStore(t)
-	scanHomeForRepos = func(string) ([]Repo, error) {
-		return []Repo{{Path: "/tmp/repo1", Name: "repo1"}}, nil
-	}
-	discoverMCPServers = func(context.Context) ([]MCPServer, error) {
-		return []MCPServer{
-			{Name: "alpha", Path: "   ", Desc: ""},
-		}, nil
-	}
+	s := newTestHandlerStore(t, testHandlerOpts{
+		repoScan: func(string) ([]Repo, error) {
+			return []Repo{{Path: "/tmp/repo1", Name: "repo1"}}, nil
+		},
+		mcpServers: func(context.Context) ([]MCPServer, error) {
+			return []MCPServer{
+				{Name: "alpha", Path: "   ", Desc: ""},
+			}, nil
+		},
+	})
 
 	req := makeRequest(map[string]any{
 		"action": "scan",
@@ -423,19 +428,20 @@ func TestHandlerScanStoresUnknownMCPPathAsNull(t *testing.T) {
 }
 
 func TestHandlerScanKeepsVisibleMCPWhenToolMetadataUnavailable(t *testing.T) {
-	s := newTestHandlerStore(t)
-	scanHomeForRepos = func(string) ([]Repo, error) {
-		return []Repo{{Path: "/tmp/repo1", Name: "repo1"}}, nil
-	}
-	discoverMCPServers = func(context.Context) ([]MCPServer, error) {
-		return []MCPServer{
-			{
-				Name: "slack",
-				Path: "   ",
-				Desc: "",
-			},
-		}, nil
-	}
+	s := newTestHandlerStore(t, testHandlerOpts{
+		repoScan: func(string) ([]Repo, error) {
+			return []Repo{{Path: "/tmp/repo1", Name: "repo1"}}, nil
+		},
+		mcpServers: func(context.Context) ([]MCPServer, error) {
+			return []MCPServer{
+				{
+					Name: "slack",
+					Path: "   ",
+					Desc: "",
+				},
+			}, nil
+		},
+	})
 
 	req := makeRequest(map[string]any{
 		"action": "scan",
@@ -462,18 +468,19 @@ func TestHandlerScanKeepsVisibleMCPWhenToolMetadataUnavailable(t *testing.T) {
 }
 
 func TestHandlerScanUsesVisibilityOnlyForSnapshotMembership(t *testing.T) {
-	s := newTestHandlerStore(t)
-	scanHomeForRepos = func(string) ([]Repo, error) {
-		return []Repo{{Path: "/tmp/repo1", Name: "repo1"}}, nil
-	}
-	discoverMCPServers = func(context.Context) ([]MCPServer, error) {
-		return []MCPServer{
-			{Name: "filesystem", Desc: "Reads and writes local files.", Visible: true, VisibilityOK: true},
-			{Name: "github", Desc: "", Visible: true, VisibilityOK: true},
-			{Name: "slack", Desc: "   ", Visible: true, VisibilityOK: true},
-			{Name: "hidden", Desc: "", Visible: false, VisibilityOK: true},
-		}, nil
-	}
+	s := newTestHandlerStore(t, testHandlerOpts{
+		repoScan: func(string) ([]Repo, error) {
+			return []Repo{{Path: "/tmp/repo1", Name: "repo1"}}, nil
+		},
+		mcpServers: func(context.Context) ([]MCPServer, error) {
+			return []MCPServer{
+				{Name: "filesystem", Desc: "Reads and writes local files.", Visible: true, VisibilityOK: true},
+				{Name: "github", Desc: "", Visible: true, VisibilityOK: true},
+				{Name: "slack", Desc: "   ", Visible: true, VisibilityOK: true},
+				{Name: "hidden", Desc: "", Visible: false, VisibilityOK: true},
+			}, nil
+		},
+	})
 
 	req := makeRequest(map[string]any{
 		"action": "scan",
@@ -502,18 +509,18 @@ func TestHandlerScanUsesVisibilityOnlyForSnapshotMembership(t *testing.T) {
 }
 
 func TestHandlerScanRescanRemovesStaleMCPRows(t *testing.T) {
-	s := newTestHandlerStore(t)
-	scanHomeForRepos = func(string) ([]Repo, error) {
-		return []Repo{{Path: "/tmp/repo1", Name: "repo1"}}, nil
-	}
-
-	discoverMCPServers = func(context.Context) ([]MCPServer, error) {
-		return []MCPServer{
-			{Name: "alpha", Desc: ""},
-			{Name: "beta", Desc: ""},
-			{Name: "gamma", Desc: ""},
-		}, nil
-	}
+	s := newTestHandlerStore(t, testHandlerOpts{
+		repoScan: func(string) ([]Repo, error) {
+			return []Repo{{Path: "/tmp/repo1", Name: "repo1"}}, nil
+		},
+		mcpServers: func(context.Context) ([]MCPServer, error) {
+			return []MCPServer{
+				{Name: "alpha", Desc: ""},
+				{Name: "beta", Desc: ""},
+				{Name: "gamma", Desc: ""},
+			}, nil
+		},
+	})
 
 	req := makeRequest(map[string]any{
 		"action": "scan",
@@ -559,17 +566,17 @@ func TestHandlerScanRescanRemovesStaleMCPRows(t *testing.T) {
 }
 
 func TestHandlerScanRescanToEmptyRemovesAllMCPRows(t *testing.T) {
-	s := newTestHandlerStore(t)
-	scanHomeForRepos = func(string) ([]Repo, error) {
-		return []Repo{{Path: "/tmp/repo1", Name: "repo1"}}, nil
-	}
-
-	discoverMCPServers = func(context.Context) ([]MCPServer, error) {
-		return []MCPServer{
-			{Name: "alpha", Desc: ""},
-			{Name: "beta", Desc: ""},
-		}, nil
-	}
+	s := newTestHandlerStore(t, testHandlerOpts{
+		repoScan: func(string) ([]Repo, error) {
+			return []Repo{{Path: "/tmp/repo1", Name: "repo1"}}, nil
+		},
+		mcpServers: func(context.Context) ([]MCPServer, error) {
+			return []MCPServer{
+				{Name: "alpha", Desc: ""},
+				{Name: "beta", Desc: ""},
+			}, nil
+		},
+	})
 
 	req := makeRequest(map[string]any{
 		"action": "scan",
@@ -615,18 +622,6 @@ func TestHandlerScanRescanToEmptyRemovesAllMCPRows(t *testing.T) {
 }
 
 func TestHandlerScanSnapshotMatchesDeduplicatedVisibleNameSet(t *testing.T) {
-	s := newTestHandlerStore(t)
-	scanHomeForRepos = func(string) ([]Repo, error) {
-		return []Repo{{Path: "/tmp/repo1", Name: "repo1"}}, nil
-	}
-
-	if _, err := s.ReplaceMCPsSnapshot([]MCPServer{
-		{Name: "stale-a", Desc: ""},
-		{Name: "stale-b", Desc: ""},
-	}); err != nil {
-		t.Fatalf("seed snapshot: %v", err)
-	}
-
 	servers := []MCPServer{
 		{Name: "alpha", Path: "/tmp/alpha-a", Desc: "alpha tools", Visible: true, VisibilityOK: true},
 		{Name: " alpha ", Path: "/tmp/alpha-b", Desc: "older alpha", Visible: true, VisibilityOK: true},
@@ -634,8 +629,20 @@ func TestHandlerScanSnapshotMatchesDeduplicatedVisibleNameSet(t *testing.T) {
 		{Name: "hidden", Desc: "hidden tools", Visible: false, VisibilityOK: true},
 		{Name: "gamma", Desc: "gamma tools"},
 	}
-	discoverMCPServers = func(context.Context) ([]MCPServer, error) {
-		return servers, nil
+	s := newTestHandlerStore(t, testHandlerOpts{
+		repoScan: func(string) ([]Repo, error) {
+			return []Repo{{Path: "/tmp/repo1", Name: "repo1"}}, nil
+		},
+		mcpServers: func(context.Context) ([]MCPServer, error) {
+			return servers, nil
+		},
+	})
+
+	if _, err := s.ReplaceMCPsSnapshot([]MCPServer{
+		{Name: "stale-a", Desc: ""},
+		{Name: "stale-b", Desc: ""},
+	}); err != nil {
+		t.Fatalf("seed snapshot: %v", err)
 	}
 
 	req := makeRequest(map[string]any{

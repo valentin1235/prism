@@ -99,12 +99,19 @@ func discoverClaudeMCPServers() ([]MCPServer, error) {
 	pluginPattern := filepath.Join(home, ".claude", "plugins", "marketplaces", "*", ".mcp.json")
 	pluginPaths, _ := filepath.Glob(pluginPattern)
 	sort.Strings(pluginPaths)
+	var parseErrors []string
 	for _, path := range pluginPaths {
 		s, err := readMCPServersFromConfig(path)
 		if err != nil {
+			if !os.IsNotExist(err) {
+				parseErrors = append(parseErrors, fmt.Sprintf("%s: %v", filepath.Base(filepath.Dir(path)), err))
+			}
 			continue
 		}
 		servers = append(servers, s...)
+	}
+	if len(parseErrors) > 0 {
+		return servers, fmt.Errorf("plugin mcp config warnings: %s", strings.Join(parseErrors, "; "))
 	}
 
 	return servers, nil

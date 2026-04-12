@@ -187,8 +187,8 @@ func (s *Store) ensureMCPTableSchema() error {
 		return err
 	}
 	if ok {
-		// Schema already matches — no migration needed.
-		return nil
+		// Schema already matches — no migration needed. Rollback the read-only tx.
+		return tx.Rollback()
 	}
 
 	if _, err := tx.Exec(fmt.Sprintf(`
