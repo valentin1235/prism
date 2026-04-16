@@ -22,8 +22,8 @@ func TestDiscoverClaudeMCPServersPreservesDuplicateVisibleNamesUntilSnapshotNorm
 		}
 	}
 
-	// User-level config with "dup" and "home-only"
-	writeJSON(filepath.Join(homeDir, ".claude", "mcp.json"), `{
+	// User scope config (~/.claude.json) with "dup" and "home-only"
+	writeJSON(filepath.Join(homeDir, ".claude.json"), `{
   "mcpServers": {
     "dup": {"command": "/tmp/zeta"},
     "home-only": {"command": "/tmp/home-only"}

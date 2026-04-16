@@ -93,17 +93,18 @@ func discoverClaudeMCPServers() ([]MCPServer, error) {
 		return nil, fmt.Errorf("resolve home dir: %w", err)
 	}
 
-	// Only discover MCPs from absolute, well-known paths:
-	// 1. User-level: ~/.claude/mcp.json
-	// 2. Installed plugins: ~/.claude/plugins/marketplaces/*/.mcp.json
+	// Discover MCPs from official Claude Code config paths:
+	// 1. User scope: ~/.claude.json (mcpServers key)
+	// 2. Project scope: .mcp.json (handled externally)
+	// 3. Installed plugins: ~/.claude/plugins/marketplaces/*/.mcp.json
 	var servers []MCPServer
 
-	// User-level MCP config
-	userConfig := filepath.Join(home, ".claude", "mcp.json")
+	// User scope MCP config (~/.claude.json)
+	userConfig := filepath.Join(home, ".claude.json")
 	if s, err := readMCPServersFromConfig(userConfig); err == nil {
 		servers = append(servers, s...)
 	} else if !os.IsNotExist(err) {
-		return nil, err
+		// non-fatal: ~/.claude.json may contain fields outside mcpServers
 	}
 
 	// Plugin MCPs from installed marketplace plugins
