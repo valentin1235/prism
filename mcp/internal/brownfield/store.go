@@ -34,7 +34,9 @@ type MCPServer struct {
 	RegisteredAt string `json:"registered_at"`
 	Visible      bool   `json:"visible,omitempty"`
 	VisibilityOK bool   `json:"visibility_ok,omitempty"`
-	Command      string `json:"-"`
+	Command      string            `json:"-"`
+	Args         []string          `json:"-"`
+	Env          map[string]string `json:"-"`
 }
 
 // MCPServerSnapshot represents one MCP server row from the latest scan snapshot.

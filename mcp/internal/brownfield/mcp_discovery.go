@@ -27,7 +27,9 @@ type claudeMCPConfig struct {
 }
 
 type claudeMCPServer struct {
-	Command string `json:"command"`
+	Command string            `json:"command"`
+	Args    []string          `json:"args"`
+	Env     map[string]string `json:"env"`
 }
 
 // DiscoverMCPServers resolves the currently configured MCP servers for the active runtime.
@@ -101,12 +103,20 @@ func discoverClaudeMCPServers() ([]MCPServer, error) {
 	sort.Strings(pluginPaths)
 	var parseErrors []string
 	for _, path := range pluginPaths {
+		pluginRoot := filepath.Dir(path)
 		s, err := readMCPServersFromConfig(path)
 		if err != nil {
 			if !os.IsNotExist(err) {
-				parseErrors = append(parseErrors, fmt.Sprintf("%s: %v", filepath.Base(filepath.Dir(path)), err))
+				parseErrors = append(parseErrors, fmt.Sprintf("%s: %v", filepath.Base(pluginRoot), err))
 			}
 			continue
+		}
+		// Expand ${CLAUDE_PLUGIN_ROOT} in command and args
+		for i := range s {
+			s[i].Command = expandPluginRoot(s[i].Command, pluginRoot)
+			for j := range s[i].Args {
+				s[i].Args[j] = expandPluginRoot(s[i].Args[j], pluginRoot)
+			}
 		}
 		servers = append(servers, s...)
 	}
@@ -138,6 +148,8 @@ func readMCPServersFromConfig(path string) ([]MCPServer, error) {
 			Visible:      true,
 			VisibilityOK: true,
 			Command:      server.Command,
+			Args:         server.Args,
+			Env:          server.Env,
 		})
 	}
 	return servers, nil
@@ -164,4 +176,8 @@ func deriveCommandPath(command string) string {
 		return command
 	}
 	return ""
+}
+
+func expandPluginRoot(s, pluginRoot string) string {
+	return strings.ReplaceAll(s, "${CLAUDE_PLUGIN_ROOT}", pluginRoot)
 }

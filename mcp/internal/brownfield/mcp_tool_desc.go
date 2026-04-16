@@ -79,7 +79,24 @@ func resolveMCPServerToolMetadataDescription(ctx context.Context, server MCPServ
 	resolveCtx, cancel := context.WithTimeout(ctx, mcpToolMetadataResolutionTimeout)
 	defer cancel()
 
-	client, err := newMCPToolListingClient("/bin/sh", "-lc", commandText)
+	// Build full shell command: env prefix + command + args
+	var fullCommand strings.Builder
+	if len(server.Env) > 0 {
+		envKeys := make([]string, 0, len(server.Env))
+		for k := range server.Env {
+			envKeys = append(envKeys, k)
+		}
+		sort.Strings(envKeys)
+		for _, k := range envKeys {
+			fullCommand.WriteString(k + "=" + shellQuote(server.Env[k]) + " ")
+		}
+	}
+	fullCommand.WriteString(commandText)
+	for _, arg := range server.Args {
+		fullCommand.WriteString(" " + shellQuote(arg))
+	}
+
+	client, err := newMCPToolListingClient("/bin/sh", "-lc", fullCommand.String())
 	if err != nil {
 		return "", err
 	}
@@ -156,4 +173,8 @@ func summarizeResolvedMCPTool(tool mcp.Tool) string {
 		return strings.TrimRight(desc, ".!? ")
 	}
 	return strings.TrimSpace(tool.Name)
+}
+
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
 }
