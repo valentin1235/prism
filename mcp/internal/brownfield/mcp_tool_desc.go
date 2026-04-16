@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	mcpToolMetadataResolutionTimeout      = 2 * time.Second
-	mcpToolMetadataResolutionTotalTimeout = 15 * time.Second
+	mcpToolMetadataResolutionTimeout      = 30 * time.Second
+	mcpToolMetadataResolutionTotalTimeout = 5 * time.Minute
 )
 
 type mcpToolListingClient interface {
