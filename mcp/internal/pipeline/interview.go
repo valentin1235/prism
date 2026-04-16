@@ -46,7 +46,6 @@ type InterviewCommand struct {
 	// OutputPath is the expected location of verified-findings.json after completion.
 	OutputPath string
 
-
 	// JSONSchema is the schema string for --json-schema structured output enforcement.
 	JSONSchema string
 }
@@ -194,6 +193,11 @@ type InterviewContext struct {
 	// OntologyScopeText is the rendered ontology scope text block.
 	// Passed to verifier so it can re-investigate evidence sources.
 	OntologyScopeText string
+
+	// AvailableMCPServersText is the rendered MCP server list for interviewers.
+	// This is always rendered as a dedicated section below Reference Documents,
+	// with an empty body when no default MCP servers are configured.
+	AvailableMCPServersText string
 }
 
 // LoadInterviewContext reads the analysis config and state files to build
@@ -222,8 +226,8 @@ func LoadInterviewContext(cfg AnalysisConfig) (InterviewContext, error) {
 	}
 	ctx.SeedSummary = seed.Summary
 
-	// Build ontology scope text block
-	ctx.OntologyScopeText = LoadOntologyScopeText(cfg.StateDir)
+	// Build ontology scope text blocks — split docs and MCP into separate sections
+	ctx.OntologyScopeText, ctx.AvailableMCPServersText = LoadSpecialistOntologyScopeSections(cfg.StateDir)
 
 	return ctx, nil
 }
@@ -322,14 +326,56 @@ func buildInterviewSystemPrompt(ictx InterviewContext, perspective Perspective, 
 	}
 	sb.WriteString("\n\n")
 
-	// --- Section 6: Data Source Constraint ---
+	// --- Section 6: Available MCP Servers ---
+	sb.WriteString("## Available MCP Servers\n\n")
+	sb.WriteString(ictx.AvailableMCPServersText)
+	sb.WriteString("\n\n")
+
+	// --- Section 7: Data Source Constraint ---
 	sb.WriteString("## Data Source Constraint\n\n")
-	sb.WriteString("You MUST only use data sources listed in the \"Reference Documents\" section above. ")
-	sb.WriteString("Do NOT use `ToolSearch` to discover or call MCP servers not in your Reference Documents. ")
+	sb.WriteString("You MUST only use data sources listed in the \"Reference Documents\" and \"Available MCP Servers\" sections above. ")
+	sb.WriteString("Do NOT use `ToolSearch` to discover or call MCP servers not listed in those sections. ")
 	sb.WriteString("If a data source is not listed there, it was not selected for this analysis and MUST NOT be used.\n\n")
 
-	// --- Section 7: Verification Protocol ---
+	// --- Section 8: Verification Protocol ---
 	sb.WriteString(buildVerificationProtocol())
+
+	return sb.String()
+}
+
+// LoadAvailableMCPServersText reads ontology-scope.json from the state directory
+// and renders only MCP server name and description lines for analyst prompts.
+func LoadAvailableMCPServersText(stateDir string) string {
+	scopePath := filepath.Join(stateDir, "ontology-scope.json")
+	data, err := os.ReadFile(scopePath)
+	if err != nil {
+		return ""
+	}
+
+	var scope struct {
+		Sources []struct {
+			Type    string `json:"type"`
+			Server  string `json:"server_name,omitempty"`
+			Summary string `json:"summary,omitempty"`
+			Status  string `json:"status"`
+		} `json:"sources"`
+	}
+
+	if err := json.Unmarshal(data, &scope); err != nil {
+		return ""
+	}
+
+	var sb strings.Builder
+	for _, src := range scope.Sources {
+		if src.Type != "mcp_query" || src.Status != "available" || src.Server == "" {
+			continue
+		}
+		if src.Summary == "" {
+			sb.WriteString(fmt.Sprintf("- %s\n", src.Server))
+			continue
+		}
+		sb.WriteString(fmt.Sprintf("- %s: %s\n", src.Server, src.Summary))
+	}
 
 	return sb.String()
 }

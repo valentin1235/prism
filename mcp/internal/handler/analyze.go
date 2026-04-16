@@ -880,9 +880,9 @@ func readOptionalFile(path string) ([]byte, bool, error) {
 }
 
 // resolveOntologyScopeFromBrownfield opens the brownfield store at the given
-// base directory, queries default repos (is_default=1), and builds an ontology
-// scope JSON string from their paths. Returns an error if the store cannot be
-// opened or no defaults are configured.
+// base directory, queries default brownfield entries (repos + MCP servers), and
+// builds an ontology scope JSON string for analyze-time use. Returns an error
+// if the store cannot be opened or no defaults are configured.
 func resolveOntologyScopeFromBrownfield(baseDir string) (string, error) {
 	dbPath := filepath.Join(baseDir, "prism.db")
 	if _, err := os.Stat(dbPath); err != nil {
@@ -895,24 +895,92 @@ func resolveOntologyScopeFromBrownfield(baseDir string) (string, error) {
 	}
 	defer store.Close()
 
-	defaults, err := store.DefaultRepos()
+	defaults, err := store.DefaultEntries()
 	if err != nil {
 		return "", fmt.Errorf("brownfield store를 먼저 설정해주세요: %v", err)
 	}
 
 	if len(defaults) == 0 {
-		return "", fmt.Errorf("ontology_scope이 지정되지 않았고 brownfield default repository도 설정되지 않았습니다. prism:brownfield defaults를 먼저 설정해주세요")
+		return "", fmt.Errorf("ontology_scope이 지정되지 않았고 brownfield default entry도 설정되지 않았습니다. prism:brownfield defaults를 먼저 설정해주세요")
 	}
 
-	paths := make([]string, len(defaults))
-	for i, r := range defaults {
-		paths[i] = r.Path
-	}
-
-	scope, err := pipeline.BuildOntologyScopeFromPaths(paths)
+	scope, repoCount, mcpCount, err := buildOntologyScopeFromBrownfieldEntries(defaults)
 	if err != nil {
 		return "", fmt.Errorf("failed to build ontology scope: %v", err)
 	}
-	log.Printf("Resolved ontology scope from %d brownfield default repo(s)", len(defaults))
+	log.Printf("Resolved ontology scope from %d brownfield default repo(s) and %d MCP server(s)", repoCount, mcpCount)
 	return scope, nil
+}
+
+func buildOntologyScopeFromBrownfieldEntries(entries []brownfield.Entry) (string, int, int, error) {
+	if len(entries) == 0 {
+		return "", 0, 0, fmt.Errorf("entries must not be empty")
+	}
+
+	type accessInfo struct {
+		Tools        []string `json:"tools,omitempty"`
+		Instructions string   `json:"instructions,omitempty"`
+	}
+	type source struct {
+		ID      int        `json:"id"`
+		Type    string     `json:"type"`
+		Path    string     `json:"path,omitempty"`
+		Server  string     `json:"server_name,omitempty"`
+		Domain  string     `json:"domain,omitempty"`
+		Summary string     `json:"summary,omitempty"`
+		Status  string     `json:"status"`
+		Access  accessInfo `json:"access,omitempty"`
+	}
+	type totals struct {
+		Doc      int `json:"doc"`
+		MCPQuery int `json:"mcp_query"`
+	}
+	type scope struct {
+		Sources []source `json:"sources"`
+		Totals  totals   `json:"totals"`
+	}
+
+	sources := make([]source, 0, len(entries))
+	docCount := 0
+	mcpCount := 0
+
+	for _, entry := range entries {
+		switch entry.Type {
+		case "repo":
+			docCount++
+			sources = append(sources, source{
+				ID:      len(sources) + 1,
+				Type:    "doc",
+				Path:    entry.Path,
+				Domain:  filepath.Base(entry.Path),
+				Summary: "Brownfield default repository",
+				Status:  "available",
+				Access: accessInfo{
+					Tools:        []string{"Read"},
+					Instructions: "Use the Read tool with offset/limit to read files in the directory.",
+				},
+			})
+		case "mcp":
+			mcpCount++
+			sources = append(sources, source{
+				ID:      len(sources) + 1,
+				Type:    "mcp_query",
+				Server:  entry.Name,
+				Summary: entry.Desc,
+				Status:  "available",
+			})
+		}
+	}
+
+	data, err := json.Marshal(scope{
+		Sources: sources,
+		Totals: totals{
+			Doc:      docCount,
+			MCPQuery: mcpCount,
+		},
+	})
+	if err != nil {
+		return "", 0, 0, fmt.Errorf("marshal ontology scope: %w", err)
+	}
+	return string(data), docCount, mcpCount, nil
 }

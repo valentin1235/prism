@@ -109,6 +109,23 @@ func TestBuildSeedAnalystPrompt_WithOntologyScope(t *testing.T) {
 	}
 }
 
+func TestBuildSeedAnalystPrompt_DoesNotRenderAvailableMCPServersSection(t *testing.T) {
+	scope := "Your reference documents:\n- doc: API docs (available)\n  Path: /docs/api"
+	prompt := BuildSeedAnalystPrompt(
+		"Test topic",
+		"analyze-000000000000",
+		"",
+		scope,
+	)
+
+	if strings.Contains(prompt, "Available MCP Servers") {
+		t.Error("seed prompt must not render specialist/interview MCP section")
+	}
+	if strings.Contains(prompt, "clickhouse") || strings.Contains(prompt, "slack") {
+		t.Error("seed prompt must not consume brownfield MCP entries")
+	}
+}
+
 
 func TestBuildPerspectiveGeneratorPrompt_BasicStructure(t *testing.T) {
 	seedJSON := `{"topic":"test","summary":"test summary","findings":[],"key_areas":[]}`

@@ -167,12 +167,13 @@ func TestBuildInterviewCommand_SystemPromptContainsVerificationProtocol(t *testi
 
 func TestBuildInterviewCommand_SystemPromptContainsContext(t *testing.T) {
 	ictx := InterviewContext{
-		Topic:             "analyze API design",
-		ContextID:         "analyze-ctx123",
-		Model:             "claude-sonnet-4-6",
-		StateDir:          "/tmp/test",
-		SeedSummary:       "API has inconsistent naming conventions.",
-		OntologyScopeText: "- doc: API specification v2",
+		Topic:                   "analyze API design",
+		ContextID:               "analyze-ctx123",
+		Model:                   "claude-sonnet-4-6",
+		StateDir:                "/tmp/test",
+		SeedSummary:             "API has inconsistent naming conventions.",
+		OntologyScopeText:       "- doc: API specification v2",
+		AvailableMCPServersText: "- clickhouse: Warehouse queries\n- tempo\n",
 	}
 
 	perspective := Perspective{
@@ -200,6 +201,15 @@ func TestBuildInterviewCommand_SystemPromptContainsContext(t *testing.T) {
 	if !strings.Contains(cmd.SystemPrompt, "API specification v2") {
 		t.Error("SystemPrompt should contain ontology scope text")
 	}
+	if !strings.Contains(cmd.SystemPrompt, "## Available MCP Servers") {
+		t.Error("SystemPrompt should contain Available MCP Servers section")
+	}
+	if !strings.Contains(cmd.SystemPrompt, "- clickhouse: Warehouse queries") {
+		t.Error("SystemPrompt should contain MCP server name and description")
+	}
+	if !strings.Contains(cmd.SystemPrompt, "- tempo") {
+		t.Error("SystemPrompt should include MCP entries with empty descriptions")
+	}
 	// Key questions should appear
 	if !strings.Contains(cmd.SystemPrompt, "Are naming conventions consistent?") {
 		t.Error("SystemPrompt should contain key questions")
@@ -224,6 +234,12 @@ func TestBuildInterviewCommand_DataSourceConstraint(t *testing.T) {
 
 	if !strings.Contains(cmd.SystemPrompt, "Data Source Constraint") {
 		t.Error("SystemPrompt should contain data source constraint")
+	}
+	if !strings.Contains(cmd.SystemPrompt, "\"Reference Documents\" and \"Available MCP Servers\"") {
+		t.Error("SystemPrompt must restrict data sources to both prompt sections")
+	}
+	if !strings.Contains(cmd.SystemPrompt, "Do NOT use `ToolSearch` to discover or call MCP servers not listed in those sections") {
+		t.Error("SystemPrompt must forbid MCP discovery outside the allowed sections")
 	}
 	if !strings.Contains(cmd.SystemPrompt, "MUST only use data sources") {
 		t.Error("SystemPrompt should enforce data source restriction")
@@ -446,7 +462,8 @@ func TestBuildInterviewCommand_NoOntologyScope(t *testing.T) {
 	ictx := InterviewContext{
 		Topic: "test", ContextID: "analyze-t", Model: "claude-sonnet-4-6",
 		StateDir: "/tmp/t", SeedSummary: "s",
-		OntologyScopeText: "", // no ontology scope
+		OntologyScopeText:       "", // no ontology scope
+		AvailableMCPServersText: "",
 	}
 	perspective := Perspective{
 		ID: "t", Name: "T", Scope: "t", KeyQuestions: []string{"q1?", "q2?"},
@@ -463,8 +480,113 @@ func TestBuildInterviewCommand_NoOntologyScope(t *testing.T) {
 	if !strings.Contains(cmd.SystemPrompt, "N/A") {
 		t.Error("SystemPrompt should contain N/A fallback when no ontology scope")
 	}
+	if !strings.Contains(cmd.SystemPrompt, "## Available MCP Servers") {
+		t.Error("SystemPrompt should always contain Available MCP Servers section")
+	}
+	if strings.Contains(cmd.SystemPrompt, "None.") {
+		t.Error("SystemPrompt should leave the MCP section empty when no MCP servers exist")
+	}
+	start := strings.Index(cmd.SystemPrompt, "## Available MCP Servers\n\n")
+	end := strings.Index(cmd.SystemPrompt, "## Data Source Constraint\n\n")
+	if start == -1 || end == -1 || end < start {
+		t.Fatal("SystemPrompt should contain MCP and Data Source Constraint headings")
+	}
+	sectionBody := strings.Trim(cmd.SystemPrompt[start+len("## Available MCP Servers\n\n"):end], "\n")
+	if sectionBody != "" {
+		t.Errorf("SystemPrompt should render an empty MCP section between headings, got %q", sectionBody)
+	}
 	// Should NOT contain "Analysis Target Directories" section
 	if strings.Contains(cmd.SystemPrompt, "Analysis Target Directories") {
 		t.Error("SystemPrompt should not contain target directories section when no doc paths")
+	}
+}
+
+func TestLoadAvailableMCPServersText_EmptyWhenNoDefaults(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	scope := map[string]interface{}{
+		"sources": []map[string]interface{}{
+			{
+				"id":      1,
+				"type":    "doc",
+				"path":    "/tmp/repo-alpha",
+				"summary": "Repo alpha",
+				"status":  "available",
+			},
+			{
+				"id":          2,
+				"type":        "mcp_query",
+				"server_name": "hidden",
+				"summary":     "Should not render",
+				"status":      "unavailable",
+			},
+		},
+	}
+
+	data, _ := json.MarshalIndent(scope, "", "  ")
+	if err := os.WriteFile(filepath.Join(tmpDir, "ontology-scope.json"), data, 0644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	text := LoadAvailableMCPServersText(tmpDir)
+	if text != "" {
+		t.Fatalf("LoadAvailableMCPServersText() = %q, want empty string", text)
+	}
+}
+
+func TestLoadAvailableMCPServersText(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	scope := map[string]interface{}{
+		"sources": []map[string]interface{}{
+			{
+				"id":      1,
+				"type":    "doc",
+				"path":    "/tmp/repo-alpha",
+				"summary": "Repo alpha",
+				"status":  "available",
+			},
+			{
+				"id":          2,
+				"type":        "mcp_query",
+				"server_name": "clickhouse",
+				"summary":     "Warehouse queries",
+				"status":      "available",
+			},
+			{
+				"id":          3,
+				"type":        "mcp_query",
+				"server_name": "tempo",
+				"summary":     "",
+				"status":      "available",
+			},
+			{
+				"id":          4,
+				"type":        "mcp_query",
+				"server_name": "hidden",
+				"summary":     "Should not render",
+				"status":      "unavailable",
+			},
+		},
+	}
+
+	data, _ := json.MarshalIndent(scope, "", "  ")
+	if err := os.WriteFile(filepath.Join(tmpDir, "ontology-scope.json"), data, 0644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	text := LoadAvailableMCPServersText(tmpDir)
+
+	if !strings.Contains(text, "- clickhouse: Warehouse queries") {
+		t.Error("should contain MCP name and description")
+	}
+	if !strings.Contains(text, "- tempo\n") {
+		t.Error("should contain MCP name even when description is empty")
+	}
+	if strings.Contains(text, "hidden") {
+		t.Error("should not contain unavailable MCP entries")
+	}
+	if strings.Contains(text, "Repo alpha") {
+		t.Error("should not contain non-MCP sources")
 	}
 }

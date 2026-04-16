@@ -23,6 +23,16 @@ import (
 // setupTestBrownfieldDB creates a temporary brownfield store with given repos
 // and returns the temp dir (which acts as PrismBaseDir).
 func setupTestBrownfieldDB(t *testing.T, repos []brownfield.Repo, defaultPaths []string) string {
+	return setupTestBrownfieldEntriesDB(t, repos, defaultPaths, nil, nil)
+}
+
+func setupTestBrownfieldEntriesDB(
+	t *testing.T,
+	repos []brownfield.Repo,
+	defaultPaths []string,
+	mcps []brownfield.Entry,
+	defaultMCPNames []string,
+) string {
 	t.Helper()
 	dir := t.TempDir()
 
@@ -63,6 +73,21 @@ func setupTestBrownfieldDB(t *testing.T, repos []brownfield.Repo, defaultPaths [
 		_, err := db.Exec("UPDATE brownfield_entries SET is_default = 1 WHERE type = 'repo' AND key = ?", p)
 		if err != nil {
 			t.Fatalf("set default: %v", err)
+		}
+	}
+
+	for _, m := range mcps {
+		_, err := db.Exec("INSERT INTO brownfield_entries (type, key, name, desc, path) VALUES ('mcp', ?, ?, ?, ?)",
+			m.Key, m.Name, m.Desc, m.Path)
+		if err != nil {
+			t.Fatalf("insert mcp: %v", err)
+		}
+	}
+
+	for _, name := range defaultMCPNames {
+		_, err := db.Exec("UPDATE brownfield_entries SET is_default = 1 WHERE type = 'mcp' AND key = ?", name)
+		if err != nil {
+			t.Fatalf("set mcp default: %v", err)
 		}
 	}
 
@@ -348,6 +373,120 @@ func TestBuildOntologyScopeFromPaths(t *testing.T) {
 		if s.Status != "available" {
 			t.Errorf("source %d: expected status 'available', got %q", i, s.Status)
 		}
+	}
+}
+
+func TestResolveOntologyScopeFromBrownfield_IncludesDefaultMCPEntries(t *testing.T) {
+	dir := setupTestBrownfieldEntriesDB(t,
+		[]brownfield.Repo{
+			{Path: "/tmp/repo-alpha", Name: "alpha"},
+		},
+		[]string{"/tmp/repo-alpha"},
+		[]brownfield.Entry{
+			{Key: "grafana", Name: "grafana", Desc: "Grafana dashboards"},
+			{Key: "tempo", Name: "tempo", Desc: ""},
+			{Key: "hidden", Name: "hidden", Desc: "Should not be included"},
+		},
+		[]string{"grafana", "tempo"},
+	)
+
+	scope, err := resolveOntologyScopeFromBrownfield(dir)
+	if err != nil {
+		t.Fatalf("resolveOntologyScopeFromBrownfield: %v", err)
+	}
+
+	var parsed struct {
+		Sources []struct {
+			Type    string `json:"type"`
+			Path    string `json:"path"`
+			Server  string `json:"server_name"`
+			Summary string `json:"summary"`
+		} `json:"sources"`
+		Totals struct {
+			Doc      int `json:"doc"`
+			MCPQuery int `json:"mcp_query"`
+		} `json:"totals"`
+	}
+	if err := json.Unmarshal([]byte(scope), &parsed); err != nil {
+		t.Fatalf("parse scope: %v", err)
+	}
+
+	if parsed.Totals.Doc != 1 {
+		t.Fatalf("expected totals.doc=1, got %d", parsed.Totals.Doc)
+	}
+	if parsed.Totals.MCPQuery != 2 {
+		t.Fatalf("expected totals.mcp_query=2, got %d", parsed.Totals.MCPQuery)
+	}
+	if len(parsed.Sources) != 3 {
+		t.Fatalf("expected 3 sources, got %d", len(parsed.Sources))
+	}
+
+	var repoSeen bool
+	mcpSummaries := map[string]string{}
+	for _, src := range parsed.Sources {
+		switch src.Type {
+		case "doc":
+			if src.Path == "/tmp/repo-alpha" {
+				repoSeen = true
+			}
+		case "mcp_query":
+			mcpSummaries[src.Server] = src.Summary
+		}
+	}
+
+	if !repoSeen {
+		t.Fatal("expected default repo to remain in ontology scope")
+	}
+	if got := mcpSummaries["grafana"]; got != "Grafana dashboards" {
+		t.Fatalf("expected grafana summary, got %q", got)
+	}
+	if got, ok := mcpSummaries["tempo"]; !ok {
+		t.Fatal("expected tempo MCP with empty description to be included")
+	} else if got != "" {
+		t.Fatalf("expected empty tempo summary, got %q", got)
+	}
+	if _, ok := mcpSummaries["hidden"]; ok {
+		t.Fatal("non-default MCP should not be included")
+	}
+}
+
+func TestResolveOntologyScopeFromBrownfield_AllowsMCPOnlyDefaults(t *testing.T) {
+	dir := setupTestBrownfieldEntriesDB(t,
+		nil,
+		nil,
+		[]brownfield.Entry{
+			{Key: "clickhouse", Name: "clickhouse", Desc: "Warehouse queries"},
+		},
+		[]string{"clickhouse"},
+	)
+
+	scope, err := resolveOntologyScopeFromBrownfield(dir)
+	if err != nil {
+		t.Fatalf("resolveOntologyScopeFromBrownfield: %v", err)
+	}
+
+	var parsed struct {
+		Sources []struct {
+			Type   string `json:"type"`
+			Server string `json:"server_name"`
+		} `json:"sources"`
+		Totals struct {
+			Doc      int `json:"doc"`
+			MCPQuery int `json:"mcp_query"`
+		} `json:"totals"`
+	}
+	if err := json.Unmarshal([]byte(scope), &parsed); err != nil {
+		t.Fatalf("parse scope: %v", err)
+	}
+
+	if len(parsed.Sources) != 1 {
+		t.Fatalf("expected 1 source, got %d", len(parsed.Sources))
+	}
+	if parsed.Sources[0].Type != "mcp_query" || parsed.Sources[0].Server != "clickhouse" {
+		t.Fatalf("expected clickhouse mcp_query source, got %#v", parsed.Sources[0])
+	}
+	if parsed.Totals.Doc != 0 || parsed.Totals.MCPQuery != 1 {
+		t.Fatalf("expected totals {doc:0,mcp_query:1}, got %+v", parsed.Totals)
 	}
 }
 

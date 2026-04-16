@@ -82,13 +82,14 @@ func TestBuildSpecialistCommand_BasicStructure(t *testing.T) {
 
 func TestBuildSpecialistSystemPrompt_FollowsAnalystPromptStructure(t *testing.T) {
 	sctx := SpecialistContext{
-		Topic:             "Analyze API rate limiting",
-		ContextID:         "analyze-test123",
-		Model:             "claude-sonnet-4-6",
-		StateDir:          "/tmp/test-state",
-		WorkDir:           "/tmp/workspace-root",
-		SeedSummary:       "API rate limiting implemented across 5 services.",
-		OntologyScopeText: "Your reference documents:\n- doc: API Gateway docs",
+		Topic:                   "Analyze API rate limiting",
+		ContextID:               "analyze-test123",
+		Model:                   "claude-sonnet-4-6",
+		StateDir:                "/tmp/test-state",
+		WorkDir:                 "/tmp/workspace-root",
+		SeedSummary:             "API rate limiting implemented across 5 services.",
+		OntologyScopeText:       "Your reference documents:\n- doc: API Gateway docs",
+		AvailableMCPServersText: "- grafana: Grafana dashboards",
 	}
 
 	perspective := Perspective{
@@ -110,7 +111,7 @@ func TestBuildSpecialistSystemPrompt_FollowsAnalystPromptStructure(t *testing.T)
 
 	prompt := buildSpecialistSystemPrompt(sctx, perspective)
 
-	// Section order: Role → CONTEXT → Reference Documents → Investigation Scope → TASKS → OUTPUT → Protocol
+	// Section order: Role → CONTEXT → Reference Documents → Available MCP Servers → Investigation Scope → TASKS → OUTPUT → Protocol
 	sections := []struct {
 		name    string
 		content string
@@ -119,6 +120,8 @@ func TestBuildSpecialistSystemPrompt_FollowsAnalystPromptStructure(t *testing.T)
 		{"Context", "CONTEXT:\nAPI rate limiting implemented across 5 services."},
 		{"Reference Documents", "### Reference Documents"},
 		{"Ontology Scope", "Your reference documents:\n- doc: API Gateway docs"},
+		{"Available MCP Servers", "### Available MCP Servers"},
+		{"MCP List", "- grafana: Grafana dashboards"},
 		{"Investigation Scope", "Focus on rate limiting configuration, enforcement, and bypass vectors."},
 		{"Tasks", "TASKS:\n1. Map rate limit configurations"},
 		{"Output Format", "OUTPUT:\n## Rate Limit Findings"},
@@ -254,11 +257,12 @@ func TestBuildSpecialistSystemPrompt_NoSelfVerification(t *testing.T) {
 
 func TestBuildSpecialistSystemPrompt_DataSourceConstraint(t *testing.T) {
 	sctx := SpecialistContext{
-		Topic:       "Test topic",
-		ContextID:   "analyze-test",
-		Model:       "claude-sonnet-4-6",
-		StateDir:    "/tmp/test",
-		SeedSummary: "Summary",
+		Topic:                   "Test topic",
+		ContextID:               "analyze-test",
+		Model:                   "claude-sonnet-4-6",
+		StateDir:                "/tmp/test",
+		SeedSummary:             "Summary",
+		AvailableMCPServersText: "- clickhouse: Warehouse queries",
 	}
 
 	perspective := Perspective{
@@ -279,6 +283,12 @@ func TestBuildSpecialistSystemPrompt_DataSourceConstraint(t *testing.T) {
 	// Must contain data source constraint
 	if !strings.Contains(prompt, "Data Source Constraint") {
 		t.Error("prompt must contain data source constraint")
+	}
+	if !strings.Contains(prompt, "\"Reference Documents\" and \"Available MCP Servers\"") {
+		t.Error("prompt must restrict data sources to both prompt sections")
+	}
+	if !strings.Contains(prompt, "Do NOT use `ToolSearch` to discover or call MCP servers not listed in those sections") {
+		t.Error("prompt must forbid MCP discovery outside the allowed sections")
 	}
 	if !strings.Contains(prompt, "MUST only use data sources") {
 		t.Error("prompt must enforce data source restriction")
@@ -313,6 +323,21 @@ func TestBuildSpecialistSystemPrompt_NoOntologyScope(t *testing.T) {
 	// Must contain fallback message
 	if !strings.Contains(prompt, "N/A") {
 		t.Error("prompt must contain N/A fallback when no ontology scope")
+	}
+	if !strings.Contains(prompt, "### Available MCP Servers") {
+		t.Error("prompt must always render Available MCP Servers section")
+	}
+	if strings.Contains(prompt, "no default MCP servers configured") {
+		t.Error("prompt must leave the MCP section empty when no MCP servers exist")
+	}
+	start := strings.Index(prompt, "### Available MCP Servers\n")
+	end := strings.Index(prompt, perspective.Prompt.InvestigationScope+"\n\n")
+	if start == -1 || end == -1 || end < start {
+		t.Fatal("prompt must contain MCP section and investigation scope")
+	}
+	sectionBody := strings.Trim(prompt[start+len("### Available MCP Servers\n"):end], "\n")
+	if sectionBody != "" {
+		t.Errorf("prompt must render an empty MCP section between headings, got %q", sectionBody)
 	}
 }
 
@@ -654,6 +679,9 @@ func TestLoadSpecialistContext(t *testing.T) {
 	if !strings.Contains(ctx.OntologyScopeText, "N/A") {
 		t.Error("OntologyScopeText should have N/A fallback")
 	}
+	if ctx.AvailableMCPServersText != "" {
+		t.Errorf("AvailableMCPServersText = %q, want empty string when no default MCP servers exist", ctx.AvailableMCPServersText)
+	}
 }
 
 func TestBuildSpecialistCommand_FixedModelIgnoresPerspectiveModel(t *testing.T) {
@@ -756,7 +784,7 @@ func TestBuildSpecialistSystemPrompt_ContainsOutputInstructions(t *testing.T) {
 	}
 }
 
-func TestLoadOntologyScopeText_MCPQuerySource(t *testing.T) {
+func TestLoadSpecialistOntologyScopeSections_MCPQuerySource(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	scope := map[string]interface{}{
@@ -784,16 +812,52 @@ func TestLoadOntologyScopeText_MCPQuerySource(t *testing.T) {
 		t.Fatalf("write: %v", err)
 	}
 
-	text := LoadOntologyScopeText(tmpDir)
+	docsText, mcpText := LoadSpecialistOntologyScopeSections(tmpDir)
 
-	// Should contain MCP query source details
-	if !strings.Contains(text, "mcp-query: grafana") {
-		t.Error("should contain mcp-query with server name")
+	if strings.Contains(docsText, "grafana") {
+		t.Error("reference documents section should not contain MCP server details")
 	}
-	if !strings.Contains(text, "Grafana monitoring dashboards") {
-		t.Error("should contain summary")
+	if !strings.Contains(mcpText, "grafana") {
+		t.Error("MCP section should contain server name")
 	}
-	if !strings.Contains(text, "Query metrics and logs") {
-		t.Error("should contain capabilities")
+	if !strings.Contains(mcpText, "Grafana monitoring dashboards") {
+		t.Error("MCP section should contain description")
+	}
+}
+
+func TestLoadSpecialistOntologyScopeSections_EmptyMCPDescriptionIncluded(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	scope := map[string]interface{}{
+		"sources": []map[string]interface{}{
+			{
+				"id":      1,
+				"type":    "doc",
+				"path":    "/repo",
+				"summary": "Repo docs",
+				"status":  "available",
+			},
+			{
+				"id":          2,
+				"type":        "mcp_query",
+				"server_name": "tempo",
+				"summary":     "",
+				"status":      "available",
+			},
+		},
+	}
+
+	data, _ := json.MarshalIndent(scope, "", "  ")
+	if err := os.WriteFile(filepath.Join(tmpDir, "ontology-scope.json"), data, 0644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	docsText, mcpText := LoadSpecialistOntologyScopeSections(tmpDir)
+
+	if !strings.Contains(docsText, "Repo docs") {
+		t.Error("reference documents section should keep doc sources")
+	}
+	if !strings.Contains(mcpText, "- tempo\n") {
+		t.Error("MCP section should include entries even when description is empty")
 	}
 }

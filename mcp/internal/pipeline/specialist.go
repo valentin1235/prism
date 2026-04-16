@@ -46,7 +46,6 @@ type SpecialistCommand struct {
 	// OutputPath is the expected location of findings.json after the specialist completes.
 	OutputPath string
 
-
 	// JSONSchema is the schema string for --json-schema structured output enforcement.
 	JSONSchema string
 }
@@ -81,6 +80,11 @@ type SpecialistContext struct {
 	// for injection into the Reference Documents section.
 	// Empty string if no ontology scope is configured.
 	OntologyScopeText string
+
+	// AvailableMCPServersText is the rendered default MCP server list
+	// for injection into the Available MCP Servers section.
+	// The section is always rendered, even when no MCP servers are configured.
+	AvailableMCPServersText string
 }
 
 // specialistFindingsJSONSchema enforces structured output from specialist subprocesses.
@@ -205,10 +209,122 @@ func LoadSpecialistContext(cfg AnalysisConfig) (SpecialistContext, error) {
 	}
 	ctx.SeedSummary = seed.Summary
 
-	// Build ontology scope text block from ontology-scope.json if it exists
-	ctx.OntologyScopeText = LoadOntologyScopeText(cfg.StateDir)
+	// Build specialist prompt sections from ontology-scope.json if it exists.
+	ctx.OntologyScopeText, ctx.AvailableMCPServersText = LoadSpecialistOntologyScopeSections(cfg.StateDir)
 
 	return ctx, nil
+}
+
+// LoadSpecialistOntologyScopeSections reads ontology-scope.json from the state
+// directory and renders separate text blocks for specialist prompt sections.
+// Reference Documents includes only doc/file/web sources. Available MCP Servers
+// includes only mcp_query sources and returns an empty section body when none exist.
+func LoadSpecialistOntologyScopeSections(stateDir string) (string, string) {
+	scopePath := filepath.Join(stateDir, "ontology-scope.json")
+	data, err := os.ReadFile(scopePath)
+	if err != nil {
+		return "N/A — ontology scope file not found. Analyze using available evidence only.", ""
+	}
+
+	var scope struct {
+		Sources []struct {
+			ID      int    `json:"id"`
+			Type    string `json:"type"`
+			Path    string `json:"path,omitempty"`
+			URL     string `json:"url,omitempty"`
+			Server  string `json:"server_name,omitempty"`
+			Domain  string `json:"domain,omitempty"`
+			Summary string `json:"summary,omitempty"`
+			Status  string `json:"status"`
+			Access  struct {
+				Tools          []string `json:"tools,omitempty"`
+				Instructions   string   `json:"instructions,omitempty"`
+				Capabilities   string   `json:"capabilities,omitempty"`
+				GettingStarted string   `json:"getting_started,omitempty"`
+				ErrorHandling  string   `json:"error_handling,omitempty"`
+				CachedSummary  string   `json:"cached_summary,omitempty"`
+			} `json:"access,omitempty"`
+		} `json:"sources"`
+		CitationFormat map[string]string `json:"citation_format,omitempty"`
+	}
+
+	if err := json.Unmarshal(data, &scope); err != nil {
+		return "N/A — failed to parse ontology scope file. Analyze using available evidence only.", ""
+	}
+
+	var docs strings.Builder
+	docs.WriteString("Your reference documents and data sources:\n\n")
+
+	var mcps strings.Builder
+	mcpCount := 0
+
+	for _, src := range scope.Sources {
+		if src.Status != "available" {
+			continue
+		}
+
+		switch src.Type {
+		case "doc":
+			docs.WriteString(fmt.Sprintf("- doc: %s (%s)\n", src.Summary, src.Status))
+			if src.Path != "" {
+				docs.WriteString(fmt.Sprintf("  Directories: %s\n", src.Path))
+			}
+			if src.Access.Instructions != "" {
+				docs.WriteString(fmt.Sprintf("  Access: %s\n", src.Access.Instructions))
+			}
+			for _, tool := range src.Access.Tools {
+				docs.WriteString(fmt.Sprintf("    %s\n", tool))
+			}
+			docs.WriteString("\n")
+		case "web":
+			docs.WriteString(fmt.Sprintf("- web: %s: %s — %s\n", src.URL, src.Domain, src.Summary))
+			if src.Access.Instructions != "" {
+				docs.WriteString(fmt.Sprintf("  Access: %s\n", src.Access.Instructions))
+			}
+			if src.Access.CachedSummary != "" {
+				docs.WriteString(fmt.Sprintf("  %s\n", src.Access.CachedSummary))
+			}
+			docs.WriteString("\n")
+		case "file":
+			docs.WriteString(fmt.Sprintf("- file: %s: %s — %s\n", src.Path, src.Domain, src.Summary))
+			if src.Access.Instructions != "" {
+				docs.WriteString(fmt.Sprintf("  Access: %s\n", src.Access.Instructions))
+			}
+			if src.Access.CachedSummary != "" {
+				docs.WriteString(fmt.Sprintf("  %s\n", src.Access.CachedSummary))
+			}
+			docs.WriteString("\n")
+		case "mcp_query":
+			mcpCount++
+			if src.Summary == "" {
+				mcps.WriteString(fmt.Sprintf("- %s\n", src.Server))
+				continue
+			}
+			mcps.WriteString(fmt.Sprintf("- %s: %s\n", src.Server, src.Summary))
+		}
+	}
+
+	if len(scope.CitationFormat) > 0 {
+		docs.WriteString("Explore these sources through your perspective's lens.\n")
+		docs.WriteString("Cite findings as: ")
+		keys := make([]string, 0, len(scope.CitationFormat))
+		for k := range scope.CitationFormat {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		formats := make([]string, 0, len(scope.CitationFormat))
+		for _, k := range keys {
+			formats = append(formats, scope.CitationFormat[k])
+		}
+		docs.WriteString(strings.Join(formats, ", "))
+		docs.WriteString(".\n")
+	}
+
+	if mcpCount == 0 {
+		return docs.String(), ""
+	}
+
+	return docs.String(), mcps.String()
 }
 
 // LoadOntologyScopeText reads ontology-scope.json from the state directory
@@ -270,23 +386,10 @@ func LoadOntologyScopeText(stateDir string) string {
 				sb.WriteString(fmt.Sprintf("    %s\n", tool))
 			}
 
-		case "mcp_query":
-			sb.WriteString(fmt.Sprintf("- mcp-query: %s: %s\n", src.Server, src.Summary))
-			if len(src.Access.Tools) > 0 {
-				sb.WriteString(fmt.Sprintf("  Tools (read-only): %s\n", strings.Join(src.Access.Tools, ", ")))
-			}
-			if src.Access.Instructions != "" {
-				sb.WriteString(fmt.Sprintf("  Access: %s\n", src.Access.Instructions))
-			}
-			if src.Access.Capabilities != "" {
-				sb.WriteString(fmt.Sprintf("  Capabilities: %s\n", src.Access.Capabilities))
-			}
-			if src.Access.GettingStarted != "" {
-				sb.WriteString(fmt.Sprintf("  Getting started: %s\n", src.Access.GettingStarted))
-			}
-			if src.Access.ErrorHandling != "" {
-				sb.WriteString(fmt.Sprintf("  Error handling: %s\n", src.Access.ErrorHandling))
-			}
+		// mcp_query sources are handled by LoadSpecialistOntologyScopeSections
+		// and rendered in the dedicated "Available MCP Servers" section.
+		// Synthesis uses LoadOntologyScopeText but does not call MCP tools,
+		// so MCP entries are intentionally excluded here.
 
 		case "web":
 			sb.WriteString(fmt.Sprintf("- web: %s: %s — %s\n", src.URL, src.Domain, src.Summary))
@@ -393,21 +496,26 @@ func buildSpecialistSystemPrompt(sctx SpecialistContext, perspective Perspective
 	}
 	sb.WriteString("\n\n")
 
-	// --- Section 4: Investigation Scope ---
+	// --- Section 4: Available MCP Servers ---
+	sb.WriteString("### Available MCP Servers\n")
+	sb.WriteString(sctx.AvailableMCPServersText)
+	sb.WriteString("\n\n")
+
+	// --- Section 5: Investigation Scope ---
 	sb.WriteString(perspective.Prompt.InvestigationScope)
 	sb.WriteString("\n\n")
 
-	// --- Section 5: TASKS ---
+	// --- Section 6: TASKS ---
 	sb.WriteString("TASKS:\n")
 	sb.WriteString(perspective.Prompt.Tasks)
 	sb.WriteString("\n\n")
 
-	// --- Section 6: OUTPUT ---
+	// --- Section 7: OUTPUT ---
 	sb.WriteString("OUTPUT:\n")
 	sb.WriteString(perspective.Prompt.OutputFormat)
 	sb.WriteString("\n\n")
 
-	// --- Section 7: Finding Protocol (adapted for MCP server orchestration) ---
+	// --- Section 8: Finding Protocol (adapted for MCP server orchestration) ---
 	sb.WriteString(buildFindingProtocol(sctx, perspective))
 
 	return sb.String()
@@ -434,8 +542,8 @@ func buildFindingProtocol(sctx SpecialistContext, perspective Perspective) strin
 
 	// Data source constraint
 	sb.WriteString("## Data Source Constraint\n\n")
-	sb.WriteString("You MUST only use data sources listed in the \"Reference Documents\" section above. ")
-	sb.WriteString("Do NOT use `ToolSearch` to discover or call MCP servers not in your Reference Documents. ")
+	sb.WriteString("You MUST only use data sources listed in the \"Reference Documents\" and \"Available MCP Servers\" sections above. ")
+	sb.WriteString("Do NOT use `ToolSearch` to discover or call MCP servers not listed in those sections. ")
 	sb.WriteString("If a data source is not listed there, it was not selected for this analysis and MUST NOT be used.\n\n")
 
 	// Investigation steps
