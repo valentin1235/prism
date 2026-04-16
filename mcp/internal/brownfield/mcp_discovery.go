@@ -17,8 +17,10 @@ type codexMCPListEntry struct {
 	Name      string `json:"name"`
 	Enabled   bool   `json:"enabled"`
 	Transport struct {
-		Type    string `json:"type"`
-		Command string `json:"command"`
+		Type    string            `json:"type"`
+		Command string            `json:"command"`
+		Args    []string          `json:"args"`
+		Env     map[string]string `json:"env"`
 	} `json:"transport"`
 }
 
@@ -33,12 +35,17 @@ type claudeMCPServer struct {
 }
 
 // DiscoverMCPServers resolves the currently configured MCP servers for the active runtime.
-func DiscoverMCPServers(ctx context.Context) ([]MCPServer, error) {
+// When adaptor is non-empty it overrides the config-file backend selection.
+func DiscoverMCPServers(ctx context.Context, adaptor string) ([]MCPServer, error) {
+	backend := strings.ToLower(strings.TrimSpace(adaptor))
+	if backend == "" {
+		backend = config.ResolveRuntimeBackend()
+	}
 	var (
 		servers []MCPServer
 		err     error
 	)
-	if config.ResolveRuntimeBackend() == "codex" {
+	if backend == "codex" {
 		servers, err = discoverCodexMCPServers(ctx)
 	} else {
 		servers, err = discoverClaudeMCPServers()
@@ -73,6 +80,8 @@ func discoverCodexMCPServers(ctx context.Context) ([]MCPServer, error) {
 			Visible:      entry.Enabled,
 			VisibilityOK: true,
 			Command:      entry.Transport.Command,
+			Args:         entry.Transport.Args,
+			Env:          entry.Transport.Env,
 		})
 	}
 	return servers, nil

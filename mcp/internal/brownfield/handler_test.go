@@ -15,7 +15,7 @@ import (
 )
 
 type testHandlerOpts struct {
-	mcpServers func(context.Context) ([]MCPServer, error)
+	mcpServers func(context.Context, string) ([]MCPServer, error)
 	repoScan   func(string) ([]Repo, error)
 }
 
@@ -39,7 +39,7 @@ func newTestHandlerStore(t *testing.T, opts ...testHandlerOpts) *Store {
 	origDiscover := discoverMCPServers
 
 	scanHomeForRepos = func(string) ([]Repo, error) { return nil, nil }
-	discoverMCPServers = func(context.Context) ([]MCPServer, error) { return nil, nil }
+	discoverMCPServers = func(context.Context, string) ([]MCPServer, error) { return nil, nil }
 
 	if len(opts) > 0 {
 		if opts[0].mcpServers != nil {
@@ -106,7 +106,7 @@ func TestHandlerScanFormat(t *testing.T) {
 
 func TestHandlerScanNoReposFound(t *testing.T) {
 	s := newTestHandlerStore(t, testHandlerOpts{
-		mcpServers: func(context.Context) ([]MCPServer, error) {
+		mcpServers: func(context.Context, string) ([]MCPServer, error) {
 			return []MCPServer{
 				{Name: "alpha", Desc: ""},
 				{Name: "beta", Desc: ""},
@@ -172,7 +172,7 @@ func TestHandlerScanStoresOneRowPerDiscoveredMCP(t *testing.T) {
 		repoScan: func(string) ([]Repo, error) {
 			return []Repo{{Path: "/tmp/repo1", Name: "repo1"}}, nil
 		},
-		mcpServers: func(context.Context) ([]MCPServer, error) {
+		mcpServers: func(context.Context, string) ([]MCPServer, error) {
 			return []MCPServer{
 				{Name: "alpha", Desc: ""},
 				{Name: "beta", Desc: ""},
@@ -226,7 +226,7 @@ func TestHandlerScanAppliesDeterministicNameCollisionPolicy(t *testing.T) {
 				repoScan: func(string) ([]Repo, error) {
 					return []Repo{{Path: "/tmp/repo1", Name: "repo1"}}, nil
 				},
-				mcpServers: func(context.Context) ([]MCPServer, error) {
+				mcpServers: func(context.Context, string) ([]MCPServer, error) {
 					return tc.servers, nil
 				},
 			})
@@ -281,7 +281,7 @@ func TestHandlerScanStoresOnlyVisibleDeduplicatedMCPServers(t *testing.T) {
 		repoScan: func(string) ([]Repo, error) {
 			return []Repo{{Path: "/tmp/repo1", Name: "repo1"}}, nil
 		},
-		mcpServers: func(context.Context) ([]MCPServer, error) {
+		mcpServers: func(context.Context, string) ([]MCPServer, error) {
 			return []MCPServer{
 				{Name: "alpha", Path: "/tmp/alpha-a", Desc: "first desc", Visible: true, VisibilityOK: true},
 				{Name: "beta", Path: "/tmp/beta-hidden", Desc: "hidden desc", Visible: false, VisibilityOK: true},
@@ -321,7 +321,7 @@ func TestHandlerScanUsesSharedRegisteredAtAcrossSnapshotRows(t *testing.T) {
 		repoScan: func(string) ([]Repo, error) {
 			return []Repo{{Path: "/tmp/repo1", Name: "repo1"}}, nil
 		},
-		mcpServers: func(context.Context) ([]MCPServer, error) {
+		mcpServers: func(context.Context, string) ([]MCPServer, error) {
 			return []MCPServer{
 				{Name: "alpha", Desc: ""},
 				{Name: "beta", Desc: ""},
@@ -362,7 +362,7 @@ func TestHandlerScanRecomputesMCPDefaultsAsFalseWithoutDefaultSource(t *testing.
 		repoScan: func(string) ([]Repo, error) {
 			return []Repo{{Path: "/tmp/repo1", Name: "repo1"}}, nil
 		},
-		mcpServers: func(context.Context) ([]MCPServer, error) {
+		mcpServers: func(context.Context, string) ([]MCPServer, error) {
 			return []MCPServer{
 				{Name: "alpha", Desc: "Alpha tools", IsDefault: true},
 				{Name: "beta", Desc: "Beta tools"},
@@ -400,7 +400,7 @@ func TestHandlerScanStoresUnknownMCPPathAsNull(t *testing.T) {
 		repoScan: func(string) ([]Repo, error) {
 			return []Repo{{Path: "/tmp/repo1", Name: "repo1"}}, nil
 		},
-		mcpServers: func(context.Context) ([]MCPServer, error) {
+		mcpServers: func(context.Context, string) ([]MCPServer, error) {
 			return []MCPServer{
 				{Name: "alpha", Path: "   ", Desc: ""},
 			}, nil
@@ -432,7 +432,7 @@ func TestHandlerScanKeepsVisibleMCPWhenToolMetadataUnavailable(t *testing.T) {
 		repoScan: func(string) ([]Repo, error) {
 			return []Repo{{Path: "/tmp/repo1", Name: "repo1"}}, nil
 		},
-		mcpServers: func(context.Context) ([]MCPServer, error) {
+		mcpServers: func(context.Context, string) ([]MCPServer, error) {
 			return []MCPServer{
 				{
 					Name: "slack",
@@ -472,7 +472,7 @@ func TestHandlerScanUsesVisibilityOnlyForSnapshotMembership(t *testing.T) {
 		repoScan: func(string) ([]Repo, error) {
 			return []Repo{{Path: "/tmp/repo1", Name: "repo1"}}, nil
 		},
-		mcpServers: func(context.Context) ([]MCPServer, error) {
+		mcpServers: func(context.Context, string) ([]MCPServer, error) {
 			return []MCPServer{
 				{Name: "filesystem", Desc: "Reads and writes local files.", Visible: true, VisibilityOK: true},
 				{Name: "github", Desc: "", Visible: true, VisibilityOK: true},
@@ -513,7 +513,7 @@ func TestHandlerScanRescanRemovesStaleMCPRows(t *testing.T) {
 		repoScan: func(string) ([]Repo, error) {
 			return []Repo{{Path: "/tmp/repo1", Name: "repo1"}}, nil
 		},
-		mcpServers: func(context.Context) ([]MCPServer, error) {
+		mcpServers: func(context.Context, string) ([]MCPServer, error) {
 			return []MCPServer{
 				{Name: "alpha", Desc: ""},
 				{Name: "beta", Desc: ""},
@@ -529,7 +529,7 @@ func TestHandlerScanRescanRemovesStaleMCPRows(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	discoverMCPServers = func(context.Context) ([]MCPServer, error) {
+	discoverMCPServers = func(context.Context, string) ([]MCPServer, error) {
 		return []MCPServer{
 			{Name: "beta", Desc: ""},
 		}, nil
@@ -570,7 +570,7 @@ func TestHandlerScanRescanToEmptyRemovesAllMCPRows(t *testing.T) {
 		repoScan: func(string) ([]Repo, error) {
 			return []Repo{{Path: "/tmp/repo1", Name: "repo1"}}, nil
 		},
-		mcpServers: func(context.Context) ([]MCPServer, error) {
+		mcpServers: func(context.Context, string) ([]MCPServer, error) {
 			return []MCPServer{
 				{Name: "alpha", Desc: ""},
 				{Name: "beta", Desc: ""},
@@ -585,7 +585,7 @@ func TestHandlerScanRescanToEmptyRemovesAllMCPRows(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	discoverMCPServers = func(context.Context) ([]MCPServer, error) {
+	discoverMCPServers = func(context.Context, string) ([]MCPServer, error) {
 		return nil, nil
 	}
 
@@ -633,7 +633,7 @@ func TestHandlerScanSnapshotMatchesDeduplicatedVisibleNameSet(t *testing.T) {
 		repoScan: func(string) ([]Repo, error) {
 			return []Repo{{Path: "/tmp/repo1", Name: "repo1"}}, nil
 		},
-		mcpServers: func(context.Context) ([]MCPServer, error) {
+		mcpServers: func(context.Context, string) ([]MCPServer, error) {
 			return servers, nil
 		},
 	})
@@ -696,7 +696,7 @@ func TestHandlerScanMigratesLegacySchemaBeforeScan(t *testing.T) {
 	scanHomeForRepos = func(string) ([]Repo, error) {
 		return []Repo{{Path: "/tmp/repo1", Name: "repo1"}}, nil
 	}
-	discoverMCPServers = func(context.Context) ([]MCPServer, error) {
+	discoverMCPServers = func(context.Context, string) ([]MCPServer, error) {
 		return []MCPServer{
 			{Name: "alpha", Path: "   ", Desc: ""},
 		}, nil

@@ -57,10 +57,11 @@ This may take a moment...
 **Implementation — use MCP tools only, do NOT use CLI or Python scripts:**
 
 1. Load the brownfield MCP tool: `ToolSearch query: "+prism brownfield"`
-2. Call scan+register:
+2. Select who you are: `codex` if running in Codex, `claude` if running in Claude Code. Store as `{ADAPTOR}`.
+3. Call scan+register:
    ```
    Tool: prism_brownfield
-   Arguments: { "action": "scan" }
+   Arguments: { "action": "scan", "adaptor": "{ADAPTOR}" }
    ```
    This scans `~/` for GitHub repos and registers them in DB. Existing defaults are preserved.
 

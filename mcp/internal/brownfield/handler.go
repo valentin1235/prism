@@ -20,7 +20,7 @@ var (
 	storeErr  error
 
 	scanHomeForRepos   = ScanHomeForRepos
-	discoverMCPServers = DiscoverMCPServers
+	discoverMCPServers = DiscoverMCPServers // func(ctx, adaptor) ([]MCPServer, error)
 )
 
 // InitStore opens the brownfield database at dbPath. Safe to call multiple
@@ -119,8 +119,10 @@ func handleScan(ctx context.Context, args map[string]interface{}) (*mcp.CallTool
 	// Register repos first so MCP failures don't block repo registration.
 	_, bulkErr := store.BulkRegister(repos)
 
+	adaptor, _ := args["adaptor"].(string)
+
 	var mcpErr error
-	servers, discoverErr := discoverMCPServers(ctx)
+	servers, discoverErr := discoverMCPServers(ctx, adaptor)
 	if discoverErr != nil {
 		mcpErr = fmt.Errorf("mcp discovery: %w", discoverErr)
 	}

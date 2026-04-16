@@ -1,0 +1,18 @@
+{
+  "description": "Auto-bump plugin version on git push",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "if": "Bash(git push)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/bump-version.sh",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}
