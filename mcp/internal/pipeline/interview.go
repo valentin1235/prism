@@ -226,9 +226,8 @@ func LoadInterviewContext(cfg AnalysisConfig) (InterviewContext, error) {
 	}
 	ctx.SeedSummary = seed.Summary
 
-	// Build ontology scope text block
-	ctx.OntologyScopeText = LoadOntologyScopeText(cfg.StateDir)
-	ctx.AvailableMCPServersText = LoadAvailableMCPServersText(cfg.StateDir)
+	// Build ontology scope text blocks — split docs and MCP into separate sections
+	ctx.OntologyScopeText, ctx.AvailableMCPServersText = LoadSpecialistOntologyScopeSections(cfg.StateDir)
 
 	return ctx, nil
 }
@@ -334,8 +333,8 @@ func buildInterviewSystemPrompt(ictx InterviewContext, perspective Perspective, 
 
 	// --- Section 7: Data Source Constraint ---
 	sb.WriteString("## Data Source Constraint\n\n")
-	sb.WriteString("You MUST only use data sources listed in the \"Reference Documents\" section above. ")
-	sb.WriteString("Do NOT use `ToolSearch` to discover or call MCP servers not in your Reference Documents. ")
+	sb.WriteString("You MUST only use data sources listed in the \"Reference Documents\" and \"Available MCP Servers\" sections above. ")
+	sb.WriteString("Do NOT use `ToolSearch` to discover or call MCP servers not listed in those sections. ")
 	sb.WriteString("If a data source is not listed there, it was not selected for this analysis and MUST NOT be used.\n\n")
 
 	// --- Section 8: Verification Protocol ---

@@ -235,6 +235,12 @@ func TestBuildInterviewCommand_DataSourceConstraint(t *testing.T) {
 	if !strings.Contains(cmd.SystemPrompt, "Data Source Constraint") {
 		t.Error("SystemPrompt should contain data source constraint")
 	}
+	if !strings.Contains(cmd.SystemPrompt, "\"Reference Documents\" and \"Available MCP Servers\"") {
+		t.Error("SystemPrompt must restrict data sources to both prompt sections")
+	}
+	if !strings.Contains(cmd.SystemPrompt, "Do NOT use `ToolSearch` to discover or call MCP servers not listed in those sections") {
+		t.Error("SystemPrompt must forbid MCP discovery outside the allowed sections")
+	}
 	if !strings.Contains(cmd.SystemPrompt, "MUST only use data sources") {
 		t.Error("SystemPrompt should enforce data source restriction")
 	}
