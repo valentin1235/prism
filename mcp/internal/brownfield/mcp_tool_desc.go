@@ -79,7 +79,13 @@ func resolveMCPServerToolMetadataDescription(ctx context.Context, server MCPServ
 	resolveCtx, cancel := context.WithTimeout(ctx, mcpToolMetadataResolutionTimeout)
 	defer cancel()
 
-	client, err := newMCPToolListingClient("/bin/sh", "-lc", commandText)
+	// Build full shell command: command + args
+	fullCommand := commandText
+	for _, arg := range server.Args {
+		fullCommand += " " + shellQuote(arg)
+	}
+
+	client, err := newMCPToolListingClient("/bin/sh", "-lc", fullCommand)
 	if err != nil {
 		return "", err
 	}
@@ -156,4 +162,8 @@ func summarizeResolvedMCPTool(tool mcp.Tool) string {
 		return strings.TrimRight(desc, ".!? ")
 	}
 	return strings.TrimSpace(tool.Name)
+}
+
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
 }
