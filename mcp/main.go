@@ -109,6 +109,7 @@ func main() {
 				mcp.WithString("indices", mcp.Description("Comma-separated rowid list for set_defaults (e.g., '6,18,19')")),
 				mcp.WithNumber("offset", mcp.Description("Number of rows to skip for pagination (for query)")),
 				mcp.WithNumber("limit", mcp.Description("Maximum rows to return (for query). 0 = no limit")),
+				mcp.WithString("adaptor", mcp.Description("Host runtime: 'claude' or 'codex'. Determines which MCP discovery method to use.")),
 			),
 			brownfield.HandleBrownfield,
 		)
