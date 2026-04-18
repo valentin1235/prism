@@ -17,6 +17,8 @@ When the user types `psm prd` or `psm prd ...`, read `skills/prd/SKILL.md` and f
 
 When the user types `psm setup`, read `skills/setup/SKILL.md` and follow its instructions exactly.
 
+When the user types `psm update`, read `skills/update/SKILL.md` and follow its instructions exactly.
+
 When the user types any of these commands, read the corresponding repo skill file
 from `skills/` and follow it exactly:
 
@@ -27,6 +29,7 @@ from `skills/` and follow it exactly:
 | `psm incident ...` | Read `skills/incident/SKILL.md` and follow it |
 | `psm prd ...` | Read `skills/prd/SKILL.md` and follow it |
 | `psm setup ...` | Read `skills/setup/SKILL.md` and follow it |
+| `psm update` | Read `skills/update/SKILL.md` and follow it |
 
 ## /prism Commands (Dev Mode)
 
@@ -40,6 +43,7 @@ from `skills/` and follow it exactly:
 | `/prism:incident ...` | Read `skills/incident/SKILL.md` and follow it |
 | `/prism:prd ...` | Read `skills/prd/SKILL.md` and follow it |
 | `/prism:setup ...` | Read `skills/setup/SKILL.md` and follow it |
+| `/prism:update` | Read `skills/update/SKILL.md` and follow it |
 
 **Important**:
 - Treat `psm analyze` as a command, not as natural language.
