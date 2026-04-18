@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "if": "Bash(git push*)",
+            "if": "Bash(*git push*)",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/bump-version.sh",
             "timeout": 15
           }
