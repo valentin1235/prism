@@ -13,9 +13,13 @@ type LLMRequest struct {
 	JSONSchema      string
 	AllowedTools    []string
 	DisallowedTools []string
-	Cwd             string
-	Env             map[string]string
-	OnMessage       func(msgType, detail string)
+	// Tools controls the set of tools available to the model via --tools flag.
+	// "" (empty string) disables all tools. Non-empty value specifies allowed tools
+	// (e.g. "Read,Grep,Glob,Bash"). Nil pointer means default (all tools available).
+	Tools *string
+	Cwd   string
+	Env   map[string]string
+	OnMessage func(msgType, detail string)
 }
 
 // ClaudeOptions is retained as a type alias so existing callers/tests keep compiling

@@ -21,6 +21,14 @@ var nonFilesystemToolRoutes = []string{
 	"Edit",
 }
 
+// noTools disables all tools via --tools "".
+var noTools = ptr("")
+
+// filesystemTools limits available tools to filesystem operations via --tools.
+var filesystemTools = ptr("Read,Grep,Glob,Bash")
+
+func ptr(s string) *string { return &s }
+
 // FilterEnv returns os.Environ() with the specified keys removed.
 func FilterEnv(keys ...string) []string {
 	env := os.Environ()
@@ -48,6 +56,7 @@ func FilterEnv(keys ...string) []string {
 func QueryLLM(ctx context.Context, prompt string) (string, error) {
 	return QuerySync(ctx, prompt, ClaudeOptions{
 		Env:          runtimeEnvOverrides(""),
+		Tools:        noTools,
 		AllowedTools: []string{},
 	})
 }
@@ -57,6 +66,7 @@ func QueryLLMWithSystemPrompt(ctx context.Context, systemPrompt, userPrompt stri
 	return QuerySync(ctx, userPrompt, ClaudeOptions{
 		SystemPrompt: systemPrompt,
 		Env:          runtimeEnvOverrides(""),
+		Tools:        noTools,
 		AllowedTools: []string{},
 	})
 }
@@ -67,6 +77,7 @@ func QueryLLMScoped(ctx context.Context, stateDir, model, prompt string) (string
 		Model:        model,
 		Cwd:          stateDir,
 		Env:          runtimeEnvOverrides(""),
+		Tools:        noTools,
 		AllowedTools: []string{},
 	})
 }
@@ -83,6 +94,7 @@ func QueryLLMScopedWithSystemPromptAdaptor(ctx context.Context, stateDir, model,
 		SystemPrompt: systemPrompt,
 		Cwd:          stateDir,
 		Env:          runtimeEnvOverrides(adaptor),
+		Tools:        noTools,
 		AllowedTools: []string{},
 	})
 }
@@ -99,6 +111,7 @@ func QueryLLMScopedWithSchemaAdaptor(ctx context.Context, stateDir, model, adapt
 		JSONSchema:   jsonSchema,
 		Cwd:          stateDir,
 		Env:          runtimeEnvOverrides(adaptor),
+		Tools:        noTools,
 		AllowedTools: []string{},
 	})
 }
@@ -116,6 +129,7 @@ func QueryLLMScopedWithToolsAndSchemaAdaptor(ctx context.Context, stateDir, mode
 		JSONSchema:      jsonSchema,
 		PermissionMode:  "bypassPermissions",
 		Env:             runtimeEnvOverrides(adaptor),
+		Tools:           filesystemTools,
 		AllowedTools:    analysisFilesystemTools,
 		DisallowedTools: nonFilesystemToolRoutes,
 		Cwd:             stateDir,

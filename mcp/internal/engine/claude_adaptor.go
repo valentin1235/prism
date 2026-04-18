@@ -170,6 +170,9 @@ func (ClaudeAdaptor) BuildCLIArgs(req LLMRequest, outputPath, schemaPath string)
 	if req.SystemPrompt != "" {
 		args = append(args, "--system-prompt", req.SystemPrompt)
 	}
+	if req.Tools != nil {
+		args = append(args, "--tools", *req.Tools)
+	}
 	if len(req.AllowedTools) > 0 {
 		args = append(args, "--allowedTools", strings.Join(req.AllowedTools, ","))
 	}
