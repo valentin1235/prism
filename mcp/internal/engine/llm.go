@@ -12,9 +12,20 @@ import (
 
 var analysisFilesystemTools = []string{"Glob", "Grep", "Read", "Bash"}
 
+var analysisFilesystemAndMCPTools = []string{"Glob", "Grep", "Read", "Bash", "ToolSearch"}
+
 var nonFilesystemToolRoutes = []string{
 	"MCP",
 	"ToolSearch",
+	"WebFetch",
+	"Browser",
+	"Write",
+	"Edit",
+}
+
+// nonFilesystemToolRoutesExceptMCP is like nonFilesystemToolRoutes but allows
+// MCP and ToolSearch so specialists can query MCP servers listed in ontology scope.
+var nonFilesystemToolRoutesExceptMCP = []string{
 	"WebFetch",
 	"Browser",
 	"Write",
@@ -26,6 +37,9 @@ var noTools = ptr("")
 
 // filesystemTools limits available tools to filesystem operations via --tools.
 var filesystemTools = ptr("Read,Grep,Glob,Bash")
+
+// filesystemAndMCPTools extends filesystemTools with MCP and ToolSearch access.
+var filesystemAndMCPTools = ptr("Read,Grep,Glob,Bash,ToolSearch,mcp")
 
 func ptr(s string) *string { return &s }
 
@@ -132,6 +146,23 @@ func QueryLLMScopedWithToolsAndSchemaAdaptor(ctx context.Context, stateDir, mode
 		Tools:           filesystemTools,
 		AllowedTools:    analysisFilesystemTools,
 		DisallowedTools: nonFilesystemToolRoutes,
+		Cwd:             stateDir,
+	})
+}
+
+// QueryLLMScopedWithToolsAndMCPAdaptor is like QueryLLMScopedWithToolsAndSchemaAdaptor
+// but additionally allows MCP tool access and ToolSearch, enabling specialists to
+// call MCP servers listed in the ontology scope.
+func QueryLLMScopedWithToolsAndMCPAdaptor(ctx context.Context, stateDir, model, adaptor, jsonSchema, systemPrompt, userPrompt string) (string, error) {
+	return QuerySync(ctx, userPrompt, ClaudeOptions{
+		Model:           model,
+		SystemPrompt:    systemPrompt,
+		JSONSchema:      jsonSchema,
+		PermissionMode:  "bypassPermissions",
+		Env:             runtimeEnvOverrides(adaptor),
+		Tools:           filesystemAndMCPTools,
+		AllowedTools:    analysisFilesystemAndMCPTools,
+		DisallowedTools: nonFilesystemToolRoutesExceptMCP,
 		Cwd:             stateDir,
 	})
 }

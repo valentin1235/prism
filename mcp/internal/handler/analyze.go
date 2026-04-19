@@ -962,12 +962,21 @@ func buildOntologyScopeFromBrownfieldEntries(entries []brownfield.Entry) (string
 			})
 		case "mcp":
 			mcpCount++
+			desc := entry.Desc
+			if desc == "" {
+				desc = "MCP server: " + entry.Name
+			}
 			sources = append(sources, source{
 				ID:      len(sources) + 1,
 				Type:    "mcp_query",
 				Server:  entry.Name,
-				Summary: entry.Desc,
+				Domain:  entry.Name,
+				Summary: desc,
 				Status:  "available",
+				Access: accessInfo{
+					Tools:        []string{fmt.Sprintf("mcp__%s__*", entry.Name)},
+					Instructions: fmt.Sprintf("Call ToolSearch(query=\"+%s\") to discover available tools for this MCP server, then call the needed tool.", entry.Name),
+				},
 			})
 		}
 	}

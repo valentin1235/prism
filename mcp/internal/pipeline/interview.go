@@ -227,7 +227,7 @@ func LoadInterviewContext(cfg AnalysisConfig) (InterviewContext, error) {
 	ctx.SeedSummary = seed.Summary
 
 	// Build ontology scope text blocks — split docs and MCP into separate sections
-	ctx.OntologyScopeText, ctx.AvailableMCPServersText = LoadSpecialistOntologyScopeSections(cfg.StateDir)
+	ctx.OntologyScopeText, ctx.AvailableMCPServersText, _ = LoadSpecialistOntologyScopeSections(cfg.StateDir)
 
 	return ctx, nil
 }
