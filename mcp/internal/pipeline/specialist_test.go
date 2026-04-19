@@ -812,7 +812,7 @@ func TestLoadSpecialistOntologyScopeSections_MCPQuerySource(t *testing.T) {
 		t.Fatalf("write: %v", err)
 	}
 
-	docsText, mcpText := LoadSpecialistOntologyScopeSections(tmpDir)
+	docsText, mcpText, _ := LoadSpecialistOntologyScopeSections(tmpDir)
 
 	if strings.Contains(docsText, "grafana") {
 		t.Error("reference documents section should not contain MCP server details")
@@ -852,7 +852,7 @@ func TestLoadSpecialistOntologyScopeSections_EmptyMCPDescriptionIncluded(t *test
 		t.Fatalf("write: %v", err)
 	}
 
-	docsText, mcpText := LoadSpecialistOntologyScopeSections(tmpDir)
+	docsText, mcpText, _ := LoadSpecialistOntologyScopeSections(tmpDir)
 
 	if !strings.Contains(docsText, "Repo docs") {
 		t.Error("reference documents section should keep doc sources")

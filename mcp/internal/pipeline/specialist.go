@@ -48,6 +48,10 @@ type SpecialistCommand struct {
 
 	// JSONSchema is the schema string for --json-schema structured output enforcement.
 	JSONSchema string
+
+	// MCPEnabled indicates that this specialist should have MCP tool access
+	// because the ontology scope contains mcp_query sources.
+	MCPEnabled bool
 }
 
 // SpecialistContext holds the shared context needed to build specialist commands
@@ -85,6 +89,10 @@ type SpecialistContext struct {
 	// for injection into the Available MCP Servers section.
 	// The section is always rendered, even when no MCP servers are configured.
 	AvailableMCPServersText string
+
+	// HasMCPSources indicates that ontology scope contains mcp_query sources,
+	// meaning specialists should be launched with MCP tool access enabled.
+	HasMCPSources bool
 }
 
 // specialistFindingsJSONSchema enforces structured output from specialist subprocesses.
@@ -210,7 +218,7 @@ func LoadSpecialistContext(cfg AnalysisConfig) (SpecialistContext, error) {
 	ctx.SeedSummary = seed.Summary
 
 	// Build specialist prompt sections from ontology-scope.json if it exists.
-	ctx.OntologyScopeText, ctx.AvailableMCPServersText = LoadSpecialistOntologyScopeSections(cfg.StateDir)
+	ctx.OntologyScopeText, ctx.AvailableMCPServersText, ctx.HasMCPSources = LoadSpecialistOntologyScopeSections(cfg.StateDir)
 
 	return ctx, nil
 }
@@ -219,11 +227,12 @@ func LoadSpecialistContext(cfg AnalysisConfig) (SpecialistContext, error) {
 // directory and renders separate text blocks for specialist prompt sections.
 // Reference Documents includes only doc/file/web sources. Available MCP Servers
 // includes only mcp_query sources and returns an empty section body when none exist.
-func LoadSpecialistOntologyScopeSections(stateDir string) (string, string) {
+// The third return value indicates whether mcp_query sources were found.
+func LoadSpecialistOntologyScopeSections(stateDir string) (string, string, bool) {
 	scopePath := filepath.Join(stateDir, "ontology-scope.json")
 	data, err := os.ReadFile(scopePath)
 	if err != nil {
-		return "N/A — ontology scope file not found. Analyze using available evidence only.", ""
+		return "N/A — ontology scope file not found. Analyze using available evidence only.", "", false
 	}
 
 	var scope struct {
@@ -249,7 +258,7 @@ func LoadSpecialistOntologyScopeSections(stateDir string) (string, string) {
 	}
 
 	if err := json.Unmarshal(data, &scope); err != nil {
-		return "N/A — failed to parse ontology scope file. Analyze using available evidence only.", ""
+		return "N/A — failed to parse ontology scope file. Analyze using available evidence only.", "", false
 	}
 
 	var docs strings.Builder
@@ -327,10 +336,10 @@ func LoadSpecialistOntologyScopeSections(stateDir string) (string, string) {
 	}
 
 	if mcpCount == 0 {
-		return docs.String(), ""
+		return docs.String(), "", false
 	}
 
-	return docs.String(), mcps.String()
+	return docs.String(), mcps.String(), true
 }
 
 // LoadOntologyScopeText reads ontology-scope.json from the state directory
@@ -592,6 +601,7 @@ func BuildAllSpecialistCommands(cfg AnalysisConfig, perspectives []Perspective) 
 		}
 
 		cmd := BuildSpecialistCommand(sctx, p)
+		cmd.MCPEnabled = sctx.HasMCPSources
 		commands = append(commands, cmd)
 	}
 
@@ -630,15 +640,20 @@ func RunSpecialistSession(ctx context.Context, task *taskpkg.AnalysisTask, cmd S
 
 	// Run claude CLI with tool access and structured output.
 	// The ctx already carries a per-job timeout from the ParallelExecutor.
-	rawOutput, err := engine.QueryLLMScopedWithToolsAndSchemaAdaptor(
-		ctx,
-		cmd.WorkDir,
-		cmd.Model,
-		cmd.Adaptor,
-		cmd.JSONSchema,
-		cmd.SystemPrompt,
-		cmd.UserPrompt,
-	)
+	// When ontology scope includes MCP sources, enable MCP/ToolSearch access.
+	var rawOutput string
+	var err error
+	if cmd.MCPEnabled {
+		rawOutput, err = engine.QueryLLMScopedWithToolsAndMCPAdaptor(
+			ctx, cmd.WorkDir, cmd.Model, cmd.Adaptor,
+			cmd.JSONSchema, cmd.SystemPrompt, cmd.UserPrompt,
+		)
+	} else {
+		rawOutput, err = engine.QueryLLMScopedWithToolsAndSchemaAdaptor(
+			ctx, cmd.WorkDir, cmd.Model, cmd.Adaptor,
+			cmd.JSONSchema, cmd.SystemPrompt, cmd.UserPrompt,
+		)
+	}
 	if err != nil {
 		return fmt.Errorf("specialist %s subprocess: %w", cmd.PerspectiveID, err)
 	}
