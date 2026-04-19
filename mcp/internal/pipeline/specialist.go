@@ -298,9 +298,15 @@ func LoadSpecialistOntologyScopeSections(stateDir string) (string, string) {
 			mcpCount++
 			if src.Summary == "" {
 				mcps.WriteString(fmt.Sprintf("- %s\n", src.Server))
-				continue
+			} else {
+				mcps.WriteString(fmt.Sprintf("- %s: %s\n", src.Server, src.Summary))
 			}
-			mcps.WriteString(fmt.Sprintf("- %s: %s\n", src.Server, src.Summary))
+			if src.Access.Instructions != "" {
+				mcps.WriteString(fmt.Sprintf("  Access: %s\n", src.Access.Instructions))
+			}
+			for _, tool := range src.Access.Tools {
+				mcps.WriteString(fmt.Sprintf("    %s\n", tool))
+			}
 		}
 	}
 
